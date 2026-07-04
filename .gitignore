@@ -26,6 +26,7 @@ data/*
 scripts/*
 !scripts/convert_nc_to_zarr.py
 
+
 *.md
 !README.md
 !skills/
@@ -35,7 +36,3 @@ benchmarking/
 
 docs/
 tests/
-!tests/
-!tests/**
-!apps/web/tests/
-!apps/web/tests/**
