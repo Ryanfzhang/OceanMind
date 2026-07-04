@@ -1,0 +1,33 @@
+id: ecs_surface_ts_watermasses
+name: East China Sea Surface T-S Watermass Bins
+description: >
+  Default named water-mass bins for tile-level event association using
+  temperature-salinity ranges only. Overlapping bins are resolved by
+  nearest-center assignment in T-S space when multiple bins match or when a
+  point falls outside every strict bin.
+classification_axes: [temp, salt]
+bins:
+  - id: coastal_fresh_surface
+    name: Coastal Fresh Surface Water
+    short_name: CFSW
+    color: "#2a9d8f"
+    temp_range: [16.0, 35.0]
+    salt_range: [0.0, 33.4]
+  - id: warm_salty_surface
+    name: Warm Salty Surface Water
+    short_name: WSSW
+    color: "#e76f51"
+    temp_range: [18.0, 35.0]
+    salt_range: [33.4, 36.5]
+  - id: shelf_mixed_water
+    name: Shelf Mixed Water
+    short_name: SHMW
+    color: "#457b9d"
+    temp_range: [8.0, 24.0]
+    salt_range: [31.5, 35.2]
+  - id: dense_subsurface_water
+    name: Dense Subsurface Water
+    short_name: DSW
+    color: "#6d597a"
+    temp_range: [-2.0, 18.0]
+    salt_range: [33.0, 36.8]

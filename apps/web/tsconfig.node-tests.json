@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["dom", "dom.iterable", "es2022"],
+    "strict": true,
+    "jsx": "react-jsx",
+    "noEmit": false,
+    "noEmitOnError": true,
+    "outDir": "./.test-dist",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "incremental": false
+  },
+  "include": [
+    "lib/api.ts",
+    "lib/backend-proxy.ts",
+    "lib/types.ts",
+    "lib/map-field-preview.ts",
+    "lib/server-api.ts",
+    "lib/dataset-display.ts",
+    "lib/dataset-state.ts",
+    "lib/geometry-tools.ts",
+    "lib/mock-data.ts",
+    "lib/map-hover.ts",
+    "lib/policy-guidance-display.ts",
+    "lib/assistant-display.ts",
+    "lib/assistant-summary.ts",
+    "lib/report-export.ts",
+    "lib/step-card-state.ts",
+    "lib/workspace-results.ts",
+    "components/renderers.tsx",
+    "tests/**/*.test.ts",
+    "tests/**/*.test.tsx"
+  ]
+}
