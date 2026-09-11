@@ -97,6 +97,7 @@ density_gradient_profile = compute_density_gradient_profile(
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
 - `compute_density` requires an assembled temperature-salinity dataset as `data`; do not pass precomputed density, response, or stratification time series into it.
+<<<<<<< HEAD
 - Define generic `stratification index`, `stratification strength`, and `water-column stability` requests as mean N2 over the selected depth interval. State the operational definition, depth interval, vertical aggregation, area weighting, and units (`s^-2`) in the result.
 - Use `depth_aggregation='max'` only for explicit peak-stratification, strongest-gradient, or pycnocline-strength requests. Label that result `peak N2`, never an unspecified `Stratification Index`.
 - Use `compute_stratification_index(method='surface_bottom_density_difference')` only when the user explicitly asks for a surface-to-bottom density difference. Label it `surface-to-bottom potential-density difference` with units of density, not a density gradient.
@@ -105,6 +106,7 @@ density_gradient_profile = compute_density_gradient_profile(
 - Describe the current tool output as density-derived N2. It finite-differences the potential-density field; do not claim that it is the exact TEOS-10 `gsw.Nsquared` calculation.
 - Treat mean or peak N2 as stratification or ventilation-vulnerability evidence, not direct bloom, hypoxia, pollution-source, or causal evidence.
 - Do not describe any result as potential energy anomaly (PEA); no current tool computes PEA.
+>>>>>>> origin/main
 - Keep the temperature and salinity load steps multi-level for stability diagnostics; do not collapse them to a single surface, bottom, or fixed-depth layer before computing density.
 - Use `compute_density_gradient_profile` only when the user provides a point profile location.
 - Loader contract: never pass `depth_aggregation` to `load_dataset`; loader depth controls are `vertical_mode`, `depth_value`, and `depth_range`.

@@ -157,7 +157,7 @@ def compute_brunt_vaisala_frequency(
     salt: Optional[xr.DataArray] = None,
     density: Optional[xr.DataArray] = None,
 ) -> xr.DataArray:
-    """Compute buoyancy frequency from density."""
+    """Compute density-gradient N² (not N) at adjacent-level midpoints, s^-2."""
     density_field = _resolve_density_field(data=data, temp=temp, salt=salt, density=density)
     dataset = xr.Dataset({"density": density_field})
     n2 = compute_derived_field(data=dataset, field_type="buoyancy_frequency")
@@ -267,7 +267,14 @@ def compute_vertical_stability_timeseries(
     depth_range: Optional[Tuple[float, float]] = None,
     weighting: str = "area_weighted",
 ) -> Dict[str, Any]:
-    """Reduce the stratification index to a regional time series."""
+    """Regional density-based N²: layer-thickness mean, then area mean.
+
+    depth_range includes only adjacent-level intervals fully contained in
+    that physical range. Missing pairs are excluded, not interpolated.
+    The default uses all available valid intervals in each water column.
+    """
+    if weighting != "area_weighted":
+        raise ValueError("N2 stability time series currently requires area_weighted weighting")
     data, temp, salt, density = _subset_stability_inputs(
         data=data,
         temp=temp,
@@ -276,16 +283,35 @@ def compute_vertical_stability_timeseries(
         lon_range=lon_range,
         lat_range=lat_range,
     )
-    stratification = compute_stratification_index(
+    n2 = compute_brunt_vaisala_frequency(
         data=data,
         temp=temp,
         salt=salt,
         density=density,
-        depth_range=depth_range,
     )
+    thickness = n2['layer_thickness']
+    if depth_range is not None:
+        shallow, deep = sorted(abs(float(v)) for v in depth_range)
+        midpoint = abs(n2['depth'])
+        inside = (midpoint - thickness / 2 >= shallow) & (midpoint + thickness / 2 <= deep)
+        if not bool(inside.any()):
+            raise ValueError("depth_range must contain at least one complete N2 interval")
+        n2 = n2.where(inside)
+    valid_thickness = thickness.where(np.isfinite(n2))
+    denominator = valid_thickness.sum('depth', skipna=True)
+    stratification = (n2 * thickness).sum('depth', skipna=True) / denominator.where(denominator > 0)
+    stratification.name = 'buoyancy_frequency_squared'
+    stratification.attrs = dict(n2.attrs)
     metadata = {
-        "variable": "stratification_index",
-        "units": stratification.attrs.get("units", ""),
+        "variable": "buoyancy_frequency_squared",
+        "long_name": "Layer-thickness-weighted mean squared buoyancy frequency",
+        "units": "s^-2",
+        "unit": "s^-2",
+        "method": n2.attrs['method'],
+        "formula": n2.attrs['formula'],
+        "depth_aggregation": "layer_thickness_weighted_mean",
+        "depth_range": list(depth_range) if depth_range is not None else None,
+        "missing_data_policy": "exclude_invalid_adjacent_pairs_without_bridging",
         "source_variable": stratification.attrs.get("source_variable", "density"),
     }
     return _reduce_field_to_timeseries(

@@ -270,7 +270,7 @@ Use for warming overlap, heat stress, or heatwave exposure.
 
 ### Stratification
 
-Use for overlap with stratification or ventilation-risk context.
+Use for overlap with stratification or ventilation-risk context. The stability tool computes density-based N² (s^-2), not a surface-to-bottom density difference: adjacent-level potential-density gradients are averaged by layer thickness, then by regional area. Load multiple depth levels; keep negative N² and exclude missing pairs without interpolation. Describe this as a potential-density-gradient approximation, not full TEOS-10 N². Report the selected depth range and aggregation, and use the trend significance before claiming strengthening stratification. Stratification alone does not establish the cause of hypoxia.
 
 1. `load_dataset(variable="temp")` -> `temp_field`
 2. `load_dataset(variable="salt")` -> `salt_field`

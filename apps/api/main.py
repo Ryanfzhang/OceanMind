@@ -129,7 +129,7 @@ TOOL_TITLES: Dict[str, str] = {
     "compute_brunt_vaisala_frequency": "Squared buoyancy frequency (N²)",
     "compute_density_gradient_profile": "Density-gradient profile",
     "compute_mld_thermocline_offset": "MLD-thermocline offset",
-    "compute_vertical_stability_timeseries": "Vertical stability timeseries",
+    "compute_vertical_stability_timeseries": "Regional mean N² timeseries",
     "compute_tracer_horizontal_advection_timeseries": "Tracer advection timeseries",
     "compute_tracer_advection_map": "Tracer advection map",
     "compute_partial_tracer_budget": "Partial tracer budget",
@@ -194,10 +194,14 @@ TOOL_TITLES_ZH: Dict[str, str] = {
     "compute_event_summary_map": "事件汇总图",
     "compute_event_timeseries_count": "事件计数时间序列",
     "compute_stratification_index": "层化指标",
+<<<<<<< HEAD
     "compute_brunt_vaisala_frequency": "浮力频率平方（N²）",
+=======
+    "compute_brunt_vaisala_frequency": "浮力频率平方 (N²)",
+>>>>>>> origin/main
     "compute_density_gradient_profile": "密度梯度剖面",
     "compute_mld_thermocline_offset": "混合层-温跃层偏移",
-    "compute_vertical_stability_timeseries": "垂向稳定性时间序列",
+    "compute_vertical_stability_timeseries": "区域平均 N² 时间序列",
     "compute_tracer_horizontal_advection_timeseries": "示踪物平流时间序列",
     "compute_tracer_advection_map": "示踪物平流图",
     "compute_partial_tracer_budget": "部分示踪物收支",
