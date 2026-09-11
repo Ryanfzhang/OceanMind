@@ -102,7 +102,7 @@ def compute_density(
     # broadcast them against the Zarr-backed fields inside each Dask block.
     p = xr.apply_ufunc(
         gsw.p_from_z,
-        depth_coord,
+        -_physical_depth(depth_coord),
         lat_coord,
         dask="parallelized",
         output_dtypes=[float],
@@ -126,14 +126,13 @@ def compute_density(
         dask="parallelized",
         output_dtypes=[float],
     )
-    CT = xr.apply_ufunc(
-        gsw.CT_from_t,
-        SA,
-        temp,
-        p,
-        dask="parallelized",
-        output_dtypes=[float],
-    )
+    temperature_kind = str(temp.attrs.get('standard_name', '')).lower()
+    if temperature_kind == 'sea_water_conservative_temperature':
+        CT = temp
+    elif temperature_kind == 'sea_water_potential_temperature' or (not temperature_kind and temp_var == 'thetao'):
+        CT = xr.apply_ufunc(gsw.CT_from_pt, SA, temp, dask="parallelized", output_dtypes=[float])
+    else:
+        CT = xr.apply_ufunc(gsw.CT_from_t, SA, temp, p, dask="parallelized", output_dtypes=[float])
     density = xr.apply_ufunc(
         gsw.rho,
         SA,
@@ -146,7 +145,8 @@ def compute_density(
     density.attrs = {
         'long_name': 'Potential Density',
         'units': 'kg/m³',
-        'reference_pressure': '0 dbar'
+        'reference_pressure': '0 dbar',
+        'input_temperature_standard_name': temperature_kind or ('sea_water_potential_temperature' if temp_var == 'thetao' else 'assumed_in_situ_temperature'),
     }
     density.name = 'density'
 
@@ -672,18 +672,74 @@ def _compute_vertical_gradient(data: xr.Dataset, variable: str) -> xr.DataArray:
     return dfdz
 
 
+def _physical_depth(coord: xr.DataArray) -> xr.DataArray:
+    """Positive-down depth in metres; accept either ocean depth convention."""
+    if coord.ndim != 1:
+        raise ValueError("Stratification requires a one-dimensional metric depth coordinate")
+    units = str(coord.attrs.get('units', 'm')).strip().lower()
+    if units not in {'m', 'meter', 'meters', 'metre', 'metres'}:
+        raise ValueError("Depth must be in metres for density and N2 calculations")
+    values = np.asarray(coord.values, dtype=float)
+    if not values.size or not np.isfinite(values).all():
+        raise ValueError("Depth coordinates must be finite")
+    positive = str(coord.attrs.get('positive', '')).lower()
+    if positive == 'up':
+        depth = -coord
+    elif positive == 'down':
+        depth = coord
+    elif positive:
+        raise ValueError("Depth positive attribute must be 'up' or 'down'")
+    elif (values >= 0).all():
+        depth = coord
+    elif (values <= 0).all():
+        depth = -coord
+    else:
+        raise ValueError("Mixed-sign depth requires an explicit CF positive attribute")
+    if (np.asarray(depth.values) < 0).any():
+        raise ValueError("Ocean depths must be at or below the sea surface")
+    if values.size > 1:
+        delta = np.diff(values)
+        if not ((delta > 0).all() or (delta < 0).all()):
+            raise ValueError("Depth coordinates must be strictly monotonic and unique")
+    return depth
+
+
 def _compute_buoyancy_frequency(data: xr.Dataset) -> xr.DataArray:
-    """计算浮力频率: N² = -(g/ρ₀) * dρ/dz"""
+    """Density-based N² approximation at adjacent-level midpoints, in s^-2.
+
+    N² = (g/rho0) d(rho_theta)/dD, with D positive downward. Input should
+    be potential density referenced to a common pressure (compute_density).
+    This is not the full pressure-dependent TEOS-10 gsw.Nsquared calculation.
+    Negative N² is retained; missing levels are never bridged.
+    """
     g = 9.81  # m/s²
     rho0 = 1025.0  # kg/m³
 
     density = data['density']
-    drhodz = density.differentiate('depth')
-
-    N2 = -(g / rho0) * drhodz
+    coord = density['depth']
+    physical = _physical_depth(coord)
+    if coord.size < 2:
+        raise ValueError("N2 requires at least two depth levels")
+    mid = (coord.values[:-1] + coord.values[1:]) / 2
+    # Match midpoint labels before subtraction to avoid xarray realignment.
+    upper = density.isel(depth=slice(None, -1)).assign_coords(depth=mid)
+    lower = density.isel(depth=slice(1, None)).assign_coords(depth=mid)
+    delta = xr.DataArray(np.diff(physical.values), dims='depth', coords={'depth': mid})
+    N2 = ((g / rho0) * (lower - upper) / delta).where(
+        np.isfinite(upper) & np.isfinite(lower)
+    )
+    N2.name = 'buoyancy_frequency_squared'
+    N2['depth'].attrs = dict(coord.attrs)
+    N2 = N2.assign_coords(layer_thickness=abs(delta))
+    N2['layer_thickness'].attrs = {'units': 'm'}
     N2.attrs = {
         'long_name': 'Buoyancy Frequency Squared',
-        'units': 's⁻²'
+        'units': 's^-2',
+        'method': 'potential_density_gradient_midpoints',
+        'formula': 'N2 = (9.81 / 1025) * d(potential_density)/d(positive_down_depth)',
+        'reference_density_kg_m3': rho0,
+        'density_reference_pressure': density.attrs.get('reference_pressure', 'unspecified'),
+        'vertical_location': 'midpoints_between_adjacent_valid_levels',
     }
 
     return N2

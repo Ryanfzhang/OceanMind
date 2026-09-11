@@ -88,7 +88,8 @@ density_gradient_profile = compute_density_gradient_profile(
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
 - `compute_density` requires an assembled temperature-salinity dataset as `data`; do not pass precomputed density, response, or stratification time series into it.
-- `compute_vertical_stability_timeseries` is the default time-series output for stability, stratification, and vertical-stability requests.
+- `compute_vertical_stability_timeseries` is the default time-series output for stability, stratification, and vertical-stability requests. It computes density-based squared buoyancy frequency (N², s^-2) from adjacent-level potential-density gradients, takes a layer-thickness-weighted vertical mean, then an area-weighted regional mean. It is not the surface-to-bottom density difference. A depth range includes only complete adjacent-level intervals within that range; missing pairs are excluded without bridging gaps.
+- For vertically resolved N² maps or profiles, use `compute_brunt_vaisala_frequency`; its depth coordinates are layer midpoints. Retain negative N² (unstable density gradients). Do not label N² as density or as N, and do not claim full TEOS-10 N²: this tool uses the potential-density-gradient approximation with reference density 1025 kg m^-3.
 - Keep the temperature and salinity load steps multi-level for stability diagnostics; do not collapse them to a single surface, bottom, or fixed-depth layer before computing density.
 - Use `compute_density_gradient_profile` only when the user provides a point profile location.
 - Loader contract: never pass `depth_aggregation` to `load_dataset`; loader depth controls are `vertical_mode`, `depth_value`, and `depth_range`.
