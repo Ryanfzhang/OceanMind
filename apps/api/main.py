@@ -126,7 +126,7 @@ TOOL_TITLES: Dict[str, str] = {
     "compute_event_summary_map": "Event summary map",
     "compute_event_timeseries_count": "Event count timeseries",
     "compute_stratification_index": "Stratification index",
-    "compute_brunt_vaisala_frequency": "Brunt-Vaisala frequency",
+    "compute_brunt_vaisala_frequency": "Squared buoyancy frequency (N²)",
     "compute_density_gradient_profile": "Density-gradient profile",
     "compute_mld_thermocline_offset": "MLD-thermocline offset",
     "compute_vertical_stability_timeseries": "Vertical stability timeseries",
@@ -194,7 +194,7 @@ TOOL_TITLES_ZH: Dict[str, str] = {
     "compute_event_summary_map": "事件汇总图",
     "compute_event_timeseries_count": "事件计数时间序列",
     "compute_stratification_index": "层化指标",
-    "compute_brunt_vaisala_frequency": "布伦特-魏萨拉频率",
+    "compute_brunt_vaisala_frequency": "浮力频率平方（N²）",
     "compute_density_gradient_profile": "密度梯度剖面",
     "compute_mld_thermocline_offset": "混合层-温跃层偏移",
     "compute_vertical_stability_timeseries": "垂向稳定性时间序列",
@@ -6588,6 +6588,9 @@ VARIABLE_LABELS: Dict[str, str] = {
     "chlorophyll": "Chlorophyll",
     "chla": "Chlorophyll",
     "mixed_layer_depth": "Mixed-Layer Depth",
+    "brunt_vaisala_frequency": "Squared Buoyancy Frequency (N²)",
+    "squared_buoyancy_frequency": "Squared Buoyancy Frequency (N²)",
+    "n2": "N²",
 }
 
 VARIABLE_LABELS_ZH: Dict[str, str] = {
@@ -6606,6 +6609,9 @@ VARIABLE_LABELS_ZH: Dict[str, str] = {
     "chlorophyll": "叶绿素",
     "chla": "叶绿素",
     "mixed_layer_depth": "混合层深度",
+    "brunt_vaisala_frequency": "浮力频率平方（N²）",
+    "squared_buoyancy_frequency": "浮力频率平方（N²）",
+    "n2": "N²",
 }
 
 AGGREGATION_LABELS: Dict[str, str] = {
@@ -6614,7 +6620,7 @@ AGGREGATION_LABELS: Dict[str, str] = {
     "vertical_advection": "Vertical Advection",
     "horizontal_gradient": "Horizontal Gradient",
     "vertical_gradient": "Vertical Gradient",
-    "buoyancy_frequency": "Buoyancy Frequency",
+    "buoyancy_frequency": "Squared Buoyancy Frequency (N²)",
     "climatology": "Climatology",
     "anomaly": "Anomaly",
     "mean": "Mean",
@@ -6626,7 +6632,7 @@ AGGREGATION_LABELS_ZH: Dict[str, str] = {
     "vertical_advection": "垂向平流",
     "horizontal_gradient": "水平梯度",
     "vertical_gradient": "垂向梯度",
-    "buoyancy_frequency": "浮力频率",
+    "buoyancy_frequency": "浮力频率平方（N²）",
     "climatology": "气候态",
     "anomaly": "异常",
     "mean": "平均",
@@ -6657,6 +6663,60 @@ def _humanize_data_label(value: Any, *, chinese: bool = False) -> Optional[str]:
                 return f"{prefix_label}{label}"
             return f"{label} of {prefix_label}"
     return cleaned.replace("_", " ").strip().title()
+
+
+_SQUARED_BUOYANCY_FREQUENCY_KEYS = {
+    "brunt_vaisala_frequency",
+    "brunt-vaisala_frequency",
+    "brunt_väisälä_frequency",
+    "buoyancy_frequency_squared",
+    "squared_buoyancy_frequency",
+    "n2",
+    "n²",
+}
+
+
+def _summary_context_value(summary: Dict[str, Any], key: str) -> Any:
+    value = summary.get(key)
+    if value is not None:
+        return value
+    context = summary.get("analysis_context")
+    if isinstance(context, dict):
+        return context.get(key)
+    return None
+
+
+def _is_squared_buoyancy_frequency_summary(summary: Dict[str, Any]) -> bool:
+    variable = str(summary.get("variable") or "").strip().lower()
+    return variable in _SQUARED_BUOYANCY_FREQUENCY_KEYS
+
+
+def _build_squared_buoyancy_frequency_series_title(
+    summary: Dict[str, Any],
+    output_type: str,
+    *,
+    chinese: bool,
+) -> Optional[str]:
+    if not _is_squared_buoyancy_frequency_summary(summary):
+        return None
+
+    depth_aggregation = str(_summary_context_value(summary, "depth_aggregation") or "").strip().lower()
+    weighting = str(_summary_context_value(summary, "weighting") or "").strip().lower()
+    is_mean = depth_aggregation == "mean" or weighting in {"area_weighted", "volume_weighted"}
+    is_anomaly = _summary_context_value(summary, "is_anomaly") is True
+    metric = ("平均 N²" if is_mean else "N²") if chinese else ("Mean N²" if is_mean else "N²")
+    anomaly = "异常" if chinese and is_anomaly else (" Anomaly" if is_anomaly else "")
+
+    if output_type == "trend_result":
+        return f"{metric}{anomaly}趋势" if chinese else f"{metric}{anomaly} Trend"
+    if output_type == "timeseries_result":
+        return f"{metric}{anomaly}时间序列" if chinese else f"{metric}{anomaly} Time Series"
+    if output_type == "climatology_result":
+        period_label = _climatology_period_label(summary.get("period"))
+        if chinese:
+            return f"{period_label or ''}{metric}气候态"
+        return f"{metric} {period_label + ' ' if period_label else ''}Climatology"
+    return None
 
 
 def _data_container_variable_label(summary: Dict[str, Any], *, chinese: bool = False) -> Optional[str]:
@@ -6817,6 +6877,13 @@ def _build_result_title(summary: Dict[str, Any], step_tool: Optional[str], resul
     aggregation_label = _humanize_data_label(summary.get("aggregation"), chinese=chinese)
     feature_label = _humanize_data_label(summary.get("feature"), chinese=chinese)
     base_title = _humanize_tool_name(step_tool, chinese=chinese) if step_tool else _humanize_result_id(result_id)
+    n2_series_title = _build_squared_buoyancy_frequency_series_title(
+        summary,
+        output_type,
+        chinese=chinese,
+    )
+    if n2_series_title:
+        return n2_series_title
 
     if output_type == "data_container_result":
         if _is_spatial_data_container_summary(summary):
@@ -6837,7 +6904,12 @@ def _build_result_title(summary: Dict[str, Any], step_tool: Optional[str], resul
         if period_label:
             return f"{period_label}气候态" if chinese else f"{period_label} Climatology"
         return "气候态" if chinese else "Climatology"
-    if output_type in {"timeseries_result", "trend_result"}:
+    if output_type == "trend_result":
+        if variable_label and aggregation_label:
+            return f"{aggregation_label}{variable_label}趋势" if chinese else f"{aggregation_label} {variable_label} Trend"
+        if variable_label:
+            return f"{variable_label}趋势" if chinese else f"{variable_label} Trend"
+    if output_type == "timeseries_result":
         if variable_label and aggregation_label:
             return f"{aggregation_label}{variable_label}时间序列" if chinese else f"{aggregation_label} {variable_label} Time Series"
         if variable_label:
@@ -6856,12 +6928,12 @@ def _build_result_title(summary: Dict[str, Any], step_tool: Optional[str], resul
             "Vertical Advection",
             "Horizontal Gradient",
             "Vertical Gradient",
-            "Buoyancy Frequency",
+            "Squared Buoyancy Frequency (N²)",
             "水平平流",
             "垂向平流",
             "水平梯度",
             "垂向梯度",
-            "浮力频率",
+            "浮力频率平方（N²）",
         }:
             return f"{variable_label}{aggregation_label}" if chinese else f"{aggregation_label} of {variable_label}"
         if variable_label and aggregation_label:
@@ -9858,6 +9930,7 @@ def _build_workspace_data(
             workspace_data["mapField"] = map_field
     elif active_output_type == "trend_result" and isinstance(active_result, dict):
         active_trend = active_result
+        active_metadata = active_trend.get("metadata", {}) if isinstance(active_trend.get("metadata"), dict) else {}
         source_times = active_trend.get("times") if isinstance(active_trend.get("times"), list) else []
         source_values = active_trend.get("values") if isinstance(active_trend.get("values"), list) else []
         has_source_series = bool(source_times and source_values)
@@ -9898,6 +9971,22 @@ def _build_workspace_data(
         workspace_data["seriesLabels"] = {
             "result": "观测值" if chinese else "Observed",
             "compare": "趋势线" if chinese else "Trend line",
+        }
+        display_values = np.asarray(source_values, dtype=float).reshape(-1) if source_values else np.asarray([], dtype=float)
+        if display_values.size == 0 and base_timeseries is not None:
+            display_values = np.asarray(base_timeseries.get("values", []), dtype=float).reshape(-1)
+        finite_count = int(np.count_nonzero(np.isfinite(display_values))) if display_values.size else 0
+        workspace_data["timeseriesDisplayInfo"] = {
+            "aggregation": "none",
+            "aggregationLabel": "Original time steps",
+            "originalPoints": int(display_values.size),
+            "displayPoints": len(workspace_data["resultSeries"]),
+            "variable": active_metadata.get("variable") or active_metadata.get("source_variable") or "unknown",
+            "units": active_metadata.get("units") or active_metadata.get("unit") or "",
+            "finiteCount": finite_count,
+            "hasFiniteValues": finite_count > 0,
+            "isAnomaly": active_metadata.get("is_anomaly") is True,
+            "climatologyPeriod": active_metadata.get("climatology_period"),
         }
     elif active_output_type == "mechanism_score_result" and isinstance(active_result, dict):
         active_metadata = active_result.get("metadata", {}) if isinstance(active_result.get("metadata"), dict) else {}
@@ -10620,6 +10709,8 @@ def _build_timeseries_display_payload(result: Dict[str, Any]) -> Dict[str, Any]:
                 "units": metadata.get("units") or metadata.get("unit") or "",
                 "finiteCount": 0,
                 "hasFiniteValues": False,
+                "isAnomaly": metadata.get("is_anomaly") is True,
+                "climatologyPeriod": metadata.get("climatology_period"),
             },
         }
 
@@ -10634,6 +10725,8 @@ def _build_timeseries_display_payload(result: Dict[str, Any]) -> Dict[str, Any]:
             "units": metadata.get("units") or metadata.get("unit") or "",
             "finiteCount": finite_count,
             "hasFiniteValues": has_finite_values,
+            "isAnomaly": metadata.get("is_anomaly") is True,
+            "climatologyPeriod": metadata.get("climatology_period"),
         }
     )
     return {
@@ -11678,8 +11771,8 @@ def _format_coord_label(value: Any, dim: str) -> str:
 
 def _short_label(value: Any) -> str:
     text = str(value)
-    if "T" in text:
-        text = text.split("T", 1)[0]
+    if re.match(r"^\d{4}-\d{2}-\d{2}(?:T|\s)", text):
+        text = text[:10]
     return text
 
 

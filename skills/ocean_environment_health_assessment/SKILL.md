@@ -36,7 +36,8 @@ Only use real tool names. Core evidence tools include:
 `compute_event_summary_map`, `compute_event_frequency_map`,
 `compute_event_spatial_distribution`, `compare_event_periods`,
 `assemble_dataset`, `compute_density`,
-`compute_vertical_stability_timeseries`, `compute_lag_correlation`,
+`compute_brunt_vaisala_frequency`, `compute_lag_correlation`,
+`resample_timeseries`, `compute_climatology`, `compute_anomaly`,
 `compute_regression_map`, `compute_composite_field`, `apply_mask`,
 `build_threshold_mask`, `build_condition_mask`, `build_polygon_mask`,
 `build_isobath_mask`, `combine_masks`.
@@ -181,15 +182,35 @@ density_field = compute_density(
     data=thermo_dataset.data,
 )
 
-stability_timeseries = compute_vertical_stability_timeseries(
+n2_field = compute_brunt_vaisala_frequency(
     density=density_field.data,
+)
+
+stability_timeseries = compute_area_weighted_mean(
+    data=n2_field.data,
     lon_range=lon_range,
     lat_range=lat_range,
-    weighting='area_weighted',
+    depth_aggregation='mean',
+)
+
+stability_monthly = resample_timeseries(
+    timeseries=stability_timeseries,
+    freq='MS',
+    method='mean',
+)
+
+stability_climatology = compute_climatology(
+    timeseries=stability_monthly,
+    period='monthly',
+)
+
+stability_anomaly = compute_anomaly(
+    timeseries=stability_monthly,
+    climatology=stability_climatology,
 )
 
 stratification_trend = compute_trend(
-    timeseries=stability_timeseries,
+    timeseries=stability_anomaly,
     method='linear',
     confidence_level=confidence_level,
 )
@@ -256,9 +277,13 @@ Use for overlap with stratification or ventilation-risk context.
 3. `assemble_dataset(variables={"temp": "$ref:temp_field.data",
    "salt": "$ref:salt_field.data"})` -> `thermo_dataset`
 4. `compute_density(data="$ref:thermo_dataset.data")` -> `density_field`
-5. `compute_vertical_stability_timeseries(density="$ref:density_field.data")`
-   -> `stability_timeseries`
-6. `compute_trend(timeseries="$ref:stability_timeseries")` ->
+5. `compute_brunt_vaisala_frequency(density="$ref:density_field.data")` ->
+   `n2_field`
+6. `compute_area_weighted_mean(data="$ref:n2_field.data",
+   depth_aggregation="mean")` -> `stability_timeseries`
+7. Resample the stability series monthly and compute monthly anomalies before
+   trend estimation.
+8. `compute_trend(timeseries="$ref:stability_anomaly")` ->
    `stratification_trend`
 
 ### Bloom Or Chlorophyll Pressure
@@ -303,4 +328,10 @@ source, or discharge data are explicitly present.
 - SST, heatwave, bloom, and chlorophyll surface evidence must use
   `vertical_mode="surface"` unless the user explicitly asks otherwise.
 - Stratification temperature and salinity loads should retain the water column.
+- Define a generic stratification index as mean N2 across the selected water-column levels, with units `s^-2`. Use peak N2 only when the user explicitly asks for peak stratification, the strongest gradient, or pycnocline strength.
+- Describe this as density-derived N2; the current tool finite-differences potential density and is not the exact TEOS-10 `gsw.Nsquared` calculation.
+- Treat stratification as physical vulnerability and timing context for weak ventilation. Do not place stratification alone under bloom pressure, and do not infer bloom occurrence, hypoxia occurrence, or pollution-source responsibility from stratification alone.
+- Use direct bottom-oxygen or hypoxia outputs as oxygen-risk endpoints and direct chlorophyll/bloom outputs as bloom-pressure endpoints.
+- Describe trends from records shorter than five years as short-record changes, not long-term trends, even when the ordinary regression p-value is small.
+- Do not describe the N2 result as potential energy anomaly (PEA); no current tool computes PEA.
 - Event statistics must reference the matching detection result.

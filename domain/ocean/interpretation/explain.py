@@ -164,8 +164,9 @@ def compute_brunt_vaisala_frequency(
     n2.name = "brunt_vaisala_frequency"
     n2.attrs = {
         **n2.attrs,
-        "long_name": "Brunt-Vaisala Frequency Squared",
+        "long_name": "Squared Buoyancy Frequency (N²)",
         "aggregation": "buoyancy_frequency",
+        "symbol": "N²",
         "source_variable": density_field.name or "density",
     }
     return n2
