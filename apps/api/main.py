@@ -194,11 +194,8 @@ TOOL_TITLES_ZH: Dict[str, str] = {
     "compute_event_summary_map": "事件汇总图",
     "compute_event_timeseries_count": "事件计数时间序列",
     "compute_stratification_index": "层化指标",
-<<<<<<< HEAD
     "compute_brunt_vaisala_frequency": "浮力频率平方（N²）",
-=======
     "compute_brunt_vaisala_frequency": "浮力频率平方 (N²)",
->>>>>>> origin/main
     "compute_density_gradient_profile": "密度梯度剖面",
     "compute_mld_thermocline_offset": "混合层-温跃层偏移",
     "compute_vertical_stability_timeseries": "区域平均 N² 时间序列",
