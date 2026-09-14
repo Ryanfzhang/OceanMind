@@ -3,6 +3,7 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -12,6 +13,7 @@ import sys
 import threading
 import time
 from urllib.request import build_opener, ProxyHandler
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent
 WEB = ROOT / "apps/web"
@@ -115,6 +117,68 @@ def wait_backend(proc, port, timeout):
     return False
 
 
+def public_url(value):
+    """Accept an origin, not a credential-bearing URL or an unsupported subpath."""
+    if any(c.isspace() or c in '"\\' for c in value):
+        raise argparse.ArgumentTypeError("Public URL must not contain whitespace, quotes or backslashes.")
+    try:
+        u = urlsplit(value)
+        port = u.port
+        valid = (u.scheme in ("http", "https") and u.hostname
+                 and u.username is None and u.password is None
+                 and u.path in ("", "/") and not u.query and not u.fragment
+                 and (port is None or 1 <= port <= 65535))
+    except ValueError:
+        valid = False
+    if not valid:
+        raise argparse.ArgumentTypeError("Use an http(s) origin, e.g. https://oceanmind.wavyocean.hkust.edu.hk/")
+    return value.rstrip("/")
+
+
+def nginx_settings(args):
+    if not args.nginx:
+        if args.tls_cert or args.tls_key:
+            raise RuntimeError("--tls-cert/--tls-key require --nginx.")
+        return None
+    if not args.public_url or not args.tls_cert or not args.tls_key:
+        raise RuntimeError("Nginx requires --public-url https://DOMAIN --tls-cert FILE --tls-key FILE.")
+    url = urlsplit(args.public_url)
+    if url.scheme != "https" or url.port not in (None, 443):
+        raise RuntimeError("Managed Nginx requires an HTTPS URL on port 443.")
+    if not re.fullmatch(r"[A-Za-z0-9.-]+", url.hostname or ""):
+        raise RuntimeError("Use a DNS hostname for managed Nginx.")
+    if args.web_host not in ("127.0.0.1", "0.0.0.0"):
+        raise RuntimeError("Managed Nginx needs --web-host 127.0.0.1 (recommended) or 0.0.0.0.")
+    if args.web_port in (80, 443) or args.api_port in (80, 443):
+        raise RuntimeError("Ports 80/443 are reserved for Nginx, not frontend/backend.")
+    paths = [Path(v).resolve() for v in (args.nginx, args.tls_cert, args.tls_key)]
+    for path in paths:
+        if not path.is_file():
+            raise RuntimeError(f"Nginx executable/certificate/key file not found: {path}")
+        if any(c in str(path) for c in ('"', '$', '\n', '\r')):
+            raise RuntimeError("Unsupported characters in Nginx/certificate paths.")
+    return paths
+
+
+def prepare_nginx(args, paths):
+    prefix = STATE / "nginx"
+    (prefix / "logs").mkdir(parents=True, exist_ok=True)
+    text = (ROOT / "nginx.conf.template").read_text(encoding="utf-8")
+    for key, val in {"DOMAIN": urlsplit(args.public_url).hostname,
+                     "CERT": paths[1].as_posix(), "KEY": paths[2].as_posix(),
+                     "PORT": str(args.web_port)}.items():
+        text = text.replace("@@" + key + "@@", val)
+    config = prefix / "nginx.conf"
+    config.write_text(text, encoding="utf-8")
+    cmd = [str(paths[0]), "-p", prefix.as_posix() + "/", "-c", config.as_posix()]
+    # A missing/bad certificate must fail before launching any service.
+    result = subprocess.run(cmd + ["-t"], cwd=ROOT, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", timeout=30)
+    if result.returncode:
+        raise RuntimeError("Nginx configuration test failed:\n" + result.stderr)
+    return cmd
+
+
 def configuration(args):
     if not (1 <= args.api_port <= 65535 and 1 <= args.web_port <= 65535):
         raise RuntimeError("Ports must be in 1..65535.")
@@ -154,6 +218,11 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("action", choices=["start", "stop", "check"], nargs="?", default="start")
     p.add_argument("--node", help="Full path to node.exe/node")
+    p.add_argument("--nginx", help="Full path to nginx.exe/nginx; manage HTTPS proxy too")
+    p.add_argument("--tls-cert", help="PEM full-chain certificate for the public domain")
+    p.add_argument("--tls-key", help="PEM private key (must be readable without a password prompt)")
+    p.add_argument("--public-url", type=public_url,
+                   help="External website URL behind your reverse proxy; does not configure DNS/TLS")
     p.add_argument("--web-host", default="127.0.0.1")
     p.add_argument("--web-port", type=int, default=3000)
     p.add_argument("--api-port", type=int, default=8000)
@@ -166,21 +235,36 @@ def main(argv=None):
         print("Stop requested; both services will be stopped.")
         return 0
     env, node, cli = configuration(args)
+    nginx_paths = nginx_settings(args)
+    if args.public_url:
+        env["OCEANMIND_PUBLIC_URL"] = args.public_url
+        print(f"Public address: {args.public_url}", flush=True)
+        print(f"Proxy upstream: http://127.0.0.1:{args.web_port} (if proxy runs on this host).",
+              flush=True)
     if args.action == "check":
+        if nginx_paths:
+            with InstanceLock():
+                prepare_nginx(args, nginx_paths)
+            print("Nginx configuration/certificate loading test passed.")
         print("Environment/build preflight passed (not a dataset or LLM API test).")
+        if args.public_url:
+            print("DNS, certificate hostname/expiry and external reachability are not tested.")
         return 0
     with InstanceLock():
+        nginx_cmd = prepare_nginx(args, nginx_paths) if nginx_paths else None
         STOP.unlink(missing_ok=True)
         STOPPING.clear()
         for sig in (signal.SIGINT, signal.SIGTERM):
             signal.signal(sig, lambda *_: STOPPING.set())
         log = logger("supervisor")
+        if args.public_url:
+            log.info("Configured public address: %s (external routing not verified)", args.public_url)
         print(f"OceanMind: http://{args.web_host}:{args.web_port}; Ctrl+C to stop.", flush=True)
         print(f"Logs: {ROOT / 'logs/server'}", flush=True)
         while not stopping():
-            backend = frontend = None
+            backend = frontend = proxy = None
             try:
-                for port in (args.api_port, args.web_port):
+                for port in (args.api_port, args.web_port) + ((80, 443) if nginx_cmd else ()):
                     with socket.socket() as s:
                         s.bind(("0.0.0.0", port))
                 backend = spawn([sys.executable, "-m", "uvicorn", "apps.api.main:app",
@@ -194,14 +278,19 @@ def main(argv=None):
                         "--hostname", args.web_host, "--port", str(args.web_port)],
                         WEB, env, "frontend")
                     log.info("Backend ready; frontend launched.")
+                    if nginx_cmd:
+                        proxy = spawn(nginx_cmd, ROOT, env, "nginx")
+                        log.info("Nginx launched: %s -> frontend port %s",
+                                 args.public_url, args.web_port)
                     while not stopping():
-                        if backend.poll() is not None or frontend.poll() is not None:
-                            raise RuntimeError("Service exited; restarting both in 10 seconds.")
+                        if any(p.poll() is not None for p in (backend, frontend, proxy) if p is not None):
+                            raise RuntimeError("Service exited; restarting managed services in 10 seconds.")
                         pause(1)
             except (OSError, RuntimeError) as exc:
                 log.error("%s", exc)
                 print(str(exc), file=sys.stderr, flush=True)
             finally:
+                stop_process(proxy)
                 stop_process(frontend)
                 stop_process(backend)
             if not stopping():

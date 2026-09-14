@@ -387,3 +387,88 @@ HTTPS reverse proxy/VPN. Opening firewall ports is an explicit administrator ste
 
 Task Scheduler reference:
 https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/register-scheduledtask
+
+### Launch with a public domain
+
+Pass the external URL separately from the local listen address:
+
+```powershell
+.\start-server.bat --public-url "https://oceanmind.wavyocean.hkust.edu.hk/"
+```
+
+```bash
+bash start-server.sh --public-url "https://oceanmind.wavyocean.hkust.edu.hk/"
+```
+
+The argument validates and displays the public origin and passes it to child
+processes as `OCEANMIND_PUBLIC_URL`. The current frontend uses same-origin API
+requests; it needs no hard-coded domain or rebuild when this URL changes.
+**This option is not a DNS, certificate or reverse-proxy installer.**
+It does not change the listen address or verify that the public site is reachable.
+
+For HTTPS access, your existing DNS must point to the ingress/proxy and that
+proxy must terminate TLS for this domain and forward requests to the Next.js
+frontend (normally `http://127.0.0.1:3000` on the same host), not directly to
+the Python backend. Forward all paths, including `/api/*`; preserve streaming
+responses (disable response buffering) and allow long analysis requests.
+Keep the proxy itself configured for startup after reboot.
+
+If the proxy runs on another machine, add `--web-host 0.0.0.0` and allow the
+frontend port only from that proxy's trusted address. Keep authentication/access
+restrictions at the proxy; the public URL argument does not add authentication.
+
+To persist the URL in a newly installed Windows startup task:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows-startup.ps1 -PythonPath "C:\Miniconda3\envs\ocean\python.exe" -NodePath "C:\Program Files\nodejs\node.exe" -PublicUrl "https://oceanmind.wavyocean.hkust.edu.hk/"
+```
+
+Use your actual executable paths. If the OceanMind task already exists, stop
+and unregister it using the maintenance instructions above before reinstalling;
+the installer intentionally refuses to overwrite an existing task.
+
+### Managed Nginx HTTPS (Windows)
+
+To have the launcher also run Nginx, add `--nginx`, `--tls-cert` and `--tls-key`.
+This is different from `--public-url` alone: it generates and tests an Nginx
+configuration, starts the proxy, and restarts the managed stack if a process exits.
+
+1. Download and unzip the official Windows package from https://nginx.org/en/download.html
+   (for example to `C:\nginx`). Do not separately start nginx.exe.
+2. Obtain a valid PEM full-chain certificate and PEM private key for
+   `oceanmind.wavyocean.hkust.edu.hk`. Store them outside Git, with restricted
+   file permissions. The key must not require an interactive password.
+   This script does not issue or renew certificates.
+3. After installing dependencies and building the frontend, run from the repository:
+
+```powershell
+.\start-server.bat --public-url "https://oceanmind.wavyocean.hkust.edu.hk/" --nginx "C:\nginx\nginx.exe" --tls-cert "C:\certs\fullchain.pem" --tls-key "C:\certs\privkey.pem"
+```
+
+Traffic follows: domain HTTPS:443 -> Nginx -> 127.0.0.1:3000 -> 127.0.0.1:8000.
+Port 80 redirects to HTTPS. Both 80 and 443 must be free, and network/firewall
+policy must permit your intended users. No firewall or DNS changes are performed.
+Keep web-host at its loopback default. Check public access from another computer.
+The template is at `nginx.conf.template`; the generated config and isolated
+Nginx prefix are under `.run/nginx/`. Existing Nginx configuration is not overwritten.
+Nginx stderr goes to rotating `logs/server/nginx.log`; access logging is disabled.
+
+To include Nginx in the Windows boot task, run in administrator PowerShell
+(replace executable and certificate paths with your real ones):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows-startup.ps1 -PythonPath "C:\Miniconda3\envs\ocean\python.exe" -NodePath "C:\Program Files\nodejs\node.exe" -PublicUrl "https://oceanmind.wavyocean.hkust.edu.hk/" -NginxPath "C:\nginx\nginx.exe" -TlsCert "C:\certs\fullchain.pem" -TlsKey "C:\certs\privkey.pem"
+Start-ScheduledTask -TaskName OceanMind
+```
+
+Stop the manual instance before starting the task. For an existing task, stop and
+unregister it first as described above. The task account must read the certificate
+and private key. After certificate renewal, perform a managed stop/start to reload.
+On Linux/macOS, binding ports 80/443 requires appropriate privileges; prefer a
+separate OS-managed Nginx service rather than running the whole analysis app as root.
+
+This is transport encryption, not user authentication. Before public use, restrict
+access via your institutional network/firewall or add authentication at the proxy.
+Windows Nginx has documented scalability limitations; see
+https://nginx.org/en/docs/windows.html and
+https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering.
