@@ -25,6 +25,8 @@ data/*
 
 scripts/*
 !scripts/convert_nc_to_zarr.py
+.run/
+logs/
 
 
 *.md

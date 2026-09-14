@@ -8,6 +8,7 @@ ocean datasets and receive maps, time series, statistics, and interpretation.
 ## Contents
 
 - [Quick Start](#quick-start)
+- [One-command server and Windows boot startup](#one-command-server-and-windows-boot-startup)
 - [Configuration](#configuration)
 - [Example Queries](#example-queries)
 - [Built-in Skills](#built-in-skills)
@@ -241,3 +242,148 @@ datasets used in your analysis.
 
 No license file is currently included. Add a project license before public
 redistribution.
+
+## One-command server and Windows boot startup
+
+The launcher runs both services from the correct working directories, loads the
+root `.env`, waits for backend readiness, and restarts both processes after a
+child exits (10-second backoff). Production mode is the default: no reload,
+one backend worker, and a prebuilt Next.js frontend. It does not install packages
+or build assets on every reboot.
+
+### First-time preparation (Windows, Linux or macOS)
+
+Finish the installation and dataset configuration above. Build the frontend once:
+
+```text
+conda activate ocean
+cd apps/web
+npm ci
+npm run build
+cd ../..
+```
+
+After frontend changes, stop the running server and run the build again.
+A successful preflight is not a test of dataset access or LLM credentials.
+
+Windows (Anaconda Prompt or PowerShell after activating the environment):
+
+```powershell
+.\start-server.bat check
+.\start-server.bat
+```
+
+Linux/macOS:
+
+```bash
+conda activate ocean
+bash start-server.sh check
+bash start-server.sh
+```
+
+Open http://localhost:3000. Keep this terminal open. Stop with Ctrl+C, or from
+another terminal in the repository:
+
+```text
+python server.py stop
+```
+
+The stop command targets only this repository's launcher. It cannot stop servers
+started manually with uvicorn/npm. Avoid running the launcher alongside those.
+On Windows the managed child processes are terminated, so stop only when no
+analysis is running. Linux/macOS receives SIGTERM before a bounded forced stop.
+
+If Python is not on PATH, set `OCEANMIND_PYTHON` to the full path to the
+installed environment's Python before running the wrapper. You can also call
+that Python directly with `server.py`. Use
+`--node "C:\path\to\node.exe"` if Node is not on PATH.
+`--dev` is available for local development; do not use it for a boot task.
+
+Logs rotate at 10 MB with three backups per service:
+
+- `logs/server/supervisor.log`: startup, exit and restart events.
+- `logs/server/backend.log`: backend errors and requests.
+- `logs/server/frontend.log`: Next.js output.
+
+Treat logs as private: application output can contain queries and provider errors.
+The launcher does not log the contents of `.env`.
+
+### Windows: start after reboot, even before login
+
+Use Windows Task Scheduler, not the Startup folder (which runs only after login).
+The installer registers a boot trigger with a 45-second delay, no execution-time
+limit, no parallel duplicate task instances, and retry on supervisor failure.
+It does not install a Windows Service, change firewall rules, or reboot the server.
+
+1. In your working Conda environment, obtain the exact executable paths:
+
+```powershell
+conda activate ocean
+python -c "import sys; print(sys.executable)"
+(Get-Command node).Source
+```
+
+2. Open **PowerShell as Administrator**, enter the repository directory, and use
+your actual paths (the following paths are examples):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-windows-startup.ps1 -PythonPath "C:\Miniconda3\envs\ocean\python.exe" -NodePath "C:\Program Files\nodejs\node.exe"
+Start-ScheduledTask -TaskName OceanMind
+```
+
+The prompt asks for a Windows account password, not a PIN. Choose an account with
+read access to the repository, Python/Node installations and datasets, and write
+access to logs, outputs, caches and runtime state. The account must be allowed to
+log on as a batch job. The task runs with limited privileges, not as SYSTEM.
+Credentials are registered with Windows Task Scheduler, not stored in the scripts.
+If the account password or installation paths change, update/reinstall the task.
+The installation checks the invoking environment; verify permissions under the
+chosen task account separately.
+
+Do not start the manual launcher while the scheduled instance is running.
+Check task state and recent result:
+
+```powershell
+Get-ScheduledTask -TaskName OceanMind
+Get-ScheduledTaskInfo -TaskName OceanMind
+Get-Content .\logs\server\backend.log -Tail 50
+```
+
+Verify http://localhost:3000, run a small dataset query, then perform a planned
+reboot when no analysis is running and verify access **before interactive login**.
+A reboot loses in-flight analyses; this feature restores the server, not the job.
+
+For temporary maintenance, disable future startup and request a managed stop:
+
+```powershell
+Disable-ScheduledTask -TaskName OceanMind
+& "C:\Miniconda3\envs\ocean\python.exe" .\server.py stop
+```
+
+Wait until the task is no longer running before editing/rebuilding. Re-enable
+and start it using `Enable-ScheduledTask` and `Start-ScheduledTask`.
+To uninstall, stop it as above, then:
+
+```powershell
+Unregister-ScheduledTask -TaskName OceanMind -Confirm
+```
+
+Avoid forcibly ending only the supervisor in Task Manager/Task Scheduler: child
+processes may survive. Use the managed stop command. Network drives mapped in an
+interactive session may not exist at boot; use local storage or a UNC path with
+appropriate account permissions. Dataset/network availability can delay startup.
+
+### Remote access
+
+Defaults are loopback-only. For a trusted LAN/VPN deployment, use
+`--web-host 0.0.0.0` on the launcher, or `-WebHost 0.0.0.0` when installing
+the task. Browse to http://SERVER-IP:3000, not http://0.0.0.0:3000.
+The backend stays on 127.0.0.1; the frontend proxy is configured automatically.
+Custom ports use `--web-port` / `--api-port` (installer: `-WebPort` / `-ApiPort`).
+
+Do not expose this unauthenticated analysis interface directly to the public
+Internet. Restrict inbound access to trusted addresses, or use an authenticated
+HTTPS reverse proxy/VPN. Opening firewall ports is an explicit administrator step.
+
+Task Scheduler reference:
+https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/register-scheduledtask
