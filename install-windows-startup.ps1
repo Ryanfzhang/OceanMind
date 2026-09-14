@@ -1,8 +1,8 @@
 #Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory=$true)][string]$PythonPath,
-    [Parameter(Mandatory=$true)][string]$NodePath,
+    [string]$PythonPath = (Get-Command python -ErrorAction Stop).Source,
+    [string]$NodePath = (Get-Command node -ErrorAction Stop).Source,
     [string]$TaskName = "OceanMind",
     [string]$WebHost = "127.0.0.1",
     [string]$PublicUrl = "",

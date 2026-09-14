@@ -179,6 +179,43 @@ def prepare_nginx(args, paths):
     return cmd
 
 
+def prepare_frontend(node, env, dev=False, check=False):
+    cli = WEB / "node_modules/next/dist/bin/next"
+    build = WEB / ".next/BUILD_ID"
+    if cli.is_file() and (dev or build.is_file()):
+        return str(cli)
+    if check:
+        raise RuntimeError("Frontend is not prepared yet. Run start-server.bat once; it installs and builds automatically.")
+    # Never change dependencies underneath an already running instance.
+    with InstanceLock():
+        installed = False
+        if not cli.is_file():
+            npm = shutil.which("npm", path=env["PATH"])
+            candidates = [Path(node).parent / "node_modules/npm/bin/npm-cli.js"]
+            if npm:
+                candidates.append(Path(npm).parent / "node_modules/npm/bin/npm-cli.js")
+            npm_cli = next((p for p in candidates if p.is_file()), None)
+            if npm_cli:
+                command = [node, str(npm_cli)]
+            elif npm and os.name != "nt":
+                command = [npm]
+            else:
+                raise RuntimeError("npm not found alongside Node. Install Node.js including npm in the ocean environment.")
+            print("OceanMind: installing frontend dependencies (first launch)...", flush=True)
+            result = subprocess.run(command + ["ci", "--include=dev"], cwd=WEB, env=env)
+            if result.returncode:
+                raise RuntimeError("Frontend dependency installation failed; see npm output above.")
+            installed = True
+        if not dev and (installed or not build.is_file()):
+            print("OceanMind: building frontend (first launch)...", flush=True)
+            result = subprocess.run([node, str(cli), "build"], cwd=WEB, env=env)
+            if result.returncode:
+                raise RuntimeError("Frontend build failed; see output above.")
+        if not cli.is_file() or (not dev and not build.is_file()):
+            raise RuntimeError("Frontend setup did not produce the required files.")
+    return str(cli)
+
+
 def configuration(args):
     if not (1 <= args.api_port <= 65535 and 1 <= args.web_port <= 65535):
         raise RuntimeError("Ports must be in 1..65535.")
@@ -204,11 +241,8 @@ def configuration(args):
     node = args.node or shutil.which("node", path=env["PATH"])
     if not node or not Path(node).is_file():
         raise RuntimeError("Node not found. Pass --node with the absolute executable path.")
-    cli = WEB / "node_modules/next/dist/bin/next"
-    if not cli.is_file():
-        raise RuntimeError("Run npm ci inside apps/web first.")
-    if not args.dev and not (WEB / ".next/BUILD_ID").is_file():
-        raise RuntimeError("Run npm run build inside apps/web first.")
+    cli = prepare_frontend(str(Path(node).resolve()), env, args.dev,
+                           check=args.action == "check")
     if not args.dev:
         env["NODE_ENV"] = "production"
     return env, str(Path(node).resolve()), str(cli)
@@ -223,7 +257,7 @@ def main(argv=None):
     p.add_argument("--tls-key", help="PEM private key (must be readable without a password prompt)")
     p.add_argument("--public-url", type=public_url,
                    help="External website URL behind your reverse proxy; does not configure DNS/TLS")
-    p.add_argument("--web-host", default="127.0.0.1")
+    p.add_argument("--web-host", "--hostname", dest="web_host", default="127.0.0.1")
     p.add_argument("--web-port", type=int, default=3000)
     p.add_argument("--api-port", type=int, default=8000)
     p.add_argument("--startup-timeout", type=int, default=180)
