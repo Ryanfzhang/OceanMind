@@ -1622,7 +1622,6 @@ function HovmollerChart({
 
       <div
         className="detail-chart-shell"
-        style={{ minHeight: 440 }}
         onMouseLeave={() => setHoverState(null)}
         onMouseMove={(event) => {
           const svg = svgRef.current;
