@@ -964,6 +964,38 @@ h4 {
   max-width: 320px;
 }
 
+.map-top-overlays {
+  position: absolute;
+  inset: 16px 16px auto;
+  z-index: 500;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.map-top-overlays > * {
+  pointer-events: auto;
+}
+
+.map-top-overlays .map-draw-toolbar {
+  position: static;
+  flex: 0 1 320px;
+  min-width: 0;
+  max-width: 100%;
+  margin-right: auto;
+}
+
+.map-top-overlays .map-colorbar.is-floating {
+  position: static;
+  flex: 0 1 260px;
+  width: 260px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
 .map-draw-toolbar .step-card-action-row {
   margin-top: 4px;
 }
@@ -2863,6 +2895,16 @@ h4 {
 .hovmoller-chart-card .detail-chart-shell {
   aspect-ratio: 704 / 440;
   min-height: 0;
+}
+
+.hovmoller-chart-card .detail-chart-header {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hovmoller-chart-card .chart-readout strong {
+  min-height: 3lh;
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-subtitle {

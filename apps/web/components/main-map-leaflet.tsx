@@ -1081,24 +1081,27 @@ export default function MainMapLeaflet({
           ref={containerRef}
           className={`leaflet-map ${manualState.selectionMode === "box" ? "is-box-mode" : ""} ${isDrawMode ? "is-draw-mode" : ""}`}
         />
-        {isDrawMode ? (
-          <div className="map-floating-card top-left-card map-draw-toolbar">
-            <span className="mini-label">{isTransectMode ? "Transect Tool" : "Polygon Tool"}</span>
-            <strong>{activeGeometrySummary}</strong>
-            <span>Single click adds vertices. Double click or Finish completes the shape.</span>
-            <div className="step-card-action-row">
-              <button className="result-expand-btn" onClick={handleUndoDrawing} type="button">
-                Undo
-              </button>
-              <button className="result-expand-btn" onClick={handleFinishDrawing} type="button">
-                Finish
-              </button>
-              <button className="result-expand-btn" onClick={handleClearDrawing} type="button">
-                Clear
-              </button>
+        <div className="map-top-overlays">
+          {isDrawMode ? (
+            <div className="map-floating-card map-draw-toolbar">
+              <span className="mini-label">{isTransectMode ? "Transect Tool" : "Polygon Tool"}</span>
+              <strong>{activeGeometrySummary}</strong>
+              <span>Single click adds vertices. Double click or Finish completes the shape.</span>
+              <div className="step-card-action-row">
+                <button className="result-expand-btn" onClick={handleUndoDrawing} type="button">
+                  Undo
+                </button>
+                <button className="result-expand-btn" onClick={handleFinishDrawing} type="button">
+                  Finish
+                </button>
+                <button className="result-expand-btn" onClick={handleClearDrawing} type="button">
+                  Clear
+                </button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+          <MapColorbar field={mapField} compact floating />
+        </div>
         {mapField ? (
           <div className="map-hover-panel">
             <span className="mini-label">Hover Value</span>
@@ -1118,7 +1121,6 @@ export default function MainMapLeaflet({
             )}
           </div>
         ) : null}
-        <MapColorbar field={mapField} compact floating />
         {selectedEvent ? (
           <div className="map-floating-card bottom-right-card">
             <span className="mini-label">Selected Event</span>
