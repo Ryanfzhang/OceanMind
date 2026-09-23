@@ -1,14 +1,24 @@
 # OceanMind: A multi-agent AI system for ocean diagnosis
 
+<p align="center">Ask ocean questions in natural language and get planned, traceable analyses of time-dependent 3D ocean data.</p>
+
+<p align="center">
+  <a href="http://143.89.31.83"><img alt="Demo: http://oceanmind.wavyocean.hkust.edu.hk/" src="https://img.shields.io/badge/Demo-http%3A%2F%2Foceanmind.wavyocean.hkust.edu.hk%2F-d4a017?style=flat-square"></a>
+</p>
+
 **Contents**
 
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Use CMEMS for Global Ocean Diagnosis](#use-cmems-for-global-ocean-diagnosis)
-- [Example Queries](#example-queries)
-- [Benchmarks](#benchmarks)
-- [Citation and License](#citation-and-license)
-- [Development](#development)
+- [OceanMind: A multi-agent AI system for ocean diagnosis](#oceanmind-a-multi-agent-ai-system-for-ocean-diagnosis)
+  - [Architecture](#architecture)
+  - [Quick Start](#quick-start)
+    - [Step 1: Install dependencies](#step-1-install-dependencies)
+    - [Step 2: Configure environment](#step-2-configure-environment)
+    - [Step 3: Start](#step-3-start)
+  - [Use CMEMS for Global Ocean Diagnosis](#use-cmems-for-global-ocean-diagnosis)
+  - [Example Queries](#example-queries)
+  - [Benchmarks](#benchmarks)
+  - [Citation and License](#citation-and-license)
+  - [Development](#development)
 
 ## Architecture
 
