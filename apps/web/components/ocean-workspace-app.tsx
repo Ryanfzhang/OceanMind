@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CenterWorkspace } from "@/components/center-workspace";
 import { LeftControlPanel } from "@/components/left-control-panel";
 import { AnalysisFeed } from "@/components/analysis-feed";
@@ -81,19 +81,8 @@ const TOOL_LABELS: Record<string, string> = {
   detect_eddies: "Detect Eddies",
 };
 
-const DESIGN_VIEWPORT_WIDTH = 1920;
-const MIN_WORKSPACE_SCALE = 0.78;
-
 function createMessageId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function readWorkspaceScale() {
-  if (typeof window === "undefined") {
-    return 1;
-  }
-  const widthScale = window.innerWidth / DESIGN_VIEWPORT_WIDTH;
-  return Math.min(1, Math.max(MIN_WORKSPACE_SCALE, widthScale));
 }
 
 function describeTool(tool?: string | null) {
@@ -574,7 +563,6 @@ function updateAssistantMessage(
 
 export function OceanWorkspaceApp() {
   const [conversationId, setConversationId] = useState(() => createMessageId("conversation"));
-  const [workspaceScale, setWorkspaceScale] = useState(1);
   const [hasPendingClarification, setHasPendingClarification] = useState(false);
   const [manualState, setManualState] = useState(manualViewState);
   const [datasetInfo, setDatasetInfo] = useState<DatasetInfo | null>(null);
@@ -587,13 +575,6 @@ export function OceanWorkspaceApp() {
   const [activeMapResult, setActiveMapResult] = useState<ResultCardSummary | null>(null);
   const [activeMapWorkspaceData, setActiveMapWorkspaceData] = useState<WorkspaceData>(EMPTY_WORKSPACE_DATA);
   const quickVisualizeEnabled = canRunQuickVisualization(manualState, datasetInfo);
-
-  useEffect(() => {
-    const updateScale = () => setWorkspaceScale(readWorkspaceScale());
-    updateScale();
-    window.addEventListener("resize", updateScale);
-    return () => window.removeEventListener("resize", updateScale);
-  }, []);
 
   useEffect(() => {
     pingApi().catch(() => undefined);
@@ -1492,19 +1473,9 @@ export function OceanWorkspaceApp() {
   };
 
   const mergedWorkspaceData = useMemo(() => activeMapWorkspaceData, [activeMapWorkspaceData]);
-  const workspaceStageStyle = useMemo(
-    () =>
-      ({
-        "--workspace-scale": workspaceScale,
-        width: `${100 / workspaceScale}vw`,
-        height: `${100 / workspaceScale}vh`,
-      }) as CSSProperties,
-    [workspaceScale],
-  );
-
   return (
     <div className="workspace-viewport">
-      <div className="workspace-stage" style={workspaceStageStyle}>
+      <div className="workspace-stage">
         <header className="app-banner">
           <h1>OceanMind</h1>
         </header>

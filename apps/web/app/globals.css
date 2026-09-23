@@ -18,10 +18,10 @@
   --radius-md: 8px;
   --radius-sm: 6px;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --type-lg: 20px;
-  --type-md: 15px;
-  --type-sm: 13px;
-  --card-title-size: 16px;
+  --type-lg: 21px;
+  --type-md: 16px;
+  --type-sm: 14px;
+  --card-title-size: 17px;
   --card-body-size: var(--type-md);
   --card-title-weight: 750;
 }
@@ -58,8 +58,9 @@ body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  transform: scale(var(--workspace-scale, 1));
-  transform-origin: top left;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
 }
 
 .app-banner {
@@ -93,13 +94,15 @@ button:disabled {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 360px minmax(720px, 1.18fr) minmax(520px, 0.92fr);
-  gap: 18px;
+  grid-template-columns: 360px minmax(0, 1fr) clamp(360px, 31vw, 520px);
+  gap: 12px;
   align-items: stretch;
   align-self: stretch;
   height: 100%;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
-  padding: 16px 16px 0;
+  padding: 12px 12px 0;
   overflow: hidden;
 }
 
@@ -2584,6 +2587,7 @@ h4 {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -2592,6 +2596,7 @@ h4 {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   background: var(--panel);
   border-left: 1px solid var(--border);
@@ -2648,6 +2653,7 @@ h4 {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -2669,10 +2675,12 @@ h4 {
 .feed-input form {
   display: flex;
   gap: 8px;
+  min-width: 0;
 }
 
 .feed-input input {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2680,12 +2688,59 @@ h4 {
 }
 
 .feed-input button {
+  flex: 0 0 auto;
+  white-space: nowrap;
   padding: 10px 20px;
   border: none;
   border-radius: var(--radius-md);
   background: var(--accent);
   color: white;
   font-weight: 600;
+}
+
+@media (max-width: 1150px) {
+  .app-shell {
+    grid-template-columns: 360px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .left-panel {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  .map-column {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .feed-column {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .left-panel {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .map-column,
+  .feed-column {
+    flex: 0 0 auto;
+    width: 100%;
+    height: min(65vh, 600px);
+    min-height: 380px;
+  }
 }
 
 .user-message {
