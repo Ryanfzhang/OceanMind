@@ -14,7 +14,6 @@ import { sampleNearestMapFieldValue, type HoverSample } from "@/lib/map-hover";
 import { MapColorbar } from "@/components/map-colorbar";
 import {
   LIGHT_BASEMAP,
-  OSM_FALLBACK_BASEMAP,
   leafletTileLayerOptions,
   normalizeBasemapConfig,
   type BasemapConfig,
@@ -242,12 +241,12 @@ async function loadRuntimeBasemap(): Promise<{ basemap: BasemapConfig; fallback:
     const payload = (await response.json()) as Partial<MapConfigResponse>;
     return {
       basemap: normalizeBasemapConfig(payload.basemap, LIGHT_BASEMAP),
-      fallback: normalizeBasemapConfig(payload.fallback, OSM_FALLBACK_BASEMAP),
+      fallback: normalizeBasemapConfig(payload.fallback, LIGHT_BASEMAP),
     };
   } catch {
     return {
       basemap: LIGHT_BASEMAP,
-      fallback: OSM_FALLBACK_BASEMAP,
+      fallback: LIGHT_BASEMAP,
     };
   }
 }
@@ -385,7 +384,7 @@ export default function MainMapLeaflet({
       let fallbackInstalled = false;
       let basemapLayers = createTileLayerStack(L, runtimeBasemap.basemap);
       const installFallbackBasemap = () => {
-        if (fallbackInstalled || !mounted) {
+        if (fallbackInstalled || !mounted || runtimeBasemap.basemap.url === runtimeBasemap.fallback.url) {
           return;
         }
         fallbackInstalled = true;

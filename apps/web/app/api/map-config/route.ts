@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   LIGHT_BASEMAP,
-  OSM_FALLBACK_BASEMAP,
   type BasemapConfig,
   type BasemapRegion,
   type MapConfigResponse,
@@ -195,7 +194,11 @@ export async function GET(request: NextRequest) {
   const { country, source } = detectCountry(request.headers);
   const region = selectRegion(request, country);
   const chinaBasemap = region === "cn" ? buildChinaBasemap() : null;
-  const basemap = region === "cn" ? chinaBasemap ?? LIGHT_BASEMAP : LIGHT_BASEMAP;
+  const cartoKey = envValue("CARTO_BASEMAP_API_KEY");
+  const cartoBasemap = cartoKey
+    ? { ...LIGHT_BASEMAP, url: `${LIGHT_BASEMAP.url}?key=${encodeURIComponent(cartoKey)}` }
+    : LIGHT_BASEMAP;
+  const basemap = region === "cn" ? chinaBasemap ?? cartoBasemap : cartoBasemap;
   const reason =
     region === "cn" && !chinaBasemap
       ? "china_basemap_not_configured"
@@ -208,7 +211,7 @@ export async function GET(request: NextRequest) {
     detectedCountry: country,
     detectionSource: source,
     basemap,
-    fallback: OSM_FALLBACK_BASEMAP,
+    fallback: cartoBasemap,
     reason,
   };
 

@@ -27,19 +27,11 @@ export const LIGHT_BASEMAP: BasemapConfig = {
   id: "carto-light",
   label: "CARTO Light",
   region: "global",
-  url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  url: "https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png",
+  subdomains: "abcd",
   attribution:
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   maxZoom: 20,
-};
-
-export const OSM_FALLBACK_BASEMAP: BasemapConfig = {
-  id: "osm-standard",
-  label: "OpenStreetMap",
-  region: "global",
-  url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 19,
 };
 
 type TileLayerOptions = {
