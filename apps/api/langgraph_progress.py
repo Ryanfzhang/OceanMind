@@ -18,22 +18,6 @@ PREVIEW_JSON_BYTES = 4 * 1024 * 1024
 PREVIEW_GRID_SIDE = 64
 
 
-def _map_land_mask(x: Any, y: Any, values: Any) -> tuple[Any, str | None]:
-    """Keep sampled land cells empty and supply a pixel-level coastline clip."""
-    import numpy as np
-    from domain.ocean.visualization.landmask import build_land_mask, render_land_mask_image
-
-    land = build_land_mask(lat=y, lon=x)
-    if land is not None and land.shape == values.shape:
-        values = np.where(land, np.nan, values)
-    try:
-        image = render_land_mask_image(float(x.min()), float(x.max()),
-                                       float(y.min()), float(y.max()))
-    except (ImportError, OSError, ValueError):
-        image = None
-    return values, image
-
-
 def _map_values(values: Any) -> list[list[float | None]]:
     return [[float(value) if math.isfinite(value) else None for value in row]
             for row in values]
@@ -73,6 +57,7 @@ def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
     """Read at most a small slice of a saved field for the existing UI charts."""
     import numpy as np
     import xarray as xr
+    from domain.ocean.visualization.landmask import mask_land_for_map_preview
 
     with xr.open_dataarray(path) as source:
         field = source.squeeze(drop=True)
@@ -108,7 +93,7 @@ def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
                     or not np.all(np.isfinite(lon)) or not np.all(np.isfinite(lat))
                     or not np.any(np.isfinite(values))):
                 return None
-            values, land_image = _map_land_mask(lon, lat, values)
+            values, land_image = mask_land_for_map_preview(lon, lat, values)
             map_field = {
                 "lon": lon.tolist(), "lat": lat.tolist(),
                 "values": _map_values(values),
@@ -220,6 +205,7 @@ def _transport_map_style(value: Any, metadata: dict, root: Any,
 
 def _map_payload(value: dict, root: Any, name: str) -> dict | None:
     import numpy as np
+    from domain.ocean.visualization.landmask import mask_land_for_map_preview
 
     lon, lat = value.get("lon"), value.get("lat")
     field = value.get("values", value.get("slope"))
@@ -241,7 +227,7 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
     if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y)) and np.any(np.isfinite(sample))):
         return None
     metadata = value.get("metadata") or {}
-    sample, land_image = _map_land_mask(x, y, sample)
+    sample, land_image = mask_land_for_map_preview(x, y, sample)
     result = {"lon": x.tolist(), "lat": y.tolist(),
             "values": _map_values(sample),
             "label": name.replace("_", " ").title(),

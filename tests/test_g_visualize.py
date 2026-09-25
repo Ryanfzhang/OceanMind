@@ -11,6 +11,21 @@ from fastapi.testclient import TestClient
 from apps.api import langgraph_visualize
 
 
+def test_quick_visualization_uses_shared_coastline_mask(monkeypatch):
+    def masked_preview(lon, lat, values):
+        masked = values.copy()
+        masked[0, 0] = np.nan
+        return masked, "land-png"
+
+    monkeypatch.setattr(langgraph_visualize, "mask_land_for_map_preview", masked_preview)
+    field = langgraph_visualize._map_field({
+        "lon": [120.0, 121.0], "lat": [20.0, 21.0],
+        "values": [[1.0, 2.0], [3.0, 4.0]], "metadata": {"variable": "temp"},
+    }, "Temperature", ("2011-01-01", "2011-01-01"), "0 m")
+    assert field["values"][0][0] is None
+    assert field["landMaskImage"] == "land-png"
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     time = np.array(["2022-01-01", "2022-01-02", "2022-01-03"], dtype="datetime64[ns]")

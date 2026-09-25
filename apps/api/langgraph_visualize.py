@@ -29,6 +29,7 @@ from domain.ocean.data_access.assemble import assemble_dataset
 from domain.ocean.data_access.load import load_dataset
 from domain.ocean.diagnostics.compute import compute_density
 from domain.ocean.preprocessing.filter import build_polygon_mask
+from domain.ocean.visualization.landmask import mask_land_for_map_preview
 
 
 router = APIRouter()
@@ -125,7 +126,8 @@ def _map_field(result: dict, title: str, dates: tuple[str, str], depth_label: st
     rows = np.unique(np.linspace(0, len(lat) - 1, min(len(lat), 100), dtype=int))
     cols = np.unique(np.linspace(0, len(lon) - 1, min(len(lon), 100), dtype=int))
     sampled = values[np.ix_(rows, cols)]
-    finite = values[np.isfinite(values)]
+    sampled, land_image = mask_land_for_map_preview(lon[cols], lat[rows], sampled)
+    finite = sampled[np.isfinite(sampled)]
     if finite.size == 0:
         raise ValueError("The selection contains no finite ocean values")
     low, high = float(finite.min()), float(finite.max())
@@ -133,7 +135,7 @@ def _map_field(result: dict, title: str, dates: tuple[str, str], depth_label: st
         pad = max(abs(low) * 1e-6, 1e-9)
         low, high = low - pad, high + pad
     metadata = result.get("metadata") or {}
-    return {
+    map_field = {
         "lon": lon[cols].tolist(),
         "lat": lat[rows].tolist(),
         "values": [[_finite(value) for value in row] for row in sampled],
@@ -148,6 +150,9 @@ def _map_field(result: dict, title: str, dates: tuple[str, str], depth_label: st
         "bounds": [[float(lat[rows[0]]), float(lon[cols[0]])],
                    [float(lat[rows[-1]]), float(lon[cols[-1]])]],
     }
+    if land_image:
+        map_field["landMaskImage"] = land_image
+    return map_field
 
 
 def _series(result: dict) -> list[dict]:

@@ -20,6 +20,21 @@ def build_land_mask(*, lat: np.ndarray, lon: np.ndarray) -> Optional[np.ndarray]
         return None
 
 
+def mask_land_for_map_preview(
+    lon: np.ndarray, lat: np.ndarray, values: np.ndarray,
+) -> tuple[np.ndarray, str | None]:
+    """Mask grid points and return a finer coastline clip for browser interpolation."""
+    land = build_land_mask(lat=lat, lon=lon)
+    if land is not None and land.shape == values.shape:
+        values = np.where(land, np.nan, values)
+    try:
+        image = render_land_mask_image(float(lon.min()), float(lon.max()),
+                                       float(lat.min()), float(lat.max()))
+    except (ImportError, OSError, ValueError):
+        image = None
+    return values, image
+
+
 @lru_cache(maxsize=16)
 def _cached_land_mask(lat_key: tuple[float, ...], lon_key: tuple[float, ...]) -> np.ndarray:
     from cartopy.io import shapereader
