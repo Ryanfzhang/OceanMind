@@ -40,4 +40,8 @@ def run_query(
         run_id=session.run_id if session else None,
         run_root=str(session.root) if session else None,
     )
-    return graph.invoke(state, config={"recursion_limit": 2 * max_rounds + 8})
+    try:
+        return graph.invoke(state, config={"recursion_limit": 2 * max_rounds + 8})
+    finally:
+        if session is not None:
+            session.close()

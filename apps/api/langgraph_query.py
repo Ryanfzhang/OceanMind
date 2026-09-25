@@ -298,20 +298,23 @@ class QueryService:
             turn_start = len(record.messages)
             state["messages"] = [*record.messages, *state["messages"]]
             emit({"event": "execution_event", "payload": {"type": "planning_started"}})
-            graph = build_graph(
-                self.model_factory(), max_rounds=self.max_rounds,
-                answer_model=self.answer_model_factory() if self.answer_model_factory else None,
-                analysis_session=session,
-            )
-            state = graph.invoke(
-                state, config={"recursion_limit": 2 * self.max_rounds + 8},
-            )
-            record = replace(record, messages=state["messages"], status=state["status"])
-            self.store.save(record)
-            response = _response(state, record, request.query, turn_start)
-            if adapter is not None:
-                response.update(adapter.finalize(state))
-            return response
+            try:
+                graph = build_graph(
+                    self.model_factory(), max_rounds=self.max_rounds,
+                    answer_model=self.answer_model_factory() if self.answer_model_factory else None,
+                    analysis_session=session,
+                )
+                state = graph.invoke(
+                    state, config={"recursion_limit": 2 * self.max_rounds + 8},
+                )
+                record = replace(record, messages=state["messages"], status=state["status"])
+                self.store.save(record)
+                response = _response(state, record, request.query, turn_start)
+                if adapter is not None:
+                    response.update(adapter.finalize(state))
+                return response
+            finally:
+                session.close()
 
     def stream(self, request: QueryRequest) -> Iterator[str]:
         events: queue.Queue[dict[str, Any] | None] = queue.Queue()

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import select
 import signal
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -185,6 +187,70 @@ def _unavailable_results(root: Path, run_id: str, attempt_id: str,
     return unavailable
 
 
+def _summarize_attempt(
+    root: Path, run_id: str, attempt_id: str, code_id: str,
+    records: RunRecords, store: CodeStore, roots: list[Path],
+    *, exit_code: int | None, timed_out: bool, timeout_seconds: float,
+    stdout: str, stderr: str, stdout_truncated: bool, stderr_truncated: bool,
+    event_counts: dict, on_event: EventCallback | None,
+) -> dict:
+    attempt = records.read("attempt", attempt_id)
+    if timed_out:
+        status, reason = "timed_out", f"Script exceeded {timeout_seconds:g} seconds"
+    elif exit_code != 0:
+        status, reason = "failed", attempt.get("error") or f"Worker exited {exit_code}"
+    elif (attempt.get("run_id") != run_id or attempt.get("attempt_id") != attempt_id
+          or attempt.get("code_version") != code_id):
+        status, reason = "failed", "Attempt record changed its run or code version"
+    elif attempt["status"] != "completed":
+        status, reason = "failed", "Worker exited before completing the attempt"
+    else:
+        status, reason = "completed", None
+    try:
+        store.get_path(code_id)
+    except (OSError, ValueError) as exc:
+        status, reason = "failed", f"Saved code changed during execution: {exc}"
+    if status != "completed":
+        _close_unfinished(records, attempt_id, reason, on_event)
+        records.update("attempt", attempt_id, status=status, error=reason)
+
+    stages = _records_for(records, "stage", attempt_id)
+    calls = _records_for(records, "call", attempt_id)
+    results = [entry for item in stages for entry in item.get("result_index", [])]
+    successful = [entry for entry in results if entry["status"] == "completed"]
+    unavailable = _unavailable_results(root, run_id, attempt_id, roots, successful)
+    if unavailable:
+        status, reason = "failed", f"Saved result artifacts unavailable: {len(unavailable)}"
+        records.update("attempt", attempt_id, status=status, error=reason)
+    failed = [call for call in calls if call["status"] == "failed"]
+    failed_stages = [item for item in stages if item["status"] != "completed"]
+    stage_preview = (list(reversed(failed_stages)) + [item for item in reversed(stages)
+                                      if item["status"] == "completed"])[:PREVIEW_LIMIT]
+    return {
+        "run_id": run_id, "attempt_id": attempt_id, "code_id": code_id,
+        "status": status, "exit_code": exit_code, "timed_out": timed_out,
+        "error": reason, "stdout": stdout, "stderr": stderr,
+        "stdout_truncated": stdout_truncated, "stderr_truncated": stderr_truncated,
+        "event_count": event_counts["received"],
+        "invalid_event_count": event_counts["invalid"],
+        "stage_count": len(stages), "call_count": len(calls),
+        "result_count": len(successful),
+        "invalid_result_count": len(unavailable),
+        "invalid_result_preview": unavailable[:PREVIEW_LIMIT],
+        "stages": [{"stage_id": item["stage_id"], "title": item["name"],
+                    "status": item["status"],
+                    "completed_units": item.get("completed_units", 0)}
+                   for item in stage_preview],
+        "result_preview": [{"artifact_id": entry["artifact_id"],
+                            "call_id": entry["call_id"], "stage_id": entry["stage_id"],
+                            "status": entry["status"], "summary": entry["summary"]}
+                           for entry in successful[-PREVIEW_LIMIT:]],
+        "failed_call_preview": [{"call_id": item["call_id"], "stage_id": item["stage_id"],
+                                 "name": item["name"], "error": item.get("error", "")}
+                                for item in failed[-PREVIEW_LIMIT:]],
+    }
+
+
 def run_script(
     *, root: str | Path, run_id: str, code_id: str, launcher: Launcher,
     code_store: CodeStore | None = None,
@@ -267,60 +333,173 @@ def run_script(
     for thread in threads:
         thread.join(timeout=5)
 
-    attempt = records.read("attempt", attempt_id)
-    if timed_out:
-        status, reason = "timed_out", f"Script exceeded {timeout_seconds:g} seconds"
-    elif process.returncode != 0:
-        status, reason = "failed", attempt.get("error") or f"Worker exited {process.returncode}"
-    elif (attempt.get("run_id") != run_id or attempt.get("attempt_id") != attempt_id
-          or attempt.get("code_version") != code_id):
-        status, reason = "failed", "Attempt record changed its run or code version"
-    elif attempt["status"] != "completed":
-        status, reason = "failed", "Worker exited before completing the attempt"
-    else:
-        status, reason = "completed", None
-    try:
-        store.get_path(code_id)
-    except (OSError, ValueError) as exc:
-        status, reason = "failed", f"Saved code changed during execution: {exc}"
-    if status != "completed":
-        _close_unfinished(records, attempt_id, reason, on_event)
-        records.update("attempt", attempt_id, status=status, error=reason)
-
-    stages = _records_for(records, "stage", attempt_id)
-    calls = _records_for(records, "call", attempt_id)
-    results = [entry for item in stages for entry in item.get("result_index", [])]
-    successful = [entry for entry in results if entry["status"] == "completed"]
-    unavailable = _unavailable_results(root, run_id, attempt_id, roots, successful)
-    if unavailable:
-        status, reason = "failed", f"Saved result artifacts unavailable: {len(unavailable)}"
-        records.update("attempt", attempt_id, status=status, error=reason)
-    failed = [call for call in calls if call["status"] == "failed"]
-    failed_stages = [item for item in stages if item["status"] != "completed"]
-    stage_preview = (list(reversed(failed_stages)) + [item for item in reversed(stages)
-                                      if item["status"] == "completed"])[:PREVIEW_LIMIT]
     stdout, stdout_truncated = stdout_log.result()
     stderr, stderr_truncated = stderr_log.result()
-    return {
-        "run_id": run_id, "attempt_id": attempt_id, "code_id": code_id,
-        "status": status, "exit_code": process.returncode, "timed_out": timed_out,
-        "error": reason, "stdout": stdout, "stderr": stderr,
-        "stdout_truncated": stdout_truncated, "stderr_truncated": stderr_truncated,
-        "event_count": event_counts["received"],
-        "invalid_event_count": event_counts["invalid"],
-        "stage_count": len(stages), "call_count": len(calls),
-        "result_count": len(successful),
-        "invalid_result_count": len(unavailable),
-        "invalid_result_preview": unavailable[:PREVIEW_LIMIT],
-        "stages": [{"stage_id": item["stage_id"], "title": item["name"],
-                    "status": item["status"],
-                    "completed_units": item.get("completed_units", 0)}
-                   for item in stage_preview],
-        "result_preview": [{"artifact_id": entry["artifact_id"],
-                            "call_id": entry["call_id"], "stage_id": entry["stage_id"],
-                            "status": entry["status"], "summary": entry["summary"]}
-                           for entry in successful[-PREVIEW_LIMIT:]],
-        "failed_call_preview": [{"call_id": item["call_id"], "stage_id": item["stage_id"],
-                                 "name": item["name"], "error": item.get("error", "")}
-                                for item in failed[-PREVIEW_LIMIT:]],
-    }
+    return _summarize_attempt(
+        root, run_id, attempt_id, code_id, records, store, roots,
+        exit_code=process.returncode, timed_out=timed_out,
+        timeout_seconds=timeout_seconds, stdout=stdout, stderr=stderr,
+        stdout_truncated=stdout_truncated, stderr_truncated=stderr_truncated,
+        event_counts=event_counts, on_event=on_event,
+    )
+
+
+class SessionRunner:
+    """Keep one sandboxed Python process and namespace for successive cells."""
+
+    def __init__(self, *, root: Path, run_id: str, code_store: CodeStore,
+                 launcher: Launcher, allowed_read_roots: Sequence[Path],
+                 on_event: EventCallback | None = None,
+                 max_log_bytes: int = 16_384) -> None:
+        if not callable(launcher):
+            raise ValueError("An isolation launcher is required")
+        if not 1024 <= max_log_bytes <= 1_048_576:
+            raise ValueError("Invalid log limit")
+        self.root = Path(root).expanduser().resolve()
+        self.run_id = run_id
+        self.codes = code_store
+        self.launcher = launcher
+        self.roots = [Path(path).expanduser().resolve() for path in allowed_read_roots]
+        self.on_event = on_event
+        self.max_log_bytes = max_log_bytes
+        self.records = RunRecords(self.root, run_id)
+        self.process: subprocess.Popen | None = None
+        self.read_fd: int | None = None
+        self.worker_stderr = _LogBuffer(max_log_bytes)
+        self.stderr_thread: threading.Thread | None = None
+        self.pending = bytearray()
+        self.lock = threading.Lock()
+
+    def _start(self) -> None:
+        if self.process is not None and self.process.poll() is None:
+            return
+        self._stop()
+        read_fd, write_fd = os.pipe()
+        try:
+            args = ["-m", "packages.analysis_runtime.session_worker",
+                    "--root", str(self.root), "--run-id", self.run_id,
+                    "--event-fd", str(write_fd),
+                    "--max-log-bytes", str(self.max_log_bytes)]
+            command = self.launcher(sys.executable, args, self.root, self.roots)
+            if not isinstance(command, list) or not command or not all(
+                    isinstance(item, str) for item in command):
+                raise ValueError("Launcher must return a nonempty argv list")
+            self.process = subprocess.Popen(
+                command, cwd=self.root, env=_child_env(self.root),
+                stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE, pass_fds=(write_fd,),
+                start_new_session=True,
+            )
+            self.worker_stderr = _LogBuffer(self.max_log_bytes)
+            assert self.process.stderr is not None
+            self.stderr_thread = threading.Thread(
+                target=_read_log, args=(self.process.stderr, self.worker_stderr),
+                daemon=True,
+            )
+            self.stderr_thread.start()
+            self.read_fd = read_fd
+            self.pending.clear()
+        except BaseException:
+            os.close(read_fd)
+            raise
+        finally:
+            os.close(write_fd)
+
+    def _stop(self) -> None:
+        process = self.process
+        self.process = None
+        if process is not None:
+            if process.stdin:
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
+            _kill_process_group(process.pid)
+            process.wait()
+        if self.stderr_thread is not None:
+            self.stderr_thread.join(timeout=5)
+            self.stderr_thread = None
+        if self.read_fd is not None:
+            os.close(self.read_fd)
+            self.read_fd = None
+        self.pending.clear()
+
+    def close(self) -> None:
+        with self.lock:
+            self._stop()
+
+    def run(self, code_id: str, timeout_seconds: float = 1800) -> dict:
+        if not 0 < timeout_seconds <= 3600:
+            raise ValueError("timeout_seconds must be within 0..3600")
+        with self.lock:
+            self.codes.get_path(code_id)
+            attempt_id = self.records.new_attempt(code_version=code_id)
+            counts = {"received": 0, "invalid": 0, "callback_errors": 0}
+            completion = None
+            timed_out = False
+            try:
+                self._start()
+                assert self.process is not None and self.process.stdin is not None
+                self.process.stdin.write((json.dumps({"attempt_id": attempt_id,
+                                                      "code_id": code_id}) + "\n").encode())
+                self.process.stdin.flush()
+                deadline = time.monotonic() + timeout_seconds
+                while completion is None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        timed_out = True
+                        break
+                    assert self.read_fd is not None
+                    readable, _, _ = select.select([self.read_fd], [], [], remaining)
+                    if not readable:
+                        timed_out = True
+                        break
+                    chunk = os.read(self.read_fd, 8192)
+                    if not chunk:
+                        break
+                    self.pending.extend(chunk)
+                    while b"\n" in self.pending:
+                        line, _, remainder = self.pending.partition(b"\n")
+                        self.pending = bytearray(remainder)
+                        if len(line) > MAX_EVENT_LINE:
+                            counts["invalid"] += 1
+                            continue
+                        try:
+                            event = json.loads(line)
+                            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                                raise ValueError("Invalid event")
+                        except (ValueError, UnicodeDecodeError):
+                            counts["invalid"] += 1
+                            continue
+                        if event.get("attempt_id") != attempt_id:
+                            continue
+                        if event["type"] == "attempt_finished":
+                            completion = event
+                            break
+                        counts["received"] += 1
+                        if self.on_event:
+                            try:
+                                self.on_event(event)
+                            except Exception:
+                                counts["callback_errors"] += 1
+                if completion is None:
+                    self._stop()
+            except Exception as exc:
+                self.records.update("attempt", attempt_id, status="failed",
+                                    error=f"{type(exc).__name__}: {exc}"[:500])
+                self._stop()
+            worker_stderr, worker_stderr_truncated = self.worker_stderr.result()
+            result = _summarize_attempt(
+                self.root, self.run_id, attempt_id, code_id,
+                self.records, self.codes, self.roots,
+                exit_code=completion["exit_code"] if completion else None,
+                timed_out=timed_out, timeout_seconds=timeout_seconds,
+                stdout=completion["stdout"] if completion else "",
+                stderr=completion["stderr"] if completion else worker_stderr,
+                stdout_truncated=completion["stdout_truncated"] if completion else False,
+                stderr_truncated=(completion["stderr_truncated"] if completion
+                                  else worker_stderr_truncated),
+                event_counts=counts, on_event=self.on_event,
+            )
+            result["environment_lost"] = completion is None
+            return result

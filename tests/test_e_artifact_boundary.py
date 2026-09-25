@@ -60,7 +60,7 @@ def test_symlinked_store_directory_and_index_are_rejected(tmp_path):
         session.read_artifact(artifact_id)
 
 
-def test_parent_log_write_rejects_script_created_symlink(tmp_path, monkeypatch):
+def test_parent_log_write_rejects_script_created_symlink(tmp_path):
     session = AnalysisSession(tmp_path / "work")
     saved = session.write_analysis('print("hello")\n')
     outside = tmp_path / "outside"
@@ -68,11 +68,6 @@ def test_parent_log_write_rejects_script_created_symlink(tmp_path, monkeypatch):
     logs = session.root / "logs"
     logs.rmdir()
     logs.symlink_to(outside, target_is_directory=True)
-    monkeypatch.setattr(
-        "packages.agent_loop.analysis.run_script",
-        lambda **kwargs: {"attempt_id": "attempt_abc", "stdout": "", "stderr": "",
-                          "stdout_truncated": False, "stderr_truncated": False},
-    )
     with pytest.raises(ValueError, match="log directory"):
         session.run_analysis(saved["code_id"])
     assert list(outside.iterdir()) == []

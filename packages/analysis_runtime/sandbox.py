@@ -205,6 +205,7 @@ from pathlib import Path
 import numpy, xarray
 import packages.analysis_runtime.records
 import packages.analysis_runtime.worker
+import packages.analysis_runtime.session_worker
 from packages.tool_loader.introspect import get_tools_cached
 tool_count = len(get_tools_cached())
 data, secret, output, code_target, log_target, escape_link = map(Path, sys.argv[1:7])

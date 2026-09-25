@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from packages.analysis_runtime.artifacts import ArtifactStore
 from packages.analysis_runtime.code_store import CodeStore
-from packages.analysis_runtime.executor import run_script
+from packages.analysis_runtime.executor import SessionRunner
 from packages.analysis_runtime.index import list_results
 from packages.analysis_runtime.records import RunRecords, write_json_atomic
 from packages.analysis_runtime.sandbox import build_sandbox_command, validate_data_roots
@@ -19,7 +19,8 @@ from packages.analysis_runtime.sandbox import build_sandbox_command, validate_da
 WRITE_ANALYSIS_SCHEMA = {
     "type": "function", "function": {
         "name": "write_analysis",
-        "description": "Save a complete ordinary Python analysis script as a new immutable version.",
+        "description": ("Save one Python cell for the next run_analysis call. Its variables "
+                        "persist for later cells in this query; write only new or repaired work."),
         "parameters": {"type": "object", "properties": {
             "code": {"type": "string"},
             "previous_version": {"type": "string"},
@@ -41,7 +42,8 @@ READ_ARTIFACT_SCHEMA = {
 RUN_ANALYSIS_SCHEMA = {
     "type": "function", "function": {
         "name": "run_analysis",
-        "description": "Run one saved script version in a checked process sandbox; return stage and result references.",
+        "description": ("Execute one saved cell in this query's persistent sandboxed Python "
+                        "environment; return new stage and result references."),
         "parameters": {"type": "object", "properties": {
             "code_id": {"type": "string"},
             "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600},
@@ -82,6 +84,7 @@ class AnalysisSession:
             raise ValueError("Data sources must be outside the writable task directory")
         self.artifacts = ArtifactStore(self.root, allowed_source_roots=self.data_roots)
         self.on_event = on_event
+        self._runner: SessionRunner | None = None
 
     @classmethod
     def open_existing(
@@ -109,7 +112,18 @@ class AnalysisSession:
         session.data_roots = roots
         session.artifacts = ArtifactStore(task_root, allowed_source_roots=roots)
         session.on_event = on_event
+        session._runner = None
         return session
+
+    def close(self) -> None:
+        if self._runner is not None:
+            self._runner.close()
+            self._runner = None
+
+    def __del__(self) -> None:
+        runner = getattr(self, "_runner", None)
+        if runner is not None:
+            runner.close()
 
     def write_analysis(self, code: str, previous_version: str | None = None) -> dict:
         return self.codes.write_analysis(code, previous_version)
@@ -169,14 +183,19 @@ class AnalysisSession:
         return list_results(self.root, self.run_id, attempt_id, offset=offset, limit=limit)
 
     def run_analysis(self, code_id: str, timeout_seconds: float = 1800) -> dict:
-        result = run_script(
-            root=self.root, run_id=self.run_id, code_id=code_id,
-            code_store=self.codes, launcher=build_sandbox_command,
-            allowed_read_roots=self.data_roots, timeout_seconds=timeout_seconds,
-            on_event=self.on_event, max_log_bytes=16_384,
-        )
+        log_dir = self.root / "logs"
+        if log_dir.is_symlink() or not log_dir.is_dir():
+            raise ValueError("Task log directory is unavailable")
+        if self._runner is None:
+            self._runner = SessionRunner(
+                root=self.root, run_id=self.run_id, code_store=self.codes,
+                launcher=build_sandbox_command,
+                allowed_read_roots=self.data_roots, on_event=self.on_event,
+            )
+        self._runner.on_event = self.on_event
+        result = self._runner.run(code_id, timeout_seconds=timeout_seconds)
         attempt_id = result["attempt_id"]
-        if (self.root / "logs").is_symlink() or not (self.root / "logs").is_dir():
+        if log_dir.is_symlink() or not log_dir.is_dir():
             raise ValueError("Task log directory is unavailable")
         write_json_atomic(self.root / "logs" / f"{attempt_id}.json", {
             "run_id": self.run_id, "attempt_id": attempt_id,
