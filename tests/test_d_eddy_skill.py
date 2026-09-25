@@ -68,7 +68,7 @@ def test_two_depths_share_one_stage_and_keep_two_results(tmp_path):
         )
 
     assert len(stages.stages) == 2
-    assert [item.title for item in stages.stages] == ["读取流速", "涡旋检测"]
+    assert [item.title for item in stages.stages] == ["Load velocity fields", "Detect eddies"]
     assert stages.stages[1].completed == 2
     assert [item["depth"] for item in stages.stages[1].results] == [0.0, 50.0]
     assert all(item["artifact_id"] for item in stages.stages[1].results)

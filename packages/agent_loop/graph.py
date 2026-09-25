@@ -133,6 +133,8 @@ def build_graph(
             "Save complete ordinary Python with write_analysis, then run its code_id. "
             "Inside the script, use `from oceanmind_runtime import tools, stage, publish, "
             "load_result`; wrap related work in stage blocks and keep stages outside loops. "
+            "Use short, descriptive English stage titles for the English workspace UI; "
+            "name actual analysis actions, not diagnostic probes. "
             "Use `publish(name, value, inputs=[])` for custom computed results; "
             "if the value derives from a tool result, pass its saved ID in inputs using "
             "`tools.ref(result)`. Tool calls already save their results; do not publish "

@@ -26,14 +26,14 @@ from packages.analysis_runtime.stages import stage
 def run_spatial_map(tools, *, variable, lon_range, lat_range, time_range,
                     vertical_mode, depth_value=None, depth_range=None,
                     time_aggregation="mean", depth_aggregation="mean"):
-    with stage("读取原始变量"):
+    with stage("Load source field"):
         field = tools.load_dataset(
             variable=variable, lon_range=lon_range, lat_range=lat_range,
             time_range=time_range, vertical_mode=vertical_mode,
             depth_value=depth_value, depth_range=depth_range,
         )
 
-    with stage("计算二维空间场"):
+    with stage("Compute spatial field"):
         spatial_map = tools.compute_spatial_field(
             data=field, time_range=time_range,
             time_aggregation=time_aggregation,

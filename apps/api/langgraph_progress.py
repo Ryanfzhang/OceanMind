@@ -397,7 +397,7 @@ class ProgressAdapter:
     def _card(self, stage_id: str, title: str | None = None) -> dict:
         if stage_id not in self.cards:
             self.cards[stage_id] = {
-                "step_id": stage_id, "human_label": title or "运行分析",
+                "step_id": stage_id, "human_label": title or "Run analysis",
                 "technical_label": "analysis stage", "status": "running",
                 "results_hidden_by_default": False, "results": [], "actions": [],
                 "is_map_bound": False, "is_expanded": False,

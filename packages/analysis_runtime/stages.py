@@ -199,7 +199,7 @@ class StageManager:
                 raise RuntimeError("Current stage belongs to another script attempt")
             return item
         if self._default is None:
-            self._default = self._new_stage("运行分析", None, None)
+            self._default = self._new_stage("Run analysis", None, None)
         return self._default
 
     def close(self, error: BaseException | None = None) -> None:

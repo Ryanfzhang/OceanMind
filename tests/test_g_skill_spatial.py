@@ -86,7 +86,7 @@ def test_surface_example_runs_and_saves_both_results(tmp_path):
     assert calls[1][1]["depth_range"] is None
     assert result["values"].shape == (2, 3)
     assert result["metadata"]["units"] == "mg m-3"
-    assert [item.title for item in stages.stages] == ["读取原始变量", "计算二维空间场"]
+    assert [item.title for item in stages.stages] == ["Load source field", "Compute spatial field"]
     assert all(item.results[0]["artifact_id"] for item in stages.stages)
 
 

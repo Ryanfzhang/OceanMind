@@ -83,6 +83,7 @@ def test_count_mismatch_overrun_empty_and_failure_result():
 def test_default_stage_reused_and_limit_keeps_prior_results():
     stages = manager(max_stages=1)
     first = stages.ensure_stage()
+    assert first.title == "Run analysis"
     for n in range(100):
         assert stages.ensure_stage() is first
         stages.register_call_result(f"call_{n}", status="completed", artifact_id=f"art_{n}")

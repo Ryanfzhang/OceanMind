@@ -24,12 +24,12 @@ from packages.analysis_runtime.stages import stage
 def run_eddy_detection(tools, *, u_name, v_name, scope, slices,
                        ow_threshold=-2e-12, min_radius_km=30,
                        max_radius_km=300, min_pixels=10):
-    with stage("读取流速"):
+    with stage("Load velocity fields"):
         u = tools.load_dataset(variable=u_name, **scope)
         v = tools.load_dataset(variable=v_name, **scope)
 
     summaries = []
-    with stage("涡旋检测", total=len(slices), unit="切片") as progress:
+    with stage("Detect eddies", total=len(slices), unit="slices") as progress:
         for time, depth in slices:
             progress.set_current(time=time, depth=depth)
             selected = []
