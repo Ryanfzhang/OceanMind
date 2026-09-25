@@ -59,7 +59,7 @@ def clarification_request(assistant_message: Mapping[str, Any]) -> tuple[str, st
 
 def finalize_state(state: AgentState) -> AgentState:
     """Always return a readable delivery unless the agent requested user input."""
-    if state["status"] in {"completed", "needs_input"}:
+    if state["status"] in {"completed", "needs_input", "failed"}:
         return state.copy()
     final = state["messages"][-1] if state["messages"] else {}
     if state["status"] == "running" and isinstance(final, Mapping):

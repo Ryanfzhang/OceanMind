@@ -45,6 +45,13 @@ class OpenAIChatModel:
             "role": "assistant",
             "content": _get(message, "content"),
         }
+        reasoning = (
+            message.get("reasoning_content") if isinstance(message, dict)
+            else getattr(message, "reasoning_content", None)
+        )
+        if reasoning is not None:
+            # DeepSeek thinking mode requires this field on subsequent tool requests.
+            result["reasoning_content"] = reasoning
         calls = (
             message.get("tool_calls")
             if isinstance(message, dict)

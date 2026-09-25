@@ -3,6 +3,7 @@
 from apps.api.langgraph_query import QueryRequest, QueryService
 from packages.agent_loop.graph import build_graph
 from packages.agent_loop.language import preferred_language
+from packages.agent_loop.model import OpenAIChatModel
 from packages.agent_loop.state import initial_state
 
 
@@ -68,3 +69,22 @@ def test_query_service_uses_separate_answer_model_when_configured(tmp_path):
     result = service.execute(QueryRequest(query="Give the verified answer"))
     assert result["synthesis"]["summary"] == "Verified final answer."
     assert len(executor.seen) == len(answer.seen) == 1
+
+
+def test_deepseek_reasoning_content_survives_tool_turns():
+    class Client:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kwargs):
+                    return {"choices": [{"message": {
+                        "content": None, "reasoning_content": "synthetic reasoning",
+                        "tool_calls": [{"id": "call_1", "type": "function", "function": {
+                            "name": "web_search", "arguments": '{"query":"ocean"}',
+                        }}],
+                    }}]}
+
+    model = OpenAIChatModel(api_key="test", base_url="http://test", model="test", client=Client())
+    reply = model.complete([{"role": "user", "content": "Search"}], tools=[], timeout=None)
+    assert reply["reasoning_content"] == "synthetic reasoning"
+    assert reply["tool_calls"][0]["function"]["name"] == "web_search"

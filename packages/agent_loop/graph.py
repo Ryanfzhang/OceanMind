@@ -219,6 +219,13 @@ def build_graph(
             goto="finalize",
         )
 
+    def answer_error(state: AgentState, error: NodeError) -> Command:
+        return Command(
+            update={"status": "failed",
+                    "termination_reason": f"answer_model_error: {type(error.error).__name__}"},
+            goto="finalize",
+        )
+
     def after_agent(state: AgentState) -> str:
         if state["status"] != "running":
             return "finalize"
@@ -364,7 +371,7 @@ def build_graph(
     graph.add_node("finalize", finalize)
     if answer_model is not None:
         graph.add_node("answer_agent", answer_agent,
-                       retry_policy=RetryPolicy(max_attempts=3), error_handler=model_error)
+                       retry_policy=RetryPolicy(max_attempts=3), error_handler=answer_error)
         graph.add_node("answer_tools", run_answer_tools)
         graph.add_conditional_edges("answer_agent", after_answer,
                                     {"answer_tools": "answer_tools", "finalize": "finalize"})
