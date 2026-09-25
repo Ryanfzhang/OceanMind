@@ -86,18 +86,17 @@ export function mergeStepCardLists(existingCards: StepCard[], incomingCards: Ste
 }
 
 export function displayStepTimeline(stepCards: StepCard[], terminal: boolean): StepCard[] {
-  if (!terminal) return stepCards;
   const steps = new Map<string, StepCard>();
   const occurrences = new Map<string, number>();
   for (const step of stepCards) {
-    if (step.status !== "completed" && step.results.length === 0) continue;
+    if (terminal && step.status !== "completed" && step.results.length === 0) continue;
     const label = step.human_label.trim().toLocaleLowerCase() || step.step_id;
     const withinAttempt = `${step.attempt_id ?? "run"}\u0000${label}`;
     const occurrence = occurrences.get(withinAttempt) ?? 0;
     occurrences.set(withinAttempt, occurrence + 1);
     const key = `${label}\u0000${occurrence}`;
     const previous = steps.get(key);
-    if (!previous || step.status === "completed" || previous.status !== "completed") {
+    if (!terminal || !previous || step.results.length > 0 || previous.results.length === 0) {
       steps.set(key, step);
     }
   }
@@ -105,14 +104,13 @@ export function displayStepTimeline(stepCards: StepCard[], terminal: boolean): S
 }
 
 export function displayLooseResults(
-  resultCards: ResultCardSummary[], stepCards: StepCard[], terminal: boolean,
+  resultCards: ResultCardSummary[], stepCards: StepCard[],
 ): ResultCardSummary[] {
   const stepIds = new Set(stepCards.map((step) => step.step_id));
-  const loose = resultCards.filter((card) => !card.ownerStepId || !stepIds.has(card.ownerStepId));
-  if (!terminal) return loose;
   const results = new Map<string, ResultCardSummary>();
   const occurrences = new Map<string, number>();
-  for (const card of loose) {
+  for (const card of resultCards) {
+    if (card.ownerStepId && stepIds.has(card.ownerStepId)) continue;
     const title = card.title.trim().toLocaleLowerCase() || card.id;
     const withinAttempt = `${card.attemptId ?? "run"}\u0000${title}`;
     const occurrence = occurrences.get(withinAttempt) ?? 0;

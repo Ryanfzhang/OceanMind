@@ -351,7 +351,7 @@ function AssistantBlock({
   const resultCards = payload?.resultCards ?? [];
   const terminal = payload?.state === "completed" || payload?.state === "failed";
   const visibleSteps = displayStepTimeline(stepCards, terminal);
-  const looseResults = displayLooseResults(resultCards, stepCards, terminal);
+  const looseResults = displayLooseResults(resultCards, stepCards);
   const planSteps = payload?.planSteps ?? [];
   const visibleStepIds = new Set(visibleSteps.map((step) => step.step_id));
   const visiblePlanSteps = planSteps.filter((step) => visibleStepIds.has(step.id));
@@ -362,7 +362,10 @@ function AssistantBlock({
   const attachments = (payload?.attachments ?? []).filter(
     (item) => item.kind === "code" || item.kind === "image_png"
   );
-  const { completedSteps, totalSteps } = getProgressCounts(visiblePlanSteps, visibleSteps);
+  const progressCounts = getProgressCounts(visiblePlanSteps, visibleSteps);
+  const { completedSteps, totalSteps } = terminal
+    ? { completedSteps: visibleSteps.length, totalSteps: visibleSteps.length }
+    : progressCounts;
   const progressLabel = totalSteps > 0 ? `[${completedSteps}/${totalSteps}]` : "";
   const showExecutionProgress = shouldShowExecutionProgress(payload);
   return (
