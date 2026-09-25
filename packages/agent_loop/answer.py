@@ -27,9 +27,10 @@ ANSWER_PROMPT = (
     "self-contained answer in the user's language. Never refer to an earlier "
     "answer or say that the question was already answered above. Choose headings "
     "and length for the question; use Markdown tables only with one row per "
-    "line. For general factual or scientific questions, web_search is available "
-    "when additional grounding would help. Cite useful retrieved URLs when "
-    "available, but do not invent source links. "
+    "line. For general factual or scientific questions without retrieved web "
+    "results, call web_search once before finalizing when possible. Cite useful "
+    "retrieved URLs when available, but citations are optional and source links "
+    "must not be invented. "
     "Saved code and result files are attached automatically; "
     "do not list artifact IDs in the prose."
 )
