@@ -345,7 +345,10 @@ class QueryService:
 def get_query_service() -> QueryService:
     from apps.api.langgraph_progress import ProgressAdapter
 
-    return QueryService(PROJECT_ROOT / "outputs" / "agent_runs",
+    workspace = Path(
+        os.getenv("OCEANMIND_RUNS_DIR") or PROJECT_ROOT / "outputs" / "agent_runs"
+    ).expanduser()
+    return QueryService(workspace,
                         progress_factory=ProgressAdapter)
 
 

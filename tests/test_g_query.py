@@ -11,6 +11,16 @@ from apps.api.langgraph_query import QueryRequest, QueryService, get_query_servi
 from packages.agent_loop.conversations import ConversationStore
 
 
+def test_run_workspace_can_use_another_volume(tmp_path, monkeypatch):
+    workspace = tmp_path / "runs"
+    monkeypatch.setenv("OCEANMIND_RUNS_DIR", str(workspace))
+    get_query_service.cache_clear()
+    try:
+        assert get_query_service().store.workspace == workspace
+    finally:
+        get_query_service.cache_clear()
+
+
 def _clarify(question: str):
     return {"role": "assistant", "content": None, "tool_calls": [{
         "id": "clarify_1", "type": "function",
