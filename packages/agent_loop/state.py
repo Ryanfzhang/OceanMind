@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     attachments: list[dict[str, str]]
     draft: str
     language: Language
+    answer_active: bool
 
 
 def initial_state(
@@ -44,6 +45,7 @@ def initial_state(
         "attachments": [],
         "draft": "",
         "language": language or preferred_language(user_query),
+        "answer_active": False,
     }
 
 

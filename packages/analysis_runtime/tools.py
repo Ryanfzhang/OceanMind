@@ -31,6 +31,28 @@ def _brief(value: Any) -> Any:
     return {"type": type(value).__name__}
 
 
+def _analysis_geometry(kind: str, points: Any) -> dict[str, Any]:
+    """Keep the actual, bounded geometry used by an analysis result."""
+    if kind not in {"transect", "polygon"} or not isinstance(points, (list, tuple)):
+        raise ValueError("Analysis geometry requires transect or polygon vertices")
+    if not (2 if kind == "transect" else 3) <= len(points) <= 1024:
+        raise ValueError("Analysis geometry has an invalid vertex count")
+    vertices = []
+    for point in points:
+        if isinstance(point, dict):
+            lon, lat = point.get("lon"), point.get("lat")
+        elif isinstance(point, (list, tuple)) and len(point) == 2:
+            lon, lat = point
+        else:
+            raise ValueError("Analysis vertices must be [lon, lat] pairs")
+        if (not isinstance(lon, (int, float)) or not isinstance(lat, (int, float))
+                or not math.isfinite(lon) or not math.isfinite(lat)
+                or not -180 <= lon <= 360 or not -90 <= lat <= 90):
+            raise ValueError("Analysis vertex is outside longitude/latitude bounds")
+        vertices.append([float(lon), float(lat)])
+    return {"type": kind, "points": vertices}
+
+
 class AnalysisTools:
     """Execute discovered tools, save each result, and emit call-level events."""
 
@@ -87,15 +109,30 @@ class AnalysisTools:
         self, name: str, func: Callable[..., Any], input_refs: list[str] | None,
         kwargs: dict[str, Any],
         *, source_result: bool = False, presentation: str = "auto",
+        geometry: dict[str, Any] | None = None,
     ) -> tuple[Any, str]:
         stage = self.stages.ensure_stage(visible=False)
         refs = input_refs or [
             self._result_refs[id(value)] for value in kwargs.values()
             if id(value) in self._result_refs
         ]
+        parameters = {key: _brief(value) for key, value in kwargs.items()}
+        if geometry is not None:
+            parameters["analysis_geometry"] = _analysis_geometry(
+                geometry.get("type"), geometry.get("points"),
+            )
+        else:
+            for argument, kind in (("transect_points", "transect"),
+                                   ("polygon_points", "polygon")):
+                if isinstance(kwargs.get(argument), (list, tuple)):
+                    try:
+                        parameters["analysis_geometry"] = _analysis_geometry(kind, kwargs[argument])
+                    except ValueError:
+                        pass  # Geometry recording must not reject a valid tool call.
+                    break
         call_id = self.records.new_call(
             self.stages.attempt_id, stage.id, name,
-            inputs=refs, parameters={key: _brief(value) for key, value in kwargs.items()},
+            inputs=refs, parameters=parameters,
         )
         self.stages._event({"type": "call_started", "stage_id": stage.id, "call_id": call_id,
                             "name": name})
@@ -140,11 +177,11 @@ class AnalysisTools:
             reset_tool_progress_callback(token)
 
     def publish(self, name: str, value: Any, *, inputs: list[str] | None = None,
-                presentation: str = "auto") -> str:
+                presentation: str = "auto", geometry: dict[str, Any] | None = None) -> str:
         """Save one custom calculation in the active stage."""
         _, artifact_id = self._execute(
             f"publish:{name}", lambda: value, [] if inputs is None else inputs, {},
-            presentation=presentation,
+            presentation=presentation, geometry=geometry,
         )
         return artifact_id
 

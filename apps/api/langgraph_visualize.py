@@ -243,6 +243,13 @@ def _visualize(request: VisualizationRequest) -> dict:
         overlays.append({"id": "manual_transect", "eventType": "selection", "title": "Selected transect",
                          "shape": "polyline", "center": path[0], "path": path,
                          "details": [f"{len(points)} vertices", f"{distances[-1]:.1f} km"]})
+    elif mode == "polygon":
+        points = request.polygon_points
+        assert points is not None
+        path = [{"lon": lon, "lat": lat} for lon, lat in points]
+        overlays.append({"id": "manual_polygon", "eventType": "selection", "title": "Selected polygon",
+                         "shape": "polyline", "center": path[0], "path": [*path, path[0]],
+                         "details": [f"{len(points)} vertices"]})
 
     workspace_data.update({"referenceSeries": series, "resultSeries": series, "eventOverlays": overlays})
     selection = {"point": "Point", "transect": "Transect", "polygon": "Polygon"}.get(mode)

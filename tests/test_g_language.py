@@ -56,3 +56,15 @@ def test_new_english_turn_overrides_chinese_conversation_history(tmp_path):
     assert second["language"] == "en"
     assert second["synthesis"]["summary"] == "This answer is in English."
     assert "in English" in model.seen[1][0][0]["content"]
+
+
+def test_query_service_uses_separate_answer_model_when_configured(tmp_path):
+    executor = ScriptedModel(["Draft from the executor."])
+    answer = ScriptedModel(["Verified final answer."])
+    service = QueryService(
+        tmp_path, model_factory=lambda: executor,
+        answer_model_factory=lambda: answer, data_roots=lambda: (),
+    )
+    result = service.execute(QueryRequest(query="Give the verified answer"))
+    assert result["synthesis"]["summary"] == "Verified final answer."
+    assert len(executor.seen) == len(answer.seen) == 1

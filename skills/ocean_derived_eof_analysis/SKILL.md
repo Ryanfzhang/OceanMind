@@ -129,3 +129,4 @@ eof_result = perform_eof_analysis(
 - For single-variable gradients, pass `variable=variables[0]` to `compute_derived_field`; otherwise the gradient tool cannot identify the source variable.
 - For `buoyancy_frequency`, call `compute_density` first and then call `compute_derived_field(density=density_field, field_type='buoyancy_frequency')`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.
+- `variance_explained` and `cumulative_variance` use the variance of all valid modes as the denominator; `n_modes` only limits which modes are returned. Do not renormalize the retained modes to 100%.

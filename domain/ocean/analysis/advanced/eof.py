@@ -170,6 +170,11 @@ def perform_eof_analysis(
         # 主成分
         pcs = data_centered @ eofs_weighted / _safe_sqrt(eigenvalues)
 
+    # 方差分母必须包含所有模态；只截取输出模态会把它们错误地归一化到 100%。
+    total_variance = np.sum(eigenvalues)
+    if not np.isfinite(total_variance) or total_variance <= 0.0:
+        raise ValueError("EOF analysis found no finite variance in the selected data")
+
     # 保留请求的模态数
     n_modes = min(n_modes, len(eigenvalues))
     eigenvalues = eigenvalues[:n_modes]
@@ -177,9 +182,6 @@ def perform_eof_analysis(
     pcs = pcs[:, :n_modes]
 
     # 计算方差解释率
-    total_variance = np.sum(eigenvalues)
-    if not np.isfinite(total_variance) or total_variance <= 0.0:
-        raise ValueError("EOF analysis found no finite variance in the selected data")
     variance_explained = (eigenvalues / total_variance) * 100
     cumulative_variance = np.cumsum(variance_explained)
 

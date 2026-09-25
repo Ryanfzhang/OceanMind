@@ -237,6 +237,7 @@ class QueryService:
         workspace: str | Path,
         *,
         model_factory: Callable[[], Any] = _default_model,
+        answer_model_factory: Callable[[], Any] | None = None,
         data_roots: Callable[[], tuple[str | Path, ...]] = _default_data_roots,
         progress_factory: ProgressFactory | None = None,
         max_rounds: int = 60,
@@ -244,6 +245,7 @@ class QueryService:
     ) -> None:
         self.store = ConversationStore(workspace)
         self.model_factory = model_factory
+        self.answer_model_factory = answer_model_factory
         self.data_roots = data_roots
         self.progress_factory = progress_factory
         self.max_rounds = max_rounds
@@ -298,6 +300,7 @@ class QueryService:
             emit({"event": "execution_event", "payload": {"type": "planning_started"}})
             graph = build_graph(
                 self.model_factory(), max_rounds=self.max_rounds,
+                answer_model=self.answer_model_factory() if self.answer_model_factory else None,
                 analysis_session=session,
             )
             state = graph.invoke(
@@ -351,6 +354,7 @@ def get_query_service() -> QueryService:
         os.getenv("OCEANMIND_RUNS_DIR") or PROJECT_ROOT / "outputs" / "agent_runs"
     ).expanduser()
     return QueryService(workspace,
+                        answer_model_factory=_default_model,
                         progress_factory=ProgressAdapter)
 
 

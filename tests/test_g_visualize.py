@@ -117,6 +117,8 @@ def test_polygon_selection_masks_map_and_averages_only_inside(client):
     assert data["mapField"]["values"][0] == [None, None, None]
     assert data["mapField"]["values"][1] == [None, pytest.approx(3.3), None]
     assert [item["value"] for item in data["referenceSeries"]] == pytest.approx([2.3, 3.3, 4.3])
+    assert data["eventOverlays"][0]["shape"] == "polyline"
+    assert data["eventOverlays"][0]["path"][0] == data["eventOverlays"][0]["path"][-1]
 
 
 def test_transect_selection_returns_sampled_profile_and_path(client):

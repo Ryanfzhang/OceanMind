@@ -20,9 +20,11 @@ class ScriptedModel:
     def __init__(self, responses):
         self.responses = iter(responses)
         self.seen = []
+        self.tools_seen = []
 
     def complete(self, messages, *, tools, timeout):
         self.seen.append(messages)
+        self.tools_seen.append(tools)
         response = next(self.responses)
         return response(messages) if callable(response) else response
 
@@ -86,6 +88,28 @@ def test_search_source_reaches_final_answer():
     state = build_graph(model, web_search=fake_search).invoke(initial_state("Search the web"))
     assert state["status"] == "completed"
     assert "https://example.org/source" in state["messages"][-1]["content"]
+
+
+def test_answer_agent_can_return_a_conflict_for_verification():
+    executor = ScriptedModel([
+        {"role": "assistant", "content": "Draft says 34 days."},
+        {"role": "assistant", "content": "Mask verifies 10 days."},
+    ])
+    answer = ScriptedModel([
+        {"role": "assistant", "content": None, "tool_calls": [
+            call("request_verification", {"issue": "Check duration against the saved mask."})
+        ]},
+        {"role": "assistant", "content": "The event lasted 10 days."},
+    ])
+    state = build_graph(executor, answer_model=answer).invoke(
+        initial_state("How long did the event last?")
+    )
+    assert state["status"] == "completed"
+    assert state["messages"][-1]["content"] == "The event lasted 10 days."
+    assert state["rounds"] == 4
+    assert "verification_needed" in executor.seen[1][-1]["content"]
+    assert "run_analysis" not in {item["function"]["name"] for item in answer.tools_seen[0]}
+    assert "request_verification" in {item["function"]["name"] for item in answer.tools_seen[0]}
 
 
 def test_clarification_and_limits_have_distinct_statuses():

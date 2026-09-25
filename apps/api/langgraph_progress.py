@@ -407,6 +407,26 @@ def _overlay(event: dict, artifact_id: str, number: int, kind: str,
     return overlay
 
 
+def _selection_overlay(geometry: dict, artifact_id: str) -> dict | None:
+    kind, vertices = geometry.get("type"), geometry.get("points")
+    if kind not in {"transect", "polygon"} or not isinstance(vertices, list):
+        return None
+    points = []
+    for vertex in vertices:
+        if (not isinstance(vertex, list) or len(vertex) != 2
+                or not all(isinstance(value, (int, float)) and math.isfinite(value)
+                           for value in vertex)):
+            return None
+        points.append({"lon": float(vertex[0]), "lat": float(vertex[1])})
+    if len(points) < (2 if kind == "transect" else 3):
+        return None
+    path = points + [points[0]] if kind == "polygon" and points[-1] != points[0] else points
+    return {"id": f"{artifact_id}_{kind}_selection", "eventType": "selection",
+            "title": "Analyzed transect" if kind == "transect" else "Analyzed polygon",
+            "shape": "polyline", "center": points[0], "path": path,
+            "details": [f"{len(points)} calculation vertices"]}
+
+
 class ProgressAdapter:
     """Maintain bounded UI previews while the full runtime index stays on disk."""
 
@@ -433,6 +453,42 @@ class ProgressAdapter:
 
     def _send(self, event_type: str, payload: dict[str, Any]) -> None:
         self.emit({"event": "execution_event", "payload": deepcopy({"type": event_type, **payload})})
+
+    def _result_geometry(self, metadata: dict) -> list[dict]:
+        """Follow saved input references to the vertices actually used by tools."""
+        if not hasattr(self.session, "records"):
+            return []
+        queue = [metadata]
+        seen: set[str] = set()
+        overlays = []
+        while queue and len(seen) < 128:
+            item = queue.pop(0)
+            artifact_id = item.get("artifact_id")
+            if not isinstance(artifact_id, str) or artifact_id in seen:
+                continue
+            seen.add(artifact_id)
+            call_id = item.get("call_id")
+            if isinstance(call_id, str):
+                try:
+                    call = self.session.records.read("call", call_id)
+                    geometry = call.get("parameters", {}).get("analysis_geometry")
+                    if isinstance(geometry, dict):
+                        overlay = _selection_overlay(geometry, metadata["artifact_id"])
+                        if overlay and not any(other["path"] == overlay["path"]
+                                               for other in overlays):
+                            overlays.append(overlay)
+                except (KeyError, OSError, ValueError):
+                    pass
+            for ref in item.get("inputs", []):
+                if not isinstance(ref, str) or ref in seen:
+                    continue
+                try:
+                    source = self.session.artifacts.read_artifact(ref)
+                    if source.get("run_id") == self.session.run_id:
+                        queue.append(source)
+                except (OSError, ValueError):
+                    pass
+        return overlays
 
     def _card(self, stage_id: str, title: str | None = None,
               attempt_id: str | None = None) -> dict:
@@ -547,6 +603,13 @@ class ProgressAdapter:
             except (OSError, KeyError, TypeError, ValueError):
                 pass
         workspace = result.get("workspaceData") or {}
+        if workspace.get("mapField") or workspace.get("sectionRows"):
+            geometry_overlays = self._result_geometry(metadata)
+            if geometry_overlays:
+                workspace["eventOverlays"] = [*workspace.get("eventOverlays", []),
+                                              *geometry_overlays]
+                result["workspaceData"] = workspace
+                self.workspace_by_result[artifact_id] = workspace
         if workspace.get("mapField") or workspace.get("eventOverlays"):
             result.update(surface="map", actions=[{"id": "focus_map", "label": "Show on main map"}])
             if card is not None:
@@ -566,6 +629,9 @@ class ProgressAdapter:
 
     def on_event(self, event: dict[str, Any]) -> None:
         kind = event.get("type")
+        if kind == "synthesis_started":
+            self._send("synthesis_started", {})
+            return
         stage_id = event.get("stage_id") or event.get("step_id")
         if not isinstance(stage_id, str):
             return

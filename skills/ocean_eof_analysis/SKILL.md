@@ -52,3 +52,4 @@ eof_result = perform_eof_analysis(
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.
+- `variance_explained` and `cumulative_variance` use the variance of all valid modes as the denominator; `n_modes` only limits which modes are returned. Do not renormalize the retained modes to 100%.

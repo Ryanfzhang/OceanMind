@@ -19,6 +19,7 @@ from packages.agent_loop.analysis import (
     WRITE_ANALYSIS_SCHEMA,
     AnalysisSession,
 )
+from packages.agent_loop.answer import ANSWER_PROMPT, REQUEST_VERIFICATION_SCHEMA
 from packages.agent_loop.finalize import (
     REQUEST_CLARIFICATION_SCHEMA,
     clarification_request,
@@ -83,6 +84,7 @@ def _configured_data_prompt(data_roots: tuple[Path, ...]) -> str:
 def build_graph(
     model: Any,
     *,
+    answer_model: Any | None = None,
     max_rounds: int = 60,
     tool_registry: Mapping[str, Callable[..., Any]] | None = None,
     web_search: Callable[..., Any] | None = None,
@@ -143,6 +145,10 @@ def build_graph(
             "if the value derives from a tool result, pass its saved ID in inputs using "
             "`tools.ref(result)`. Tool calls already save their results; do not publish "
             "the same result again. Do not pass a `kind` argument. "
+            "For a custom result derived from a selected transect or polygon without "
+            "a geometry-aware tool input reference, pass "
+            "`geometry={'type': 'transect' or 'polygon', 'points': vertices}` "
+            "to publish using the vertices actually used in the calculation. "
             "For a raw field that you load and publish yourself, set "
             "`presentation=\"summary\"`; published calculated spatial fields use "
             "the default interactive map when they have lat/lon coordinates. "
@@ -167,10 +173,7 @@ def build_graph(
             " To draw an interpretable eddy figure, import render_eddy_figure from "
             "packages.analysis_runtime.figures and publish its PngFigure. "
             "Call view_image with the published image artifact ID when visual patterns matter. "
-            "For data analysis, answer in the user's language with four short sections: "
-            "Result (direct answer and key numbers), Evidence (what the saved results "
-            "show), Method (data scope and calculation), and Limitations (missing data "
-            "or uncertainty). Use Markdown tables only with one row per line. "
+            "Provide a concise evidence-based draft for the answer agent. "
             "Do not transcribe code or artifact IDs: verified saved files are attached "
             "automatically. Never rerun successful analysis just to repair answer text "
             "or attachment references. Verify numerical findings before making claims "
@@ -200,7 +203,7 @@ def build_graph(
         )
         answer = model.complete(
             model_messages,
-            tools=[] if remaining == 1 else schemas,
+            tools=[] if remaining <= (2 if answer_model is not None else 1) else schemas,
             timeout=timeout,
         )
         updated = append_message(state, answer)
@@ -220,7 +223,68 @@ def build_graph(
         if state["status"] != "running":
             return "finalize"
         calls = state["messages"][-1].get("tool_calls") or []
-        return "tools" if calls else "finalize"
+        return "tools" if calls else "answer_agent" if answer_model is not None else "finalize"
+
+    answer_registry = {"web_search": search}
+    answer_schemas = [WEB_SEARCH_SCHEMA, REQUEST_VERIFICATION_SCHEMA]
+    if analysis_session is not None:
+        answer_registry.update({
+            "list_results": analysis_session.list_results,
+            "read_artifact": analysis_session.read_artifact,
+            "view_image": make_view_image(analysis_session),
+        })
+        answer_schemas.extend([LIST_RESULTS_SCHEMA, READ_ARTIFACT_SCHEMA, VIEW_IMAGE_SCHEMA])
+
+    def answer_agent(state: AgentState) -> AgentState:
+        violation = budget_violation(state, max_rounds)
+        if violation:
+            return {**state, **violation}
+        if not state["answer_active"] and analysis_session and analysis_session.on_event:
+            analysis_session.on_event({"type": "synthesis_started"})
+        remaining = max_rounds - state["rounds"]
+        deadline = state["deadline"]
+        prompt = ANSWER_PROMPT + language_instruction(state["language"])
+        if remaining == 1:
+            prompt += "\nThis is the final model decision. Deliver from verified evidence now."
+        messages = hydrate_vision_messages(
+            [{"role": "system", "content": prompt}, *state["messages"]],
+            analysis_session,
+        )
+        reply = answer_model.complete(
+            messages,
+            tools=[] if remaining == 1 else answer_schemas,
+            timeout=max(0.001, deadline - time.monotonic()) if deadline else None,
+        )
+        updated = append_message(state, reply)
+        content = reply.get("content")
+        return {**updated, "rounds": state["rounds"] + 1, "answer_active": True,
+                "draft": content.strip() if isinstance(content, str) and content.strip()
+                else state["draft"]}
+
+    def after_answer(state: AgentState) -> str:
+        if state["status"] != "running":
+            return "finalize"
+        return "answer_tools" if state["messages"][-1].get("tool_calls") else "finalize"
+
+    def run_answer_tools(state: AgentState) -> Command:
+        calls = state["messages"][-1]["tool_calls"]
+        if len(calls) == 1 and calls[0]["function"]["name"] == "request_verification":
+            observation = execute_tool_calls({"tool_calls": calls}, {
+                "request_verification": lambda issue: {"verification_needed": issue},
+            })[0]
+            return Command(update={**append_message(state, observation),
+                                   "answer_active": False}, goto="agent")
+        updated = state
+        for call in calls:
+            available = answer_registry
+            if call["function"]["name"] == "web_search" and state["deadline"]:
+                remaining = max(0.001, state["deadline"] - time.monotonic())
+                available = {**answer_registry,
+                             "web_search": lambda **args: search(timeout=remaining, **args)}
+            updated = append_message(updated, execute_tool_calls(
+                {"tool_calls": [call]}, available,
+            )[0])
+        return Command(update=updated, goto="answer_agent")
 
     def run_tools(state: AgentState) -> AgentState:
         updated = state
@@ -280,7 +344,7 @@ def build_graph(
                 preferred_language(content) != classified["language"]
             ):
                 name = "Chinese" if classified["language"] == "zh" else "English"
-                corrected = model.complete([
+                corrected = (answer_model or model).complete([
                     {"role": "system", "content": (
                         f"Translate the following answer into {name}. Return only the "
                         "translated answer. Preserve every number, unit, URL, artifact "
@@ -298,8 +362,17 @@ def build_graph(
                 if analysis_session is not None else classified)
 
     graph.add_node("finalize", finalize)
+    if answer_model is not None:
+        graph.add_node("answer_agent", answer_agent,
+                       retry_policy=RetryPolicy(max_attempts=3), error_handler=model_error)
+        graph.add_node("answer_tools", run_answer_tools)
+        graph.add_conditional_edges("answer_agent", after_answer,
+                                    {"answer_tools": "answer_tools", "finalize": "finalize"})
     graph.add_edge(START, "agent")
-    graph.add_conditional_edges("agent", after_agent, {"tools": "tools", "finalize": "finalize"})
+    graph.add_conditional_edges("agent", after_agent, {
+        "tools": "tools", "finalize": "finalize",
+        **({"answer_agent": "answer_agent"} if answer_model is not None else {}),
+    })
     graph.add_conditional_edges(
         "tools",
         lambda state: "agent" if state["status"] == "running" else "finalize",

@@ -7,6 +7,8 @@ import xarray as xr
 
 from apps.api.langgraph_progress import ProgressAdapter
 from packages.agent_loop.analysis import AnalysisSession
+from packages.analysis_runtime.stages import StageManager
+from packages.analysis_runtime.tools import AnalysisTools
 
 
 def test_many_runtime_updates_remain_one_stage_card_and_keep_final_count():
@@ -165,6 +167,51 @@ def test_eof_modes_keep_interactive_map_and_pc_series(tmp_path):
     assert card["renderer"] == "eof"
     assert card["workspaceData"]["eofModes"][0]["mapField"]["values"][0] == [1.0, 2.0]
     assert card["workspaceData"]["eofModes"][0]["pcSeries"][1]["value"] == -0.5
+
+
+def test_saved_result_keeps_actual_polygon_outline_through_inputs(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    manager = StageManager(session.run_id, attempt, records=session.records)
+    tools = AnalysisTools(session.records, session.artifacts, manager, functions={
+        "build_polygon_mask": lambda polygon_points: {"mask": "ready"},
+    })
+    vertices = [[120, 20], [121, 20], [121, 21], [120, 21]]
+    with manager.activate():
+        mask = tools.call("build_polygon_mask", polygon_points=vertices)
+        mask_ref = tools.ref(mask)
+        field = xr.DataArray([[1.0, 2.0], [3.0, 4.0]],
+                             coords={"lat": [20, 21], "lon": [120, 121]},
+                             dims=("lat", "lon"))
+        result_ref = tools.publish("polygon_mean", field, inputs=[mask_ref])
+    adapter = ProgressAdapter(session)
+    result = session.artifacts.read_artifact(result_ref)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": result["stage_id"],
+                      "entry": {"status": "completed", "artifact_id": result_ref}})
+    card = adapter.finalize()["result_cards"][0]
+    path = card["workspaceData"]["eventOverlays"][0]["path"]
+    assert [[point["lon"], point["lat"]] for point in path] == [*vertices, vertices[0]]
+
+
+def test_custom_transect_geometry_stays_with_saved_result(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    manager = StageManager(session.run_id, attempt, records=session.records)
+    tools = AnalysisTools(session.records, session.artifacts, manager, functions={})
+    vertices = [[120, 20], [121, 20.5], [122, 21]]
+    with manager.activate():
+        field = xr.DataArray([[1.0, 2.0], [3.0, 4.0]],
+                             coords={"lat": [20, 21], "lon": [120, 121]},
+                             dims=("lat", "lon"))
+        result_ref = tools.publish("section_map", field, geometry={
+            "type": "transect", "points": vertices,
+        })
+    adapter = ProgressAdapter(session)
+    result = session.artifacts.read_artifact(result_ref)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": result["stage_id"],
+                      "entry": {"status": "completed", "artifact_id": result_ref}})
+    path = adapter.finalize()["workspace_data_by_result"][result_ref]["eventOverlays"][0]["path"]
+    assert [[point["lon"], point["lat"]] for point in path] == vertices
 
 
 def test_multidimensional_saved_field_gets_bounded_spatial_preview(tmp_path):
