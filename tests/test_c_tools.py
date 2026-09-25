@@ -73,6 +73,8 @@ def test_custom_publish_and_reload_between_contexts(tmp_path):
     records, artifacts, stages, tools = runtime(tmp_path, {})
     with stages.activate():
         artifact_id = tools.publish("custom_mean", {"mean": 1.5}, inputs=[])
+        unlinked_id = tools.publish("standalone_note", {"note": "ok"})
+    assert artifacts.read_artifact(unlinked_id)["inputs"] == []
     reopened = RunRecords(tmp_path, records.run_id)
     next_attempt = reopened.new_attempt()
     next_stages = StageManager(reopened.run_id, next_attempt, records=reopened)

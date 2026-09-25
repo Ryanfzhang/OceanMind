@@ -132,9 +132,11 @@ class AnalysisTools:
         finally:
             reset_tool_progress_callback(token)
 
-    def publish(self, name: str, value: Any, *, inputs: list[str]) -> str:
+    def publish(self, name: str, value: Any, *, inputs: list[str] | None = None) -> str:
         """Save one custom calculation in the active stage."""
-        _, artifact_id = self._execute(f"publish:{name}", lambda: value, inputs, {})
+        _, artifact_id = self._execute(
+            f"publish:{name}", lambda: value, [] if inputs is None else inputs, {},
+        )
         return artifact_id
 
     def read_artifact(self, artifact_id: str, **limits: Any) -> dict:
