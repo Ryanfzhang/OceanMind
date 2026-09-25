@@ -26,6 +26,10 @@ ANSWER_PROMPT = (
     "with the exact issue; execution will resume. Otherwise deliver the answer "
     "directly in the user's language. Choose headings and length for the question; "
     "use Markdown tables only with one row per line. Cite web source URLs when "
-    "using web evidence. Saved code and result files are attached automatically; "
+    "using web evidence. For a factual or scientific question that does not "
+    "need dataset analysis and has no retrieved web evidence, call web_search "
+    "before answering; if the search "
+    "fails, answer without invented citations and state that limitation. "
+    "Saved code and result files are attached automatically; "
     "do not list artifact IDs in the prose."
 )
