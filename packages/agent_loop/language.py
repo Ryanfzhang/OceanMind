@@ -15,7 +15,7 @@ def preferred_language(text: str) -> Language:
     """Use the dominant writing system; technical English terms can occur in Chinese."""
     han = len(_HAN.findall(text))
     latin_words = len(_LATIN_WORD.findall(text))
-    return "zh" if han >= max(2, latin_words / 2) else "en"
+    return "zh" if han >= max(2, latin_words) else "en"
 
 
 def language_instruction(language: Language) -> str:
