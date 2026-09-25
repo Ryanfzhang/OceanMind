@@ -19,7 +19,7 @@ import { renderDockPanel, renderInlineChart } from "@/components/renderers";
 import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
-import { displayLooseResults, displayStepTimeline, formatStepProgressText, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
+import { displayLooseResults, displayStepTimeline, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
 import { normalizeWorkspaceData } from "@/lib/workspace-results";
 
 type QuerySubmitOptions = {
@@ -114,26 +114,13 @@ function hasUsableSourceUrl(source: SourceCard) {
   return /^https?:\/\//i.test(source.url?.trim() ?? "");
 }
 
-function stepProgressPercent(step: StepCard) {
-  const percent = step.progress?.percent;
-  if (typeof percent !== "number" || !Number.isFinite(percent)) {
-    return null;
-  }
-  return Math.max(0, Math.min(100, Math.round(percent * 100)));
-}
-
-function stepProgressText(step: StepCard, chinese: boolean) {
-  return formatStepProgressText(step.progress, chinese);
-}
-
-function shouldShowStepProgress(step: StepCard, progressPercent: number | null) {
-  if (step.status !== "running") {
-    return false;
-  }
-  if (!step.progress) {
-    return true;
-  }
-  return progressPercent === null || progressPercent < 100;
+function formatElapsedTime(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`
+    : `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
 function StepResultContent({
@@ -265,9 +252,17 @@ function StepCardBlock({
   const chinese = false;
   const canExpand = step.status !== "running" && step.status !== "pending" && step.results.length > 0;
   const showFallbackInterpretation = shouldShowStepFallbackInterpretation(step);
-  const progressPercent = stepProgressPercent(step);
-  const progressText = stepProgressText(step, chinese);
-  const showProgress = shouldShowStepProgress(step, progressPercent);
+  const isRunning = step.status === "running";
+  const [elapsedSeconds, setElapsedSeconds] = useState(1);
+  useEffect(() => {
+    if (!isRunning) return;
+    const startedAt = Date.now();
+    setElapsedSeconds(1);
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.max(1, Math.ceil((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
   const displayStatus = step.status === "failed" && step.results.length > 0 ? "completed" : step.status === "failed" ? "running" : step.status;
 
   return (
@@ -287,14 +282,10 @@ function StepCardBlock({
         <span className="step-card-toggle">{canExpand ? (step.is_expanded ? "▾" : "▸") : ""}</span>
       </button>
 
-      {showProgress ? (
+      {isRunning ? (
         <div className="step-progress-panel">
-          <div className="step-progress-meta">
-            <span>{progressText || (chinese ? "正在执行步骤" : "Running step")}</span>
-            {progressPercent !== null ? <strong>{progressPercent}%</strong> : null}
-          </div>
-          <div className="step-progress-track" aria-hidden="true">
-            <span style={{ width: `${progressPercent ?? 8}%` }} />
+          <div className="step-progress-meta" role="timer">
+            {chinese ? "正在计算" : "Computing"} · {formatElapsedTime(elapsedSeconds)}
           </div>
         </div>
       ) : null}
