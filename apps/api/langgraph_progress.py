@@ -130,11 +130,13 @@ def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
         value = json.load(file).get("value")
     if not isinstance(value, dict):
         return None
-    field = value.get("data")
-    if isinstance(field, dict) and "__dataarray_file__" in field:
-        preview = _array_preview(_stored_payload(root, field["__dataarray_file__"]), name)
-        if preview:
-            return preview
+    for field_name in ("data", "slope"):
+        field = value.get(field_name)
+        if isinstance(field, dict) and "__dataarray_file__" in field:
+            preview = _array_preview(_stored_payload(root, field["__dataarray_file__"]),
+                                     f"{name} {field_name}" if field_name == "slope" else name)
+            if preview:
+                return preview
     if all(isinstance(value.get(key), dict)
            for key in ("positive_composite", "negative_composite", "difference")):
         fields = []
@@ -186,8 +188,16 @@ def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
                       for label, number in zip(labels[::stride], values[::stride])
                       if isinstance(number, (int, float, np.number)) and math.isfinite(number)]
             if series:
-                return "timeseries", {"resultSeries": series,
-                                      "seriesLabels": {"result": name.replace("_", " ")}}
+                workspace = {"resultSeries": series,
+                             "seriesLabels": {"result": name.replace("_", " ")}}
+                trend = value.get("trend_line")
+                if isinstance(trend, list) and len(trend) == len(labels):
+                    workspace["anomalySeries"] = [
+                        {"label": str(label)[:19], "value": float(number)}
+                        for label, number in zip(labels[::stride], trend[::stride])
+                        if isinstance(number, (int, float)) and math.isfinite(number)]
+                    workspace["seriesLabels"]["compare"] = "Trend line"
+                return "timeseries", workspace
     for label_key, value_key in (("labels", "values"), ("lags", "correlations"),
                                  ("frequency", "power")):
         labels = value.get(label_key)
@@ -221,11 +231,35 @@ def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
         temperature, salinity = value["temperature"], value["salinity"]
         if len(temperature) == len(salinity):
             stride = max(1, math.ceil(len(temperature) / 2500))
-            points = [{"temperature": float(t), "salinity": float(s)}
-                      for t, s in zip(temperature[::stride], salinity[::stride])
-                      if math.isfinite(t) and math.isfinite(s)]
+            colors = value.get("color_values")
+            classes = value.get("point_classes")
+            points = []
+            for index in range(0, len(temperature), stride):
+                t, s = temperature[index], salinity[index]
+                if not (isinstance(t, (int, float)) and isinstance(s, (int, float))
+                        and math.isfinite(t) and math.isfinite(s)):
+                    continue
+                point = {"temperature": float(t), "salinity": float(s)}
+                if isinstance(colors, list) and index < len(colors):
+                    color = colors[index]
+                    if isinstance(color, (int, float)) and math.isfinite(color):
+                        point["colorValue"] = float(color)
+                if isinstance(classes, list) and index < len(classes) and isinstance(classes[index], str):
+                    point["pointClass"] = classes[index]
+                points.append(point)
             if points:
-                return "ts_diagram", {"tsDiagramPoints": points}
+                metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
+                color_range = metadata.get("color_range")
+                return "ts_diagram", {
+                    "tsDiagramPoints": points,
+                    "tsDiagramTemperatureLabel": str(metadata.get("temperature_variable") or "Temperature"),
+                    "tsDiagramSalinityLabel": str(metadata.get("salinity_variable") or "Salinity"),
+                    "tsDiagramColorLabel": metadata.get("color_variable"),
+                    "tsDiagramColorRange": color_range if isinstance(color_range, list) and len(color_range) == 2 else None,
+                    "tsDiagramPointClasses": [point["pointClass"] for point in points if "pointClass" in point],
+                    "tsDiagramClassColorMap": metadata.get("class_color_map") or {},
+                    "tsDiagramWatermassBins": metadata.get("watermass_bins") or [],
+                }
     if isinstance(value.get("time"), list) and isinstance(value.get("spatial_coord"), list) and "values" in value:
         values = _preview_values(value["values"], root)
         time, coordinate = value["time"], value["spatial_coord"]
@@ -286,25 +320,59 @@ def _current_unit(value: Any) -> str | None:
     return str(value)[:120] if value is not None else None
 
 
-def _overlay(event: dict, artifact_id: str, number: int, when: Any, depth: Any) -> dict | None:
-    center = event.get("center")
+def _overlay(event: dict, artifact_id: str, number: int, kind: str,
+             when: Any, depth: Any) -> dict | None:
+    center = event.get("center") or event.get("centroid")
     if not isinstance(center, dict):
+        center = event
+    lon, lat = center.get("lon"), center.get("lat")
+    path = event.get("path") or event.get("path_coordinates")
+    if (not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lon, lat))
+            and isinstance(path, list) and path):
+        midpoint = path[len(path) // 2]
+        if isinstance(midpoint, dict):
+            lon, lat = midpoint.get("lon"), midpoint.get("lat")
+    bbox = event.get("bbox")
+    if (not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lon, lat))
+            and isinstance(bbox, dict)):
+        edges = [bbox.get(key) for key in ("lon_min", "lon_max", "lat_min", "lat_max")]
+        if all(isinstance(v, (int, float)) and math.isfinite(v) for v in edges):
+            lon, lat = (edges[0] + edges[1]) / 2, (edges[2] + edges[3]) / 2
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lon, lat)):
         return None
-    lon, lat, radius = center.get("lon"), center.get("lat"), event.get("radius_km")
-    if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (lon, lat, radius)):
+    if not -180 <= lon <= 360 or not -90 <= lat <= 90:
         return None
-    if not -180 <= lon <= 360 or not -90 <= lat <= 90 or radius <= 0:
-        return None
-    kind = str(event.get("type", "eddy"))
-    details = [f"Radius: {radius:.1f} km"]
+    details = []
+    radius = event.get("radius_km")
+    if isinstance(radius, (int, float)) and math.isfinite(radius) and radius > 0:
+        details.append(f"Radius: {radius:.1f} km")
     if when is not None:
         details.append(f"Time: {when}")
     if depth is not None:
         details.append(f"Depth: {depth}")
-    return {"id": f"{artifact_id}_{number}", "eventType": "eddy",
-            "title": f"{kind.title()} eddy {number}", "center": {"lat": lat, "lon": lon},
-            "shape": "circle", "radiusKm": radius, "details": details,
-            "timestamp": str(when) if when is not None else None}
+    overlay = {"id": str(event.get("event_id") or event.get("track_id") or f"{artifact_id}_{number}"),
+               "eventType": kind, "title": f"{kind.replace('_', ' ').title()} {number}",
+               "center": {"lat": lat, "lon": lon}, "details": details,
+               "timestamp": str(event.get("timestamp") or when) if event.get("timestamp") or when else None}
+    if isinstance(path, list):
+        points = [{"lon": point["lon"], "lat": point["lat"]} for point in path
+                  if isinstance(point, dict) and all(isinstance(point.get(key), (int, float))
+                  and math.isfinite(point[key]) for key in ("lon", "lat"))]
+        if len(points) >= 2:
+            overlay.update(shape="polyline", path=points)
+    if "shape" not in overlay and isinstance(bbox, dict):
+        edges = [bbox.get(key) for key in ("lon_min", "lon_max", "lat_min", "lat_max")]
+        if all(isinstance(v, (int, float)) and math.isfinite(v) for v in edges):
+            overlay.update(shape="rectangle", bounds={
+                "lonMin": edges[0], "lonMax": edges[1],
+                "latMin": edges[2], "latMax": edges[3]})
+    if "shape" not in overlay and isinstance(radius, (int, float)) and math.isfinite(radius) and radius > 0:
+        overlay.update(shape="circle", radiusKm=float(radius))
+    if "shape" not in overlay:
+        overlay.update(shape="point", symbol="diamond" if kind in {"front", "meander"} else "triangle")
+    if isinstance(event.get("severity"), str):
+        overlay["severity"] = event["severity"]
+    return overlay
 
 
 class ProgressAdapter:
@@ -352,14 +420,13 @@ class ProgressAdapter:
         if (metadata.get("status") != "completed" or metadata.get("run_id") != self.session.run_id
                 or metadata.get("stage_id") != stage_id):
             return
-        is_eddy = metadata.get("name") == "detect_eddies"
         is_figure = metadata.get("kind") == "image_png"
         when, depth = entry.get("time"), entry.get("depth")
         scope = ", ".join(f"{label}: {value}" for label, value in (("time", when), ("depth", depth))
                           if value is not None)
         name = str(metadata.get("name", "Result"))[:120]
         result = {"id": artifact_id, "title": name.replace("_", " ").title(),
-                  "type": "eddy_detection" if is_eddy else str(metadata.get("kind", "result")),
+                  "type": str(metadata.get("kind", "result")),
                   "headline": scope or name,
                   "description": "Saved analysis figure" if is_figure else
                                  "Saved field" if metadata.get("kind") == "dataarray_netcdf" else
@@ -392,25 +459,48 @@ class ProgressAdapter:
                         break
         except (OSError, KeyError, TypeError, ValueError):
             pass
-        if is_eddy and metadata.get("kind") == "json":
+        if metadata.get("kind") == "json":
             try:
                 path = _stored_payload(self.session.root, metadata["payload"])
                 if path.stat().st_size <= PREVIEW_JSON_BYTES:
-                    value = self.session.artifacts.load_result(artifact_id)
-                    events = value.get("events", []) if isinstance(value, dict) else []
-                    overlays = [overlay for i, item in enumerate(events, 1)
-                                if isinstance(item, dict)
-                                if (overlay := _overlay(item, artifact_id, i, when, depth))]
-                    result.update(renderer="event", surface="map",
-                                  metrics=[{"label": "Accepted eddies", "value": str(len(overlays))}],
-                                  workspaceData={"eventOverlays": overlays},
-                                  actions=[{"id": "focus_map", "label": "Show on map"}])
-                    self.workspace_by_result[artifact_id] = {"eventOverlays": overlays}
-                    card["is_map_bound"] = True
+                    with path.open(encoding="utf-8") as file:
+                        value = json.load(file).get("value")
+                    events = value.get("events") if isinstance(value, dict) else None
+                    if isinstance(events, list):
+                        event_type = str(value.get("event_type") or
+                                         ("eddy" if name == "detect_eddies" else
+                                          name.removeprefix("detect_").rstrip("s")) or "event")
+                        overlays = [overlay for i, item in enumerate(events, 1)
+                                    if isinstance(item, dict)
+                                    if (overlay := _overlay(item, artifact_id, i, event_type,
+                                                            when, depth))]
+                        workspace = {"eventOverlays": overlays}
+                        coordinates = value.get("coordinates")
+                        if isinstance(coordinates, dict):
+                            for field_name in ("ow_field", "gradient_field", "vorticity_field"):
+                                if field_name not in value:
+                                    continue
+                                map_field = _map_payload({**coordinates, "values": value[field_name]},
+                                                         self.session.root, field_name)
+                                if map_field:
+                                    workspace["mapField"] = map_field
+                                    break
+                        for input_id in metadata.get("inputs", []):
+                            source = self.workspace_by_result.get(input_id, {})
+                            if source.get("mapField") and "mapField" not in workspace:
+                                workspace["mapField"] = source["mapField"]
+                                break
+                        result.update(type="eddy_detection" if event_type == "eddy" else "event_detection",
+                                      renderer="event", surface="map",
+                                      metrics=[{"label": "Detected events", "value": str(len(overlays))}],
+                                      workspaceData=workspace,
+                                      actions=[{"id": "focus_map", "label": "Show on map"}])
+                        self.workspace_by_result[artifact_id] = workspace
+                        card["is_map_bound"] = True
             except (OSError, KeyError, TypeError, ValueError):
                 pass
         workspace = result.get("workspaceData") or {}
-        if workspace.get("mapField"):
+        if workspace.get("mapField") or workspace.get("eventOverlays"):
             result.update(surface="map", actions=[{"id": "focus_map", "label": "Show on main map"}])
             card["is_map_bound"] = True
         card["results"].append(result)

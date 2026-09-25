@@ -178,3 +178,104 @@ def test_eddy_maps_keep_their_intermediate_results(tmp_path):
     assert all(payload["workspace_data_by_result"][result["id"]]["eventOverlays"]
                for result in eddy_cards)
     assert payload["result_summaries"][stage]["completed"] == 4
+
+
+def test_ts_diagram_keeps_color_and_watermass_classes(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "T-S diagram")
+    artifact = session.artifacts.publish("build_watermass_ts_diagram", {
+        "temperature": [18.0, 19.0], "salinity": [34.0, 35.0],
+        "color_values": [20.0, 21.0], "point_classes": ["a", "b"],
+        "metadata": {"temperature_variable": "temp", "salinity_variable": "salt",
+                     "color_variable": "density", "color_range": [20.0, 21.0],
+                     "class_color_map": {"a": "#ff0000", "b": "#0000ff"},
+                     "watermass_bins": [{"id": "a", "name": "Water mass A", "color": "#ff0000"}]},
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    card = adapter.finalize()["result_cards"][0]
+    assert card["renderer"] == "ts_diagram"
+    assert card["workspaceData"]["tsDiagramPoints"][1] == {
+        "temperature": 19.0, "salinity": 35.0, "colorValue": 21.0, "pointClass": "b"}
+    assert card["workspaceData"]["tsDiagramClassColorMap"]["a"] == "#ff0000"
+    assert card["workspaceData"]["tsDiagramWatermassBins"][0]["name"] == "Water mass A"
+
+
+def test_front_and_eddy_track_keep_interactive_map_shapes(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Detect events")
+    adapter = ProgressAdapter(session)
+    for name, value in (
+        ("detect_fronts", {"event_type": "front", "events": [{
+            "center": {"lon": 120.5, "lat": 20.5},
+            "bbox": {"lon_min": 120.0, "lon_max": 121.0,
+                     "lat_min": 20.0, "lat_max": 21.0}}]}),
+        ("track_eddies", {"event_type": "eddy_track", "events": [{
+            "track_id": "track_1", "path": [{"lon": 120.0, "lat": 20.0},
+                                           {"lon": 121.0, "lat": 21.0}]}]}),
+    ):
+        artifact = session.artifacts.publish(name, value, run_id=session.run_id,
+                                             attempt_id=attempt, stage_id=stage, inputs=[])
+        adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                          "entry": {"status": "completed", "artifact_id": artifact}})
+    front, track = adapter.finalize()["result_cards"]
+    assert front["renderer"] == track["renderer"] == "event"
+    assert front["workspaceData"]["eventOverlays"][0]["shape"] == "rectangle"
+    assert front["workspaceData"]["eventOverlays"][0]["bounds"] == {
+        "lonMin": 120.0, "lonMax": 121.0, "latMin": 20.0, "latMax": 21.0}
+    assert track["workspaceData"]["eventOverlays"][0]["shape"] == "polyline"
+    assert track["workspaceData"]["eventOverlays"][0]["path"][1] == {"lon": 121.0, "lat": 21.0}
+
+
+def test_eddy_overlay_keeps_its_input_map_context(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Eddies")
+    adapter = ProgressAdapter(session)
+    source = session.artifacts.publish("velocity", xr.DataArray(
+        [[0.1, 0.2], [0.3, 0.4]], dims=("lat", "lon"),
+        coords={"lat": [20, 21], "lon": [120, 121]}),
+        run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": source}})
+    eddies = session.artifacts.publish("detect_eddies", {
+        "event_type": "eddy", "events": [{"center": {"lon": 120.5, "lat": 20.5},
+                                          "radius_km": 12.0}],
+        "coordinates": {"lat": [20, 21], "lon": [120, 121]},
+        "ow_field": np.array([[1.0, 2.0], [3.0, 4.0]]),
+        "vorticity_field": np.ones((300, 300)),
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[source])
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": eddies}})
+    card = adapter.finalize()["result_cards"][-1]
+    assert card["workspaceData"]["eventOverlays"][0]["shape"] == "circle"
+    assert card["workspaceData"]["mapField"]["values"] == [[1.0, 2.0], [3.0, 4.0]]
+
+
+def test_nested_trend_field_and_trend_line_keep_map_and_chart(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Trend")
+    slope = xr.DataArray([[0.1, 0.2], [0.3, 0.4]], dims=("lat", "lon"),
+                         coords={"lat": [20, 21], "lon": [120, 121]},
+                         attrs={"units": "°C/year"})
+    artifacts = [
+        session.artifacts.publish("compute_field_trend", {"slope": slope},
+                                  run_id=session.run_id, attempt_id=attempt,
+                                  stage_id=stage, inputs=[]),
+        session.artifacts.publish("compute_trend", {
+            "times": ["2020-01-01", "2021-01-01"], "values": [1.0, 2.0],
+            "trend_line": [1.1, 1.9]}, run_id=session.run_id,
+            attempt_id=attempt, stage_id=stage, inputs=[]),
+    ]
+    adapter = ProgressAdapter(session)
+    for artifact in artifacts:
+        adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                          "entry": {"status": "completed", "artifact_id": artifact}})
+    map_card, trend_card = adapter.finalize()["result_cards"]
+    assert map_card["workspaceData"]["mapField"]["values"][1] == [0.3, 0.4]
+    assert trend_card["renderer"] == "timeseries"
+    assert trend_card["workspaceData"]["anomalySeries"][1]["value"] == 1.9
