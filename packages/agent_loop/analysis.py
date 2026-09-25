@@ -44,7 +44,7 @@ RUN_ANALYSIS_SCHEMA = {
         "description": "Run one saved script version in a checked process sandbox; return stage and result references.",
         "parameters": {"type": "object", "properties": {
             "code_id": {"type": "string"},
-            "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600},
+            "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 3600},
         }, "required": ["code_id"], "additionalProperties": False},
     },
 }
@@ -168,7 +168,7 @@ class AnalysisSession:
     def list_results(self, attempt_id: str, offset: int = 0, limit: int = 10) -> dict:
         return list_results(self.root, self.run_id, attempt_id, offset=offset, limit=limit)
 
-    def run_analysis(self, code_id: str, timeout_seconds: float = 60) -> dict:
+    def run_analysis(self, code_id: str, timeout_seconds: float = 1800) -> dict:
         result = run_script(
             root=self.root, run_id=self.run_id, code_id=code_id,
             code_store=self.codes, launcher=build_sandbox_command,

@@ -64,6 +64,8 @@ export type ResultCardSummary = {
   metrics: ResultMetric[];
   surface?: "inline" | "map" | "drawer" | "modal" | "summary";
   ownerStepId?: string;
+  attemptId?: string;
+  attemptIndex?: number;
   workspaceData?: Partial<WorkspaceData>;
   actions?: StepAction[];
   interpretation?: string;
@@ -100,6 +102,8 @@ export type StepProgress = {
 
 export type StepCard = {
   step_id: string;
+  attempt_id?: string;
+  attempt_index?: number;
   human_label: string;
   technical_label: string;
   status: "pending" | "running" | "completed" | "failed";

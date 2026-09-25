@@ -222,7 +222,7 @@ def test_agent_revises_failed_code_and_retries(tmp_path, local_worker):
     ) == {"value": 2}
 
 
-def test_repeating_same_failed_script_stops_the_loop(tmp_path, local_worker):
+def test_repeating_same_failed_script_can_be_repaired(tmp_path, local_worker):
     session = AnalysisSession(tmp_path / "work")
     bad_code = 'raise ValueError("same failure")\n'
     code_id = None
@@ -239,16 +239,24 @@ def test_repeating_same_failed_script_stops_the_loop(tmp_path, local_worker):
         attempts.append(first["attempt_id"])
         return action("run_analysis", {"code_id": code_id}, "second_run")
 
+    def repair(messages):
+        second = observation(messages)
+        attempts.append(second["attempt_id"])
+        assert second["status"] == "failed"
+        return action("write_analysis", {"code": 'print("fixed")\n',
+                                          "previous_version": code_id}, "write_fixed")
+
+    def run_fixed(messages):
+        return action("run_analysis", {"code_id": observation(messages)["code_id"]}, "third_run")
+
     model = ScriptedModel([
         action("write_analysis", {"code": bad_code}, "write"), run_once, repeat,
+        repair, run_fixed, {"role": "assistant", "content": "The corrected script ran."},
     ])
     state = run_loop(model, session, "运行分析脚本")
-    second = json.loads(state["messages"][-1]["content"])
-    attempts.append(second["attempt_id"])
-    assert second["status"] == "failed" and len(set(attempts)) == 2
-    assert state["status"] == "incomplete"
-    assert state["termination_reason"] == "repeated_tool_failure"
-    assert state["rounds"] == 3
+    assert len(set(attempts)) == 2
+    assert state["status"] == "completed"
+    assert state["rounds"] == 6
 
 
 def test_successful_run_with_no_valid_values_is_not_called_a_valid_mean(tmp_path, local_worker):

@@ -147,12 +147,14 @@ def _close_unfinished(records: RunRecords, attempt_id: str, reason: str,
     for call in _records_for(records, "call", attempt_id):
         if call["status"] == "running":
             records.update("call", call["call_id"], status="failed", error=reason)
-            notify({"type": "call_failed", "stage_id": call["stage_id"],
+            notify({"type": "call_failed", "attempt_id": attempt_id,
+                    "stage_id": call["stage_id"],
                     "call_id": call["call_id"], "error": reason})
     for stage in _records_for(records, "stage", attempt_id):
         if stage["status"] == "running":
             records.update("stage", stage["stage_id"], status="failed", error=reason)
-            notify({"type": "step_failed", "step_id": stage["stage_id"],
+            notify({"type": "step_failed", "attempt_id": attempt_id,
+                    "step_id": stage["stage_id"],
                     "stage_id": stage["stage_id"], "title": stage["name"],
                     "completed_units": stage.get("completed_units", 0),
                           "error": reason})

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type {
   AnalysisProposal,
   ChatMessage,
@@ -42,182 +44,12 @@ type AnalysisFeedProps = {
   onToggleStepCard?: (messageId: string, stepId: string) => void;
 };
 
-type MarkdownBlock =
-  | { type: "heading"; level: number; text: string }
-  | { type: "paragraph"; text: string }
-  | { type: "ul"; items: string[] }
-  | { type: "ol"; items: string[]; start: number }
-  | { type: "blockquote"; text: string }
-  | { type: "hr" };
-
-function parseMarkdownSummary(text: string) {
-  const blocks: MarkdownBlock[] = [];
-  const paragraphLines: string[] = [];
-  let activeList: Extract<MarkdownBlock, { type: "ul" | "ol" }> | null = null;
-  let nextOrderedNumber = 1;
-
-  const flushParagraph = () => {
-    if (paragraphLines.length === 0) {
-      return;
-    }
-    blocks.push({ type: "paragraph", text: paragraphLines.join(" ") });
-    paragraphLines.length = 0;
-  };
-
-  const flushList = () => {
-    if (!activeList) {
-      return;
-    }
-    blocks.push(activeList);
-    activeList = null;
-  };
-
-  text
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .forEach((rawLine) => {
-      const line = rawLine.trimEnd();
-      const trimmed = line.trim();
-
-      if (!trimmed) {
-        flushParagraph();
-        flushList();
-        return;
-      }
-
-      if (/^-{3,}$/.test(trimmed)) {
-        flushParagraph();
-        flushList();
-        blocks.push({ type: "hr" });
-        nextOrderedNumber = 1;
-        return;
-      }
-
-      const headingMatch = /^(#{1,4})\s+(.+)$/.exec(trimmed);
-      if (headingMatch) {
-        flushParagraph();
-        flushList();
-        blocks.push({
-          type: "heading",
-          level: headingMatch[1].length,
-          text: headingMatch[2],
-        });
-        nextOrderedNumber = 1;
-        return;
-      }
-
-      const unorderedMatch = /^[-*]\s+(.+)$/.exec(trimmed);
-      const orderedMatch = /^(\d+)[.)]\s+(.+)$/.exec(trimmed);
-      const listType = unorderedMatch ? "ul" : orderedMatch ? "ol" : null;
-      const listText = unorderedMatch?.[1] ?? orderedMatch?.[2];
-      if (listType && listText) {
-        flushParagraph();
-        if (!activeList || activeList.type !== listType) {
-          flushList();
-          if (listType === "ol") {
-            const explicitStart = Number(orderedMatch?.[1]);
-            const start = explicitStart > 1 ? explicitStart : nextOrderedNumber;
-            activeList = { type: "ol", items: [], start };
-            nextOrderedNumber = start;
-          } else {
-            activeList = { type: "ul", items: [] };
-          }
-        }
-        activeList.items.push(listText);
-        if (activeList.type === "ol") {
-          nextOrderedNumber += 1;
-        }
-        return;
-      }
-
-      const quoteMatch = /^>\s?(.+)$/.exec(trimmed);
-      if (quoteMatch) {
-        flushParagraph();
-        flushList();
-        blocks.push({ type: "blockquote", text: quoteMatch[1] });
-        return;
-      }
-
-      flushList();
-      paragraphLines.push(trimmed);
-    });
-
-  flushParagraph();
-  flushList();
-
-  return blocks;
-}
-
-function renderInlineMarkdown(text: string, keyPrefix: string) {
-  const nodes: ReactNode[] = [];
-  const inlinePattern = /(`[^`]+`|\*\*.+?\*\*)/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = inlinePattern.exec(text))) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-
-    const token = match[0];
-    const key = `${keyPrefix}-${match.index}`;
-    if (token.startsWith("**")) {
-      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>);
-    } else {
-      nodes.push(<code key={key}>{token.slice(1, -1)}</code>);
-    }
-    lastIndex = match.index + token.length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-
-  return nodes;
-}
-
 function MarkdownSummary({ text }: { text: string }) {
-  const blocks = parseMarkdownSummary(text);
-
-  if (blocks.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="markdown-summary">
-      {blocks.map((block, index) => {
-        if (block.type === "heading") {
-          const HeadingTag = block.level <= 2 ? "h3" : "h4";
-          return <HeadingTag key={`heading-${index}`}>{renderInlineMarkdown(block.text, `heading-${index}`)}</HeadingTag>;
-        }
-        if (block.type === "paragraph") {
-          return <p key={`paragraph-${index}`}>{renderInlineMarkdown(block.text, `paragraph-${index}`)}</p>;
-        }
-        if (block.type === "blockquote") {
-          return <blockquote key={`blockquote-${index}`}>{renderInlineMarkdown(block.text, `blockquote-${index}`)}</blockquote>;
-        }
-        if (block.type === "hr") {
-          return <hr key={`hr-${index}`} />;
-        }
-        if (block.type === "ol") {
-          return (
-            <ol key={`list-${index}`} start={block.start}>
-              {block.items.map((item, itemIndex) => (
-                <li key={`list-${index}-${itemIndex}`}>{renderInlineMarkdown(item, `list-${index}-${itemIndex}`)}</li>
-              ))}
-            </ol>
-          );
-        }
-        return (
-          <ul key={`list-${index}`}>
-            {block.items.map((item, itemIndex) => (
-              <li key={`list-${index}-${itemIndex}`}>{renderInlineMarkdown(item, `list-${index}-${itemIndex}`)}</li>
-            ))}
-          </ul>
-        );
-      })}
-    </div>
-  );
+  return <div className="markdown-summary"><ReactMarkdown
+    remarkPlugins={[remarkGfm]}
+    skipHtml
+    components={{table: ({ children }) => <div className="markdown-table-wrap"><table>{children}</table></div>}}
+  >{text}</ReactMarkdown></div>;
 }
 
 function statusIcon(status: StepCard["status"]) {
@@ -523,7 +355,54 @@ function AssistantBlock({
   const payload = message.payload;
   const chinese = false;
   const stepCards = payload?.stepCards ?? [];
+  const resultCards = payload?.resultCards ?? [];
+  const attempts = new Map<string, number>();
+  for (const step of stepCards) {
+    attempts.set(step.attempt_id ?? "run", step.attempt_index ?? attempts.size);
+  }
+  for (const card of resultCards) {
+    attempts.set(card.attemptId ?? "run", card.attemptIndex ?? attempts.size);
+  }
+  const attemptIds = [...attempts].sort((left, right) => left[1] - right[1]).map(([id]) => id);
+  const currentAttempt = attemptIds.at(-1);
+  const currentSteps = stepCards.filter((step) => (step.attempt_id ?? "run") === currentAttempt);
+  const renderAttempt = (attemptId: string) => {
+    const steps = stepCards.filter((step) => (step.attempt_id ?? "run") === attemptId);
+    const stepIds = new Set(steps.map((step) => step.step_id));
+    const looseResults = resultCards.filter((card) =>
+      (card.attemptId ?? "run") === attemptId && (!card.ownerStepId || !stepIds.has(card.ownerStepId)));
+    return (
+      <>
+        {steps.map((step) => (
+          <StepCardBlock
+            key={step.step_id}
+            conversationId={conversationId}
+            messageId={message.id}
+            onOpenDetail={onOpenDetail}
+            onPromoteMapField={onPromoteMapField}
+            onResultAction={onResultAction}
+            onToggleStepCard={onToggleStepCard}
+            preferredLanguage={payload?.preferredLanguage}
+            step={step}
+          />
+        ))}
+        {looseResults.map((card) => (
+          <StepResultContent
+            key={card.id}
+            card={card}
+            conversationId={conversationId}
+            onOpenDetail={onOpenDetail}
+            onPromoteMapField={onPromoteMapField}
+            onResultAction={onResultAction}
+            preferredLanguage={payload?.preferredLanguage}
+          />
+        ))}
+      </>
+    );
+  };
   const planSteps = payload?.planSteps ?? [];
+  const currentStepIds = new Set(currentSteps.map((step) => step.step_id));
+  const currentPlanSteps = planSteps.filter((step) => currentStepIds.has(step.id));
   const sourceCards = payload?.sourceCards ?? [];
   const displaySourceCards = sourceCards.filter((source) => !isNoUsableExternalSourcesCard(source) && hasUsableSourceUrl(source));
   const webSearchHeader = buildWebSearchHeader(displaySourceCards, chinese);
@@ -531,7 +410,7 @@ function AssistantBlock({
   const attachments = (payload?.attachments ?? []).filter(
     (item) => item.kind === "code" || item.kind === "image_png"
   );
-  const { completedSteps, totalSteps } = getProgressCounts(planSteps, stepCards);
+  const { completedSteps, totalSteps } = getProgressCounts(currentPlanSteps, currentSteps);
   const progressLabel = totalSteps > 0 ? `[${completedSteps}/${totalSteps}]` : "";
   const showExecutionProgress = shouldShowExecutionProgress(payload);
   const failedNote =
@@ -541,7 +420,7 @@ function AssistantBlock({
 
   return (
     <div className="analysis-block">
-      {showExecutionProgress || stepCards.length > 0 ? (
+      {showExecutionProgress || attemptIds.length > 0 ? (
         <section className="workflow-card ui-card">
           <div className="workflow-card-header">
             <div>
@@ -565,16 +444,16 @@ function AssistantBlock({
                 <span className="progress-spinner">{assistantProgressIconState(payload)}</span>
                 <span>{payload?.summary ?? message.text}</span>
                 <span>{progressLabel}</span>
-                {planSteps.length > 0 ? (
+                {currentPlanSteps.length > 0 ? (
                   <button className="progress-expand" onClick={() => setPlanExpanded((current) => !current)} type="button">
                     {planExpanded ? (chinese ? "收起 ▴" : "Collapse ▴") : (chinese ? "展开 ▾" : "Expand ▾")}
                   </button>
                 ) : null}
               </div>
 
-              {planExpanded && planSteps.length > 0 ? (
+              {planExpanded && currentPlanSteps.length > 0 ? (
                 <div className="plan-steps-list">
-                  {planSteps.map((step, index) => (
+                  {currentPlanSteps.map((step, index) => (
                     <div key={step.id} className={`plan-step-item status-${step.status}`}>
                       <span className="step-icon">{index + 1}.</span>
                       <span>{step.humanLabel ?? step.tool}</span>
@@ -585,20 +464,20 @@ function AssistantBlock({
             </div>
           ) : null}
 
-          {stepCards.length > 0 ? (
+          {attemptIds.length > 0 ? (
             <div className="step-card-timeline">
-              {stepCards.map((step) => (
-                <StepCardBlock
-                  key={step.step_id}
-                  conversationId={conversationId}
-                  messageId={message.id}
-                  onOpenDetail={onOpenDetail}
-                  onPromoteMapField={onPromoteMapField}
-                  onResultAction={onResultAction}
-                  onToggleStepCard={onToggleStepCard}
-                  preferredLanguage={payload?.preferredLanguage}
-                  step={step}
-                />
+              {attemptIds.map((attemptId, index) => (
+                attemptId === currentAttempt ? (
+                  <section className="analysis-attempt" key={attemptId}>
+                    {attemptIds.length > 1 ? <h5>Attempt {index + 1} · current</h5> : null}
+                    {renderAttempt(attemptId)}
+                  </section>
+                ) : (
+                  <details className="analysis-attempt is-previous" key={attemptId}>
+                    <summary>Attempt {index + 1} · previous results</summary>
+                    {renderAttempt(attemptId)}
+                  </details>
+                )
               ))}
             </div>
           ) : null}

@@ -56,7 +56,7 @@ def test_every_result_is_visible_without_resending_the_whole_stage():
     assert all(len(event["payload"]["step_card"]["results"]) == 1 for event in attached)
 
 
-def test_saved_field_and_derived_number_are_visible_as_map_and_metric(tmp_path):
+def test_loaded_field_shows_stats_and_computed_field_shows_map(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()
     stage = session.records.new_stage(attempt, "Mean chlorophyll")
@@ -65,18 +65,53 @@ def test_saved_field_and_derived_number_are_visible_as_map_and_metric(tmp_path):
                          coords={"lat": [20.0, 20.1], "lon": [120.0, 120.1]},
                          name="chlorophyll", attrs={"units": "mg m-3"})
     field_id = session.artifacts.publish("load_dataset", field, run_id=session.run_id,
-                                         attempt_id=attempt, stage_id=stage, inputs=[])
+                                         attempt_id=attempt, stage_id=stage, inputs=[],
+                                         presentation="summary")
     mean_id = session.artifacts.publish("mean", {"mean": 0.9}, run_id=session.run_id,
                                         attempt_id=attempt, stage_id=stage, inputs=[field_id])
-    for artifact_id in (field_id, mean_id):
+    map_id = session.artifacts.publish("compute_spatial_field", {
+        "lon": [120.0, 120.1], "lat": [20.0, 20.1],
+        "values": [[0.5, 0.8], [1.0, 1.3]],
+        "metadata": {"variable": "chlorophyll", "units": "mg m-3"},
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[field_id])
+    for artifact_id in (field_id, mean_id, map_id):
         adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
                           "entry": {"status": "completed", "artifact_id": artifact_id}})
-    field_card, mean_card = adapter.finalize()["result_cards"]
-    assert field_card["workspaceData"]["mapField"]["values"] == [[0.5, 0.8], [1.0, 1.3]]
+    field_card, mean_card, map_card = adapter.finalize()["result_cards"]
+    assert "workspaceData" not in field_card
+    assert {item["label"]: item["value"] for item in field_card["metrics"]} == {
+        "Dimensions": "lat × lon", "Shape": "2 × 2", "Units": "mg m-3",
+        "Sample valid": "4/4", "Sample min": "0.5", "Sample mean": "0.9",
+        "Sample max": "1.3",
+    }
     assert mean_card["metrics"] == [{"label": "mean", "value": "0.9"}]
-    assert mean_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
-    assert mean_card["surface"] == "map"
-    assert adapter.finalize()["active_result_id"] == mean_id
+    assert "workspaceData" not in mean_card
+    assert map_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
+    assert map_card["surface"] == "map"
+    assert adapter.finalize()["active_result_id"] == map_id
+
+
+def test_publish_outside_stage_keeps_result_without_visible_step(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Hidden default")
+    adapter = ProgressAdapter(session)
+    artifact = session.artifacts.publish("publish:computed", {
+        "lon": [120.0, 121.0], "lat": [20.0, 21.0],
+        "values": [[1.0, 2.0], [3.0, 4.0]],
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "attempt_id": attempt, "visible_step": False,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    adapter.on_event({"type": "step_progress", "stage_id": stage,
+                      "attempt_id": attempt, "visible_step": False,
+                      "completed_units": 1})
+    payload = adapter.finalize()
+    assert payload["step_cards"] == []
+    assert payload["result_cards"][0]["attemptId"] == attempt
+    assert payload["result_cards"][0]["attemptIndex"] == 0
+    assert payload["result_cards"][0]["title"] == "Computed"
+    assert payload["result_cards"][0]["surface"] == "map"
 
 
 def test_saved_tool_maps_and_timeseries_use_interactive_renderers(tmp_path):

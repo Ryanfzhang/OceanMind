@@ -1104,6 +1104,23 @@ export function OceanWorkspaceApp() {
               return;
             }
 
+            if (eventType === "attempt_result_attached") {
+              const card = payload.result_card as ResultCardSummary | undefined;
+              if (!card) return;
+              setMessages((previous) =>
+                updateAssistantMessage(previous, pendingAssistantId, (current) => ({
+                  ...current,
+                  resultCards: current.resultCards.some((item) => item.id === card.id)
+                    ? current.resultCards
+                    : [...current.resultCards, card],
+                }))
+              );
+              if (card.surface === "map" && card.workspaceData) {
+                focusMapResult(card, card.workspaceData as WorkspaceData);
+              }
+              return;
+            }
+
             if (eventType === "step_failed") {
               const stepId = String(payload.step_id ?? "");
               const stepCard = payload.step_card as StepCard | undefined;

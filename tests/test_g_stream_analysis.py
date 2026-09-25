@@ -53,6 +53,6 @@ with stage("Batch", total=100, unit="slice") as progress:
     assert len(cards) == 2
     assert cards[1]["progress"]["completed_units"] == 100
     assert final["payload"]["result_summaries"][cards[1]["step_id"]]["completed"] == 100
-    assert len(cards[1]["results"]) == 2
+    assert len(cards[1]["results"]) == 100
     assert [event["payload"]["type"] for event in events[:-1]].count("step_started") == 2
-    assert [event["payload"]["type"] for event in events[:-1]].count("step_result_attached") <= 3
+    assert [event["payload"]["type"] for event in events[:-1]].count("step_result_attached") == 101

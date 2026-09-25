@@ -58,26 +58,36 @@ def clarification_request(assistant_message: Mapping[str, Any]) -> tuple[str, st
 
 
 def finalize_state(state: AgentState) -> AgentState:
-    """Preserve a prior terminal status or classify the last assistant message."""
-    if state["status"] != "running":
+    """Always return a readable delivery unless the agent requested user input."""
+    if state["status"] in {"completed", "needs_input"}:
         return state.copy()
     final = state["messages"][-1] if state["messages"] else {}
-    if not isinstance(final, Mapping) or final.get("role") != "assistant":
-        return {**state, "status": "failed", "termination_reason": "missing_final_answer"}
-    try:
-        question = clarification_request(final)
-    except ValueError:
-        return {**state, "status": "failed", "termination_reason": "invalid_clarification_request"}
-    if question:
-        return {**state, "status": "needs_input", "termination_reason": "clarification_requested"}
-    content = final.get("content")
-    if final.get("tool_calls") or not isinstance(content, str) or not content.strip():
-        return {**state, "status": "failed", "termination_reason": "empty_or_malformed_final"}
-    return {**state, "status": "completed", "termination_reason": None}
+    if state["status"] == "running" and isinstance(final, Mapping):
+        try:
+            question = clarification_request(final)
+        except ValueError:
+            question = None
+        if question:
+            return {**state, "status": "needs_input",
+                    "termination_reason": "clarification_requested"}
+        content = final.get("content")
+        if (final.get("role") == "assistant" and not final.get("tool_calls")
+                and isinstance(content, str) and content.strip()):
+            return {**state, "status": "completed", "termination_reason": None}
+
+    draft = state.get("draft", "").strip()
+    reason = state.get("termination_reason") or "the answer was not finished"
+    if draft:
+        content = f"{draft}\n\nFurther analysis was interrupted ({reason})."
+    else:
+        content = f"I could not complete the analysis ({reason}). Any saved results remain available."
+    return {**state, "messages": [*state["messages"],
+                                 {"role": "assistant", "content": content}],
+            "status": "completed"}
 
 
 def finalize_delivery(state: AgentState, session: Any) -> AgentState:
-    """Check cited references and attach the latest verified successful attempt."""
+    """Check cited references and attach verified results from all attempts."""
     classified = finalize_state(state)
     if classified["status"] != "completed":
         return classified
@@ -110,23 +120,27 @@ def finalize_delivery(state: AgentState, session: Any) -> AgentState:
         except (KeyError, OSError, TypeError, ValueError):
             invalid.append(ref)
     if invalid:
-        feedback = {"role": "user", "content": (
-            "Delivery check failed: these code/result references are unavailable in this "
-            f"run: {', '.join(sorted(invalid))}. Check saved references and revise the answer."
-        )}
-        return {**classified, "messages": [*classified["messages"], feedback],
-                "status": "running", "termination_reason": "invalid_delivery_reference"}
+        # The backend supplies verified attachments below. A mistyped long ID in
+        # prose must not trigger another execution of an already successful run.
+        cleaned = content
+        for ref in invalid:
+            cleaned = cleaned.replace(ref, "[unverified reference omitted]")
+        messages = [*classified["messages"]]
+        messages[-1] = {**messages[-1], "content": cleaned}
+        classified = {**classified, "messages": messages}
 
     attempts = []
     directory = session.root / "records" / "attempt"
     if directory.exists():
         for path in directory.glob(f"{session.run_id}_attempt_*.json"):
             attempt = session.records.read("attempt", path.stem)
-            if attempt.get("run_id") == session.run_id and attempt.get("status") == "completed":
+            if attempt.get("run_id") == session.run_id:
                 attempts.append(attempt)
     attachments: list[dict[str, str]] = []
     if attempts:
-        attempt = max(attempts, key=lambda item: item.get("created_at", ""))
+        attempts.sort(key=lambda item: item.get("created_at", ""))
+        attempt = next((item for item in reversed(attempts)
+                        if item.get("status") == "completed"), attempts[-1])
         code_id = attempt.get("code_version")
         if isinstance(code_id, str):
             session.codes.get_path(code_id)
@@ -134,23 +148,25 @@ def finalize_delivery(state: AgentState, session: Any) -> AgentState:
         result_dir = session.root / "artifacts" / "index"
         if result_dir.exists():
             artifacts = []
-            for path in result_dir.glob(f"{attempt['attempt_id']}_artifact_*.json"):
-                metadata = session.artifacts.read_artifact(path.stem)
-                if (metadata.get("status") == "completed"
-                        and metadata.get("run_id") == session.run_id
-                        and metadata.get("attempt_id") == attempt["attempt_id"]):
-                    try:
-                        if metadata.get("kind") == "image_png":
-                            session.artifacts.read_image(metadata["artifact_id"])
-                        elif metadata.get("kind") in {"json", "dataarray_netcdf"}:
-                            _stored_payload(session.root, metadata["payload"])
-                        elif metadata.get("kind") == "source_netcdf":
-                            session.artifacts._source(metadata["source_path"])
-                        else:
+            for saved_attempt in attempts:
+                for path in result_dir.glob(f"{saved_attempt['attempt_id']}_artifact_*.json"):
+                    metadata = session.artifacts.read_artifact(path.stem)
+                    if (metadata.get("status") == "completed"
+                            and metadata.get("run_id") == session.run_id
+                            and metadata.get("attempt_id") == saved_attempt["attempt_id"]):
+                        try:
+                            if metadata.get("kind") == "image_png":
+                                session.artifacts.read_image(metadata["artifact_id"])
+                            elif metadata.get("kind") in {"json", "dataarray_netcdf"}:
+                                _stored_payload(session.root, metadata["payload"])
+                            elif metadata.get("kind") == "source_netcdf":
+                                session.artifacts._source(metadata["source_path"])
+                            else:
+                                continue
+                        except (KeyError, OSError, TypeError, ValueError):
                             continue
-                    except (KeyError, OSError, TypeError, ValueError):
-                        continue
-                    artifacts.append(metadata)
+                        artifacts.append(metadata)
+            artifacts.sort(key=lambda item: item.get("created_at", ""))
             images = [item for item in artifacts if item.get("kind") == "image_png"]
             ordinary = [item for item in artifacts if item.get("kind") != "image_png"]
             for item in ordinary[-3:] + images[-2:]:

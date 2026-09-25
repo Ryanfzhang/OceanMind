@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.errors import NodeError
+from langgraph.types import Command, RetryPolicy
 
 from packages.agent_loop.analysis import (
     LIST_RESULTS_SCHEMA,
@@ -23,7 +25,7 @@ from packages.agent_loop.finalize import (
     finalize_delivery,
     finalize_state,
 )
-from packages.agent_loop.limits import budget_violation, repeated_failure_count
+from packages.agent_loop.limits import budget_violation
 from packages.agent_loop.ocean_tools import (
     FIND_TOOLS_SCHEMA,
     INSPECT_DATA_SCHEMA,
@@ -80,16 +82,15 @@ def _configured_data_prompt(data_roots: tuple[Path, ...]) -> str:
 def build_graph(
     model: Any,
     *,
-    max_rounds: int = 12,
-    repeated_failure_limit: int = 2,
+    max_rounds: int = 60,
     tool_registry: Mapping[str, Callable[..., Any]] | None = None,
     web_search: Callable[..., Any] | None = None,
     skills_root: Path | str | None = None,
     analysis_session: AnalysisSession | None = None,
 ):
     """Compile one model/tool loop; injected model and tools support offline tests."""
-    if max_rounds < 1 or repeated_failure_limit < 1:
-        raise ValueError("loop limits must be positive")
+    if max_rounds < 1:
+        raise ValueError("model decision limit must be positive")
     search = web_search or make_web_search_tool()
     skill_index = list_skills(skills_root)
     skill_prompt = "\nAvailable skill guidance (ID: summary):\n" + "\n".join(
@@ -133,17 +134,29 @@ def build_graph(
             "Save complete ordinary Python with write_analysis, then run its code_id. "
             "Inside the script, use `from oceanmind_runtime import tools, stage, publish, "
             "load_result`; wrap related work in stage blocks and keep stages outside loops. "
+            "Keep each publish call inside the stage that produced its value; do not "
+            "create a generic Run analysis stage for publishing. "
             "Use short, descriptive English stage titles for the English workspace UI; "
             "name actual analysis actions, not diagnostic probes. "
             "Use `publish(name, value, inputs=[])` for custom computed results; "
             "if the value derives from a tool result, pass its saved ID in inputs using "
             "`tools.ref(result)`. Tool calls already save their results; do not publish "
             "the same result again. Do not pass a `kind` argument. "
+            "For a raw field that you load and publish yourself, set "
+            "`presentation=\"summary\"`; published calculated spatial fields use "
+            "the default interactive map when they have lat/lon coordinates. "
+            "When a map is requested, save the computed spatial field in its calculation "
+            "stage; loading the source dataset is not the map result. "
             "After execution, check saved results "
             "and quality metrics; a zero exit code alone does not validate a calculation. "
             "Use list_results for earlier results and read_artifact for bounded details. "
             "When the requested result is saved and its quality is established, answer "
             "without rereading large arrays or running an unrelated extra analysis."
+            " If a tool or script fails, use its error observation to revise the code or "
+            "method; an error alone does not end the task. Once you have a defensible "
+            "partial answer, keep a short current answer in the text content of later "
+            "tool-calling messages and update it when evidence changes. If work must "
+            "stop, this text can be delivered with the verified saved results."
             " Saved tool results automatically become interactive frontend views when "
             "their data shape is supported; do not build standalone HTML for them. "
             "For a T-S plot, pass the objects returned by tools.load_dataset directly "
@@ -153,8 +166,14 @@ def build_graph(
             " To draw an interpretable eddy figure, import render_eddy_figure from "
             "packages.analysis_runtime.figures and publish its PngFigure. "
             "Call view_image with the published image artifact ID when visual patterns matter. "
-            "In the final answer use exact saved code and artifact IDs for any attachments; "
-            "verify numerical findings before making claims from an image."
+            "For data analysis, answer in the user's language with four short sections: "
+            "Result (direct answer and key numbers), Evidence (what the saved results "
+            "show), Method (data scope and calculation), and Limitations (missing data "
+            "or uncertainty). Use Markdown tables only with one row per line. "
+            "Do not transcribe code or artifact IDs: verified saved files are attached "
+            "automatically. Never rerun successful analysis just to repair answer text "
+            "or attachment references. Verify numerical findings before making claims "
+            "from an image."
             "\nAuthorized data roots: "
             + (", ".join(str(path) for path in analysis_session.data_roots)
                if analysis_session.data_roots else "none")
@@ -167,20 +186,33 @@ def build_graph(
             return {**state, **violation}
         deadline = state["deadline"]
         timeout = max(0.001, deadline - time.monotonic()) if deadline else None
-        try:
-            model_messages = hydrate_vision_messages(
-                [{"role": "system", "content": SYSTEM_PROMPT + skill_prompt + analysis_prompt},
-                 *state["messages"]], analysis_session,
-            )
-            answer = model.complete(
-                model_messages,
-                tools=schemas,
-                timeout=timeout,
-            )
-        except Exception:
-            return {**state, "status": "failed", "termination_reason": "model_error"}
+        remaining = max_rounds - state["rounds"]
+        delivery_hint = (
+            f"\nYou have {remaining} model decisions left. Finish from verified results "
+            "and state any missing work; do not start a new analysis."
+            if remaining <= 3 else ""
+        )
+        model_messages = hydrate_vision_messages(
+            [{"role": "system", "content": SYSTEM_PROMPT + skill_prompt + analysis_prompt
+              + delivery_hint}, *state["messages"]], analysis_session,
+        )
+        answer = model.complete(
+            model_messages,
+            tools=[] if remaining == 1 else schemas,
+            timeout=timeout,
+        )
         updated = append_message(state, answer)
-        return {**updated, "rounds": state["rounds"] + 1}
+        content = answer.get("content")
+        return {**updated, "rounds": state["rounds"] + 1,
+                "draft": content.strip() if isinstance(content, str) and content.strip()
+                else state.get("draft", "")}
+
+    def model_error(state: AgentState, error: NodeError) -> Command:
+        return Command(
+            update={"status": "incomplete",
+                    "termination_reason": f"model_error: {type(error.error).__name__}"},
+            goto="finalize",
+        )
 
     def after_agent(state: AgentState) -> str:
         if state["status"] != "running":
@@ -218,10 +250,7 @@ def build_graph(
                 "status": "needs_input",
                 "termination_reason": "clarification_requested",
             }
-        for index, call in enumerate(calls):
-            violation = budget_violation(updated, max_rounds)
-            if violation:
-                return close_unexecuted(updated, calls[index:], violation["termination_reason"])
+        for call in calls:
             available = registry
             name = call["function"]["name"]
             if name == "web_search" and state["deadline"]:
@@ -229,17 +258,16 @@ def build_graph(
                 available = {**registry, "web_search": lambda **args: search(timeout=remaining, **args)}
             if name == "run_analysis" and analysis_session is not None and state["deadline"]:
                 remaining = max(0.001, state["deadline"] - time.monotonic())
-                available = {**registry, "run_analysis": lambda code_id, timeout_seconds=60: (
+                available = {**registry, "run_analysis": lambda code_id, timeout_seconds=1800: (
                     analysis_session.run_analysis(code_id, timeout_seconds=min(timeout_seconds, remaining))
                 )}
             observation = execute_tool_calls({"tool_calls": [call]}, available)[0]
             updated = append_message(updated, observation)
-            if repeated_failure_count(updated["messages"]) >= repeated_failure_limit:
-                return close_unexecuted(updated, calls[index + 1:], "repeated_tool_failure")
         return updated
 
     graph = StateGraph(AgentState)
-    graph.add_node("agent", agent)
+    graph.add_node("agent", agent, retry_policy=RetryPolicy(max_attempts=3),
+                   error_handler=model_error)
     graph.add_node("tools", run_tools)
     graph.add_node("finalize", (lambda state: finalize_delivery(state, analysis_session))
                    if analysis_session is not None else finalize_state)
@@ -250,9 +278,5 @@ def build_graph(
         lambda state: "agent" if state["status"] == "running" else "finalize",
         {"agent": "agent", "finalize": "finalize"},
     )
-    graph.add_conditional_edges(
-        "finalize",
-        lambda state: "agent" if state["status"] == "running" else "end",
-        {"agent": "agent", "end": END},
-    )
+    graph.add_edge("finalize", END)
     return graph.compile()

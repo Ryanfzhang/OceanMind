@@ -17,13 +17,13 @@ def run_query(
     user_query: str,
     *,
     model: Any = None,
-    max_rounds: int = 12,
-    timeout_seconds: float = 120,
+    max_rounds: int = 60,
+    timeout_seconds: float | None = None,
     analysis_workspace: str | Path | None = None,
     data_roots: tuple[str | Path, ...] = (),
 ) -> AgentState:
     """Run one query; a supplied model enables offline verification."""
-    if timeout_seconds <= 0:
+    if timeout_seconds is not None and timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be positive")
     if model is None:
         config = load_agent_model_config()
@@ -36,8 +36,8 @@ def run_query(
                if analysis_workspace is not None else None)
     graph = build_graph(model, max_rounds=max_rounds, analysis_session=session)
     state = initial_state(
-        user_query, deadline=time.monotonic() + timeout_seconds,
+        user_query, deadline=time.monotonic() + timeout_seconds if timeout_seconds else None,
         run_id=session.run_id if session else None,
         run_root=str(session.root) if session else None,
     )
-    return graph.invoke(state, config={"recursion_limit": 2 * max_rounds + 4})
+    return graph.invoke(state, config={"recursion_limit": 2 * max_rounds + 8})

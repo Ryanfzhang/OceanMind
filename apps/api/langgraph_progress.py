@@ -18,6 +18,36 @@ PREVIEW_JSON_BYTES = 4 * 1024 * 1024
 PREVIEW_GRID_SIDE = 64
 
 
+def _loaded_field_metrics(path: Any, summary: dict) -> list[dict[str, str]]:
+    """Describe a loaded array without turning it into an analysis map."""
+    import numpy as np
+    import xarray as xr
+
+    dims = summary.get("dims") or []
+    shape = summary.get("shape") or []
+    metrics = [
+        {"label": "Dimensions", "value": " × ".join(map(str, dims))},
+        {"label": "Shape", "value": " × ".join(map(str, shape))},
+    ]
+    if summary.get("units"):
+        metrics.append({"label": "Units", "value": str(summary["units"])})
+    with xr.open_dataarray(path) as field:
+        sampled = field.isel(**{
+            dim: slice(None, None, max(1, math.ceil(size / (64 if dim in {"lat", "lon"} else 8))))
+            for dim, size in field.sizes.items()
+        })
+        values = np.asarray(sampled.values, dtype=float)
+    finite = values[np.isfinite(values)]
+    metrics.append({"label": "Sample valid", "value": f"{finite.size}/{values.size}"})
+    if finite.size:
+        metrics.extend({"label": label, "value": f"{value:.4g}"} for label, value in (
+            ("Sample min", float(finite.min())),
+            ("Sample mean", float(finite.mean())),
+            ("Sample max", float(finite.max())),
+        ))
+    return metrics
+
+
 def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
     """Read at most a small slice of a saved field for the existing UI charts."""
     import numpy as np
@@ -100,6 +130,8 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
     if not isinstance(lon, list) or not isinstance(lat, list) or field is None:
         return None
     values = _preview_values(field, root)
+    if isinstance(values, list):
+        values = np.asarray(values)
     if (np.ndim(values) != 2 or len(lon) < 2 or len(lat) < 2
             or np.shape(values) != (len(lat), len(lon))):
         return None
@@ -390,25 +422,36 @@ class ProgressAdapter:
         self.counts: dict[str, dict[str, int]] = {}
         self.last_progress: dict[str, float] = {}
         self.active_result_id: str | None = None
+        self.attempt_order: dict[str, int] = {}
+
+    def _attempt_index(self, attempt_id: Any) -> int | None:
+        if not isinstance(attempt_id, str) or not attempt_id:
+            return None
+        if attempt_id not in self.attempt_order:
+            self.attempt_order[attempt_id] = len(self.attempt_order)
+        return self.attempt_order[attempt_id]
 
     def _send(self, event_type: str, payload: dict[str, Any]) -> None:
         self.emit({"event": "execution_event", "payload": deepcopy({"type": event_type, **payload})})
 
-    def _card(self, stage_id: str, title: str | None = None) -> dict:
+    def _card(self, stage_id: str, title: str | None = None,
+              attempt_id: str | None = None) -> dict:
         if stage_id not in self.cards:
             self.cards[stage_id] = {
                 "step_id": stage_id, "human_label": title or "Run analysis",
                 "technical_label": "analysis stage", "status": "running",
                 "results_hidden_by_default": False, "results": [], "actions": [],
                 "is_map_bound": False, "is_expanded": False,
+                "attempt_id": attempt_id,
+                "attempt_index": self._attempt_index(attempt_id),
             }
             self.counts[stage_id] = {"completed": 0, "failed": 0}
         return self.cards[stage_id]
 
-    def _attach(self, stage_id: str, entry: dict) -> None:
-        card = self._card(stage_id)
+    def _attach(self, stage_id: str, entry: dict, *, visible_step: bool = True) -> None:
+        card = self._card(stage_id) if visible_step else None
         status = entry.get("status")
-        if status in ("completed", "failed"):
+        if card is not None and status in ("completed", "failed"):
             self.counts[stage_id][status] += 1
         artifact_id = entry.get("artifact_id")
         if status != "completed" or not isinstance(artifact_id, str):
@@ -425,38 +468,41 @@ class ProgressAdapter:
         scope = ", ".join(f"{label}: {value}" for label, value in (("time", when), ("depth", depth))
                           if value is not None)
         name = str(metadata.get("name", "Result"))[:120]
-        result = {"id": artifact_id, "title": name.replace("_", " ").title(),
+        display_name = name.removeprefix("publish:")
+        result = {"id": artifact_id, "title": display_name.replace("_", " ").title(),
                   "type": str(metadata.get("kind", "result")),
-                  "headline": scope or name,
+                  "headline": scope or display_name,
                   "description": "Saved analysis figure" if is_figure else
                                  "Saved field" if metadata.get("kind") == "dataarray_netcdf" else
                                  "Saved calculation result",
                   "renderer": "summary", "metrics": [], "surface": "inline",
-                  "ownerStepId": stage_id}
+                  "attemptId": metadata.get("attempt_id"),
+                  "attemptIndex": self._attempt_index(metadata.get("attempt_id"))}
+        if card is not None:
+            result["ownerStepId"] = stage_id
         try:
             if metadata.get("kind") == "dataarray_netcdf":
-                preview = _array_preview(_stored_payload(self.session.root, metadata["payload"]), name)
-                if preview:
-                    result["renderer"], workspace = preview
-                    result["workspaceData"] = workspace
-                    self.workspace_by_result[artifact_id] = workspace
+                path = _stored_payload(self.session.root, metadata["payload"])
+                if metadata.get("presentation") == "summary":
+                    result["metrics"] = _loaded_field_metrics(path, metadata.get("summary") or {})
+                    result["headline"] = "Loaded data dimensions and sampled statistics"
+                else:
+                    preview = _array_preview(path, display_name)
+                    if preview:
+                        result["renderer"], workspace = preview
+                        result["workspaceData"] = workspace
+                        self.workspace_by_result[artifact_id] = workspace
             elif metadata.get("kind") == "json":
                 path = _stored_payload(self.session.root, metadata["payload"])
                 result["metrics"] = _numeric_metrics(path)
                 if result["metrics"]:
                     first = result["metrics"][0]
                     result["headline"] = f"{first['label']}: {first['value']}"
-                preview = _json_preview(self.session.root, path, name)
+                preview = _json_preview(self.session.root, path, display_name)
                 if preview:
                     result["renderer"], workspace = preview
                     result["workspaceData"] = workspace
                     self.workspace_by_result[artifact_id] = workspace
-                for input_id in metadata.get("inputs", []):
-                    source = self.workspace_by_result.get(input_id, {})
-                    if source.get("mapField") and not result.get("workspaceData"):
-                        result["workspaceData"] = {"mapField": source["mapField"]}
-                        self.workspace_by_result[artifact_id] = result["workspaceData"]
-                        break
         except (OSError, KeyError, TypeError, ValueError):
             pass
         if metadata.get("kind") == "json":
@@ -496,19 +542,27 @@ class ProgressAdapter:
                                       workspaceData=workspace,
                                       actions=[{"id": "focus_map", "label": "Show on map"}])
                         self.workspace_by_result[artifact_id] = workspace
-                        card["is_map_bound"] = True
+                        if card is not None:
+                            card["is_map_bound"] = True
             except (OSError, KeyError, TypeError, ValueError):
                 pass
         workspace = result.get("workspaceData") or {}
         if workspace.get("mapField") or workspace.get("eventOverlays"):
             result.update(surface="map", actions=[{"id": "focus_map", "label": "Show on main map"}])
-            card["is_map_bound"] = True
-        card["results"].append(result)
+            if card is not None:
+                card["is_map_bound"] = True
+        if card is not None:
+            card["results"].append(result)
         self.result_cards.append(result)
         if workspace.get("mapField") or workspace.get("eventOverlays"):
             self.active_result_id = artifact_id
-        self._send("step_result_attached", {"step_id": stage_id,
-                                            "step_card": {**card, "results": [result]}})
+        if card is not None:
+            self._send("step_result_attached", {"step_id": stage_id,
+                                                "attempt_id": metadata.get("attempt_id"),
+                                                "step_card": {**card, "results": [result]}})
+        else:
+            self._send("attempt_result_attached", {"attempt_id": metadata.get("attempt_id"),
+                                                   "result_card": result})
 
     def on_event(self, event: dict[str, Any]) -> None:
         kind = event.get("type")
@@ -517,11 +571,14 @@ class ProgressAdapter:
             return
         if kind == "stage_result_indexed":
             if isinstance(event.get("entry"), dict):
-                self._attach(stage_id, event["entry"])
+                self._attach(stage_id, event["entry"],
+                             visible_step=event.get("visible_step") is not False)
             return
         if kind not in {"step_started", "step_progress", "step_completed", "step_failed"}:
             return
-        card = self._card(stage_id, event.get("title"))
+        if event.get("visible_step") is False:
+            return
+        card = self._card(stage_id, event.get("title"), event.get("attempt_id"))
         if event.get("title"):
             card["human_label"] = str(event["title"])[:120]
         if kind == "step_progress":
@@ -551,7 +608,8 @@ class ProgressAdapter:
             card["status"] = "completed" if kind == "step_completed" else "failed"
             if kind == "step_failed":
                 card["error"] = str(event.get("error", "Analysis stage failed"))[:500]
-        self._send(kind, {"step_id": stage_id, "step_card": card.copy(),
+        self._send(kind, {"step_id": stage_id, "attempt_id": event.get("attempt_id"),
+                          "step_card": card.copy(),
                           "error": card.get("error"), "recoverable": False})
 
     def finalize(self, state: Any = None) -> dict[str, Any]:

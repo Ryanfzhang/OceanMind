@@ -219,10 +219,13 @@ class ArtifactStore:
         write_json_atomic(self._index(metadata["artifact_id"]), metadata)
 
     def publish(self, name: str, value: Any, *, run_id: str, attempt_id: str,
-                stage_id: str, inputs: list[str], call_id: str | None = None) -> str:
+                stage_id: str, inputs: list[str], call_id: str | None = None,
+                presentation: str = "auto") -> str:
         import xarray as xr
         from .figures import PngFigure
 
+        if presentation not in {"auto", "summary", "map"}:
+            raise ValueError("presentation must be auto, summary, or map")
         is_array = isinstance(value, xr.DataArray)
         is_image = isinstance(value, PngFigure)
         if is_image:
@@ -244,6 +247,8 @@ class ArtifactStore:
         metadata = self._start(name, run_id=run_id, attempt_id=attempt_id,
                                stage_id=stage_id, inputs=inputs, call_id=call_id,
                                kind=kind, summary=summary)
+        metadata["presentation"] = presentation
+        write_json_atomic(self._index(metadata["artifact_id"]), metadata)
         artifact_id = metadata["artifact_id"]
         path = self._payload(artifact_id, ".png" if is_image else ".nc" if is_array else ".json")
         sidecars: list[Path] = []

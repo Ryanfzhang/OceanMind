@@ -60,6 +60,7 @@ class Stage:
     current: dict[str, Any] = field(default_factory=dict)
     status: str = "running"
     results: list[dict[str, Any]] = field(default_factory=list)
+    visible: bool = True
 
     def set_current(self, **coordinates: Any) -> None:
         self._require_running()
@@ -117,12 +118,14 @@ class StageManager:
             _CURRENT_MANAGER.reset(token)
 
     def _event(self, event: dict[str, Any]) -> None:
+        event = {**event, "attempt_id": self.attempt_id}
         if self.retain_events:
             self.events.append(event)
         if self.callback:
             self.callback(event)
 
-    def _new_stage(self, title: str, total: int | None, unit: str | None) -> Stage:
+    def _new_stage(self, title: str, total: int | None, unit: str | None,
+                   *, visible: bool = True) -> Stage:
         if not isinstance(title, str) or not title.strip() or len(title) > 120:
             raise ValueError("Stage title must contain 1..120 characters")
         if unit is not None and (not isinstance(unit, str) or len(unit) > 40):
@@ -137,15 +140,17 @@ class StageManager:
             self.records.new_stage(self.attempt_id, title) if self.records
             else new_id("stage", run_id=self.run_id, attempt_id=self.attempt_id)
         )
-        item = Stage(self, stage_id, title, total, unit)
+        item = Stage(self, stage_id, title, total, unit, visible=visible)
         self.stages.append(item)
-        self._event(self._snapshot("step_started", item))
+        if visible:
+            self._event(self._snapshot("step_started", item))
         return item
 
     def _snapshot(self, kind: str, item: Stage) -> dict[str, Any]:
         event: dict[str, Any] = {
             "type": kind, "step_id": item.id, "stage_id": item.id,
             "title": item.title, "completed_units": item.completed,
+            "visible_step": item.visible,
         }
         if item.total is not None:
             event["total_units"] = item.total
@@ -171,7 +176,8 @@ class StageManager:
         event = self._snapshot("step_completed" if status == "completed" else "step_failed", item)
         if error:
             event["error"] = error
-        self._event(event)
+        if item.visible:
+            self._event(event)
 
     @contextmanager
     def stage(self, title: str, *, total: int | None = None, unit: str | None = None) -> Iterator[Stage]:
@@ -191,7 +197,7 @@ class StageManager:
         finally:
             _CURRENT_STAGE.reset(token)
 
-    def ensure_stage(self) -> Stage:
+    def ensure_stage(self, *, visible: bool = True) -> Stage:
         """Return the active stage, lazily creating one default script stage."""
         item = current_stage()
         if item is not None:
@@ -199,7 +205,10 @@ class StageManager:
                 raise RuntimeError("Current stage belongs to another script attempt")
             return item
         if self._default is None:
-            self._default = self._new_stage("Run analysis", None, None)
+            self._default = self._new_stage("Run analysis", None, None, visible=visible)
+        elif visible and not self._default.visible:
+            self._default.visible = True
+            self._event(self._snapshot("step_started", self._default))
         return self._default
 
     def close(self, error: BaseException | None = None) -> None:
@@ -217,7 +226,7 @@ class StageManager:
         inputs: list[str] | None = None,
     ) -> dict[str, Any]:
         """Append a call index entry; the actual result stays in the artifact store."""
-        item = self.ensure_stage()
+        item = current_stage() or self._default or self.ensure_stage(visible=False)
         item._require_running()
         if status not in {"completed", "failed"}:
             raise ValueError("Call result status must be completed or failed")
@@ -233,7 +242,9 @@ class StageManager:
         item.results.append(entry)
         if self.records:
             self.records.update("stage", item.id, result_index=item.results)
-        self._event({"type": "stage_result_indexed", "step_id": item.id, "entry": entry.copy()})
+        self._event({"type": "stage_result_indexed", "step_id": item.id,
+                     "stage_id": item.id, "visible_step": item.visible,
+                     "entry": entry.copy()})
         return entry
 
     @property

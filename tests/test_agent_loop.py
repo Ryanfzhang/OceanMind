@@ -101,8 +101,9 @@ def test_clarification_and_limits_have_distinct_statuses():
         initial_state("Analyze it", deadline=time.monotonic() - 1)
     )
     assert (expired["status"], expired["termination_reason"]) == (
-        "incomplete", "deadline_exceeded"
+        "completed", "deadline_exceeded"
     )
+    assert "could not complete" in expired["messages"][-1]["content"]
 
     one_round = build_graph(ScriptedModel([clarification]), max_rounds=1).invoke(
         initial_state("Analyze it")
@@ -114,15 +115,43 @@ def test_clarification_and_limits_have_distinct_statuses():
     ]}
     capped = build_graph(ScriptedModel([tool_call]), max_rounds=1).invoke(initial_state("Add"))
     assert (capped["status"], capped["termination_reason"]) == (
-        "incomplete", "max_rounds_exceeded"
+        "completed", "max_rounds_exceeded"
     )
 
 
-def test_repeated_identical_tool_failure_stops_loop():
+def test_repeated_identical_tool_failure_stays_recoverable():
     bad_call = {"role": "assistant", "content": None, "tool_calls": [
         call("calculator", {"operation": "add", "a": "bad", "b": 3})
     ]}
-    state = build_graph(ScriptedModel([bad_call, bad_call])).invoke(initial_state("Add"))
-    assert (state["status"], state["termination_reason"], state["rounds"]) == (
-        "incomplete", "repeated_tool_failure", 2
-    )
+    repaired = {"role": "assistant", "content": None, "tool_calls": [
+        call("calculator", {"operation": "add", "a": 2, "b": 3}, "fixed")
+    ]}
+    state = build_graph(ScriptedModel([
+        bad_call, bad_call, repaired, {"role": "assistant", "content": "The sum is 5."},
+    ])).invoke(initial_state("Add"))
+    assert (state["status"], state["rounds"]) == ("completed", 4)
+    assert json.loads(state["messages"][-2]["content"])["result"] == 5
+
+
+def test_transient_model_error_retries_agent_without_replaying_tool():
+    class FlakyModel:
+        calls = 0
+
+        def complete(self, messages, *, tools, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                return {"role": "assistant", "content": None, "tool_calls": [
+                    call("calculator", {"operation": "add", "a": 2, "b": 3})]}
+            if self.calls == 2:
+                raise ConnectionError("temporary model connection")
+            assert json.loads(messages[-1]["content"])["result"] == 5
+            return {"role": "assistant", "content": "The sum is 5."}
+
+    model = FlakyModel()
+    tool_calls = []
+    state = build_graph(model, tool_registry={"calculator": lambda **kwargs: (
+        tool_calls.append(kwargs) or kwargs["a"] + kwargs["b"]
+    )}).invoke(initial_state("Add"))
+    assert state["status"] == "completed"
+    assert model.calls == 3
+    assert len(tool_calls) == 1

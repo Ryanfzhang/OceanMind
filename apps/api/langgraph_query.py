@@ -238,8 +238,8 @@ class QueryService:
         model_factory: Callable[[], Any] = _default_model,
         data_roots: Callable[[], tuple[str | Path, ...]] = _default_data_roots,
         progress_factory: ProgressFactory | None = None,
-        max_rounds: int = 12,
-        timeout_seconds: float = 120,
+        max_rounds: int = 60,
+        timeout_seconds: float | None = None,
     ) -> None:
         self.store = ConversationStore(workspace)
         self.model_factory = model_factory
@@ -287,7 +287,7 @@ class QueryService:
                 user_content += "\n\nWorkspace context supplied by the user:\n" + encoded
             state = initial_state(
                 user_content,
-                deadline=time.monotonic() + self.timeout_seconds,
+                deadline=time.monotonic() + self.timeout_seconds if self.timeout_seconds else None,
                 run_id=session.run_id,
                 run_root=str(session.root),
             )
@@ -299,7 +299,7 @@ class QueryService:
                 analysis_session=session,
             )
             state = graph.invoke(
-                state, config={"recursion_limit": 2 * self.max_rounds + 4},
+                state, config={"recursion_limit": 2 * self.max_rounds + 8},
             )
             record = replace(record, messages=state["messages"], status=state["status"])
             self.store.save(record)
@@ -331,7 +331,11 @@ class QueryService:
 
         threading.Thread(target=worker, daemon=True).start()
         while True:
-            event = events.get()
+            try:
+                event = events.get(timeout=15)
+            except queue.Empty:
+                yield json.dumps({"event": "execution_event", "payload": {"type": "heartbeat"}}) + "\n"
+                continue
             if event is None:
                 break
             yield json.dumps(event, ensure_ascii=False, allow_nan=False) + "\n"

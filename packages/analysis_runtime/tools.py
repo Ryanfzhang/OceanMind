@@ -79,14 +79,16 @@ class AnalysisTools:
         func = self._function(tool_name)
         bound = inspect.signature(func).bind(*args, **kwargs)
         invoke = lambda: func(*args, **kwargs)
-        result, _ = self._execute(tool_name, invoke, input_refs, dict(bound.arguments))
+        result, _ = self._execute(tool_name, invoke, input_refs, dict(bound.arguments),
+                                  source_result=True)
         return result
 
     def _execute(
         self, name: str, func: Callable[..., Any], input_refs: list[str] | None,
         kwargs: dict[str, Any],
+        *, source_result: bool = False, presentation: str = "auto",
     ) -> tuple[Any, str]:
-        stage = self.stages.ensure_stage()
+        stage = self.stages.ensure_stage(visible=False)
         refs = input_refs or [
             self._result_refs[id(value)] for value in kwargs.values()
             if id(value) in self._result_refs
@@ -105,9 +107,14 @@ class AnalysisTools:
         token = set_tool_progress_callback(progress)
         try:
             result = func()
+            if (presentation == "auto" and isinstance(result, xr.DataArray)
+                    and not refs and source_result
+                    and not any(isinstance(value, xr.DataArray) for value in kwargs.values())):
+                presentation = "summary"
             artifact_id = self.artifacts.publish(
                 name, result, run_id=self.records.run_id, attempt_id=self.stages.attempt_id,
                 stage_id=stage.id, inputs=refs, call_id=call_id,
+                presentation=presentation,
             )
             summary = json.dumps(
                 self.artifacts.read_artifact(artifact_id)["summary"], ensure_ascii=False
@@ -132,10 +139,12 @@ class AnalysisTools:
         finally:
             reset_tool_progress_callback(token)
 
-    def publish(self, name: str, value: Any, *, inputs: list[str] | None = None) -> str:
+    def publish(self, name: str, value: Any, *, inputs: list[str] | None = None,
+                presentation: str = "auto") -> str:
         """Save one custom calculation in the active stage."""
         _, artifact_id = self._execute(
             f"publish:{name}", lambda: value, [] if inputs is None else inputs, {},
+            presentation=presentation,
         )
         return artifact_id
 

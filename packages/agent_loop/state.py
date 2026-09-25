@@ -20,6 +20,7 @@ class AgentState(TypedDict):
     run_id: str | None
     run_root: str | None
     attachments: list[dict[str, str]]
+    draft: str
 
 
 def initial_state(
@@ -37,6 +38,7 @@ def initial_state(
         "run_id": run_id,
         "run_root": run_root,
         "attachments": [],
+        "draft": "",
     }
 
 
