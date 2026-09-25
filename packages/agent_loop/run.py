@@ -17,7 +17,7 @@ def run_query(
     user_query: str,
     *,
     model: Any = None,
-    max_rounds: int = 8,
+    max_rounds: int = 12,
     timeout_seconds: float = 120,
     analysis_workspace: str | Path | None = None,
     data_roots: tuple[str | Path, ...] = (),

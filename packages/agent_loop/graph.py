@@ -80,7 +80,7 @@ def _configured_data_prompt(data_roots: tuple[Path, ...]) -> str:
 def build_graph(
     model: Any,
     *,
-    max_rounds: int = 8,
+    max_rounds: int = 12,
     repeated_failure_limit: int = 2,
     tool_registry: Mapping[str, Callable[..., Any]] | None = None,
     web_search: Callable[..., Any] | None = None,
@@ -139,7 +139,9 @@ def build_graph(
             "the same result again. Do not pass a `kind` argument. "
             "After execution, check saved results "
             "and quality metrics; a zero exit code alone does not validate a calculation. "
-            "Use list_results for earlier results and read_artifact for bounded details."
+            "Use list_results for earlier results and read_artifact for bounded details. "
+            "When the requested result is saved and its quality is established, answer "
+            "without rereading large arrays or running an unrelated extra analysis."
             " Saved tool results automatically become interactive frontend views when "
             "their data shape is supported; do not build standalone HTML for them. "
             "For a T-S plot, pass the objects returned by tools.load_dataset directly "

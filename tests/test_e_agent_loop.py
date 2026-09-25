@@ -79,6 +79,7 @@ def test_configured_dataset_guidance_only_applies_to_its_source(tmp_path, monkey
     assert "do not write and run probe scripts" in prompt
     assert "interactive T-S chart" in prompt
     assert "never pass their `.data` arrays" in prompt
+    assert "without rereading large arrays" in prompt
 
 
 def test_direct_entry_point_creates_run_scoped_analysis_session(tmp_path):

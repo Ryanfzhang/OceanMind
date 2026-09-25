@@ -238,7 +238,7 @@ class QueryService:
         model_factory: Callable[[], Any] = _default_model,
         data_roots: Callable[[], tuple[str | Path, ...]] = _default_data_roots,
         progress_factory: ProgressFactory | None = None,
-        max_rounds: int = 8,
+        max_rounds: int = 12,
         timeout_seconds: float = 120,
     ) -> None:
         self.store = ConversationStore(workspace)
