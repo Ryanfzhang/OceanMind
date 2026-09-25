@@ -214,6 +214,28 @@ def test_custom_transect_geometry_stays_with_saved_result(tmp_path):
     assert [[point["lon"], point["lat"]] for point in path] == vertices
 
 
+def test_later_summary_backfills_polygon_outline_on_earlier_map(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    manager = StageManager(session.run_id, attempt, records=session.records)
+    tools = AnalysisTools(session.records, session.artifacts, manager, functions={})
+    vertices = [[120, 20], [121, 20], [121, 21], [120, 21]]
+    with manager.activate():
+        field = xr.DataArray([[1.0, 2.0], [3.0, 4.0]],
+                             coords={"lat": [20, 21], "lon": [120, 121]},
+                             dims=("lat", "lon"))
+        map_ref = tools.publish("masked_map", field)
+        summary_ref = tools.publish("statistics", {"mean": 2.5}, inputs=[map_ref],
+                                    geometry={"type": "polygon", "points": vertices})
+    adapter = ProgressAdapter(session)
+    for ref in (map_ref, summary_ref):
+        metadata = session.artifacts.read_artifact(ref)
+        adapter.on_event({"type": "stage_result_indexed", "stage_id": metadata["stage_id"],
+                          "entry": {"status": "completed", "artifact_id": ref}})
+    path = adapter.finalize()["workspace_data_by_result"][map_ref]["eventOverlays"][0]["path"]
+    assert [[point["lon"], point["lat"]] for point in path] == [*vertices, vertices[0]]
+
+
 def test_multidimensional_saved_field_gets_bounded_spatial_preview(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()

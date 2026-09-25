@@ -490,6 +490,39 @@ class ProgressAdapter:
                     pass
         return overlays
 
+    def _backfill_input_geometry(self, metadata: dict) -> None:
+        """A later summary can identify geometry used by an earlier saved map."""
+        call_id = metadata.get("call_id")
+        if not isinstance(call_id, str) or not hasattr(self.session, "records"):
+            return
+        try:
+            call = self.session.records.read("call", call_id)
+        except (KeyError, OSError, ValueError):
+            return
+        geometry = call.get("parameters", {}).get("analysis_geometry")
+        if not isinstance(geometry, dict):
+            return
+        pending = list(metadata.get("inputs", []))
+        seen: set[str] = set()
+        while pending and len(seen) < 128:
+            ref = pending.pop(0)
+            if not isinstance(ref, str) or ref in seen:
+                continue
+            seen.add(ref)
+            try:
+                source = self.session.artifacts.read_artifact(ref)
+            except (OSError, ValueError):
+                continue
+            if source.get("run_id") != self.session.run_id:
+                continue
+            workspace = self.workspace_by_result.get(ref)
+            if workspace and (workspace.get("mapField") or workspace.get("sectionRows")):
+                overlay = _selection_overlay(geometry, ref)
+                if overlay and not any(item.get("id") == overlay["id"]
+                                       for item in workspace.get("eventOverlays", [])):
+                    workspace["eventOverlays"] = [*workspace.get("eventOverlays", []), overlay]
+            pending.extend(source.get("inputs", []))
+
     def _card(self, stage_id: str, title: str | None = None,
               attempt_id: str | None = None) -> dict:
         if stage_id not in self.cards:
@@ -617,6 +650,7 @@ class ProgressAdapter:
         if card is not None:
             card["results"].append(result)
         self.result_cards.append(result)
+        self._backfill_input_geometry(metadata)
         if workspace.get("mapField") or workspace.get("eventOverlays"):
             self.active_result_id = artifact_id
         if card is not None:
