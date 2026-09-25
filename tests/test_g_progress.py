@@ -168,6 +168,71 @@ def test_event_mask_is_projected_as_footprint_instead_of_bounding_rectangle(tmp_
     assert card["workspaceData"]["eventOverlays"][0]["shape"] == "point"
 
 
+def test_detector_masks_share_the_same_sparse_map_projection(tmp_path):
+    for index, (event_type, mask_key, mask) in enumerate((
+        ("front", "front_mask", np.array([[True, False], [False, False]])),
+        ("eddy", "mask", np.array([[False, True], [False, False]])),
+        ("meander", "curvature_mask", [[0, 0], [1, 0]]),
+    )):
+        session = AnalysisSession(tmp_path / f"detector_{index}")
+        attempt = session.records.new_attempt()
+        stage = session.records.new_stage(attempt, "Detect events")
+        artifact = session.artifacts.publish("detect_events", {
+            "event_type": event_type,
+            "events": [{"center": {"lon": 120.0, "lat": 20.0},
+                        "bbox": {"lon_min": 120.0, "lon_max": 121.0,
+                                 "lat_min": 20.0, "lat_max": 21.0}}],
+            "coordinates": {"lon": [120.0, 121.0], "lat": [20.0, 21.0]},
+            mask_key: mask,
+        }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+        adapter = ProgressAdapter(session)
+        adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                          "entry": {"status": "completed", "artifact_id": artifact}})
+        workspace = adapter.finalize()["result_cards"][0]["workspaceData"]
+        assert workspace["mapField"]["variable"] == mask_key
+        assert sum(value is not None for row in workspace["mapField"]["values"]
+                   for value in row) == 1
+        assert workspace["eventOverlays"][0]["shape"] != "rectangle"
+
+
+def test_boolean_dataarray_mask_is_sparse_on_map(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Build mask")
+    mask = xr.DataArray(
+        np.array([[[True, False], [False, False]],
+                  [[False, False], [False, True]]]),
+        dims=("time", "lat", "lon"),
+        coords={"time": [0, 1], "lat": [20.0, 21.0], "lon": [120.0, 121.0]},
+        name="polygon_mask",
+    )
+    artifact = session.artifacts.publish("build_polygon_mask", mask,
+                                         run_id=session.run_id, attempt_id=attempt,
+                                         stage_id=stage, inputs=[], presentation="map")
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    field = adapter.finalize()["result_cards"][0]["workspaceData"]["mapField"]
+    assert field["values"] == [[1.0, None], [None, 1.0]]
+    assert field["discreteLegend"][0]["label"] == "Mask cells"
+
+
+def test_unknown_structured_mask_without_events_uses_same_map_layer(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Custom analysis")
+    artifact = session.artifacts.publish("custom_mask", {
+        "coordinates": {"lon": [120.0, 121.0], "lat": [20.0, 21.0]},
+        "quality_mask": [[0, 1], [0, 0]],
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    card = adapter.finalize()["result_cards"][0]
+    assert card["surface"] == "map"
+    assert card["workspaceData"]["mapField"]["values"] == [[None, 1.0], [None, None]]
+
+
 def test_eof_modes_keep_interactive_map_and_pc_series(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()
@@ -328,7 +393,7 @@ def test_ts_diagram_keeps_color_and_watermass_classes(tmp_path):
     assert card["workspaceData"]["tsDiagramWatermassBins"][0]["name"] == "Water mass A"
 
 
-def test_front_and_eddy_track_keep_interactive_map_shapes(tmp_path):
+def test_bbox_only_event_uses_point_and_track_keeps_polyline(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()
     stage = session.records.new_stage(attempt, "Detect events")
@@ -348,9 +413,7 @@ def test_front_and_eddy_track_keep_interactive_map_shapes(tmp_path):
                           "entry": {"status": "completed", "artifact_id": artifact}})
     front, track = adapter.finalize()["result_cards"]
     assert front["renderer"] == track["renderer"] == "event"
-    assert front["workspaceData"]["eventOverlays"][0]["shape"] == "rectangle"
-    assert front["workspaceData"]["eventOverlays"][0]["bounds"] == {
-        "lonMin": 120.0, "lonMax": 121.0, "latMin": 20.0, "latMax": 21.0}
+    assert front["workspaceData"]["eventOverlays"][0]["shape"] == "point"
     assert track["workspaceData"]["eventOverlays"][0]["shape"] == "polyline"
     assert track["workspaceData"]["eventOverlays"][0]["path"][1] == {"lon": 121.0, "lat": 21.0}
 

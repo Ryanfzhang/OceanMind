@@ -57,21 +57,31 @@ def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
         field = source.squeeze(drop=True)
         if {"lat", "lon"}.issubset(field.dims):
             extras = [dim for dim in field.dims if dim not in {"lat", "lon"}]
+            is_mask = (source.dtype.kind == "b" or
+                       str(source.name or name).lower().endswith("_mask"))
             field = field.isel(**{
                 dim: slice(None, None, max(1, math.ceil(field.sizes[dim] / PREVIEW_GRID_SIDE)))
                 for dim in ("lat", "lon")
             })
             if extras:
-                field = field.isel(**{
-                    dim: slice(None, None, max(1, math.ceil(field.sizes[dim] / 8)))
-                    for dim in extras
-                }).mean(extras, skipna=True)
-                name = f"{name} (sampled mean preview)"
+                if is_mask:
+                    field = field.any(extras) if field.dtype.kind == "b" else field.max(extras)
+                else:
+                    field = field.isel(**{
+                        dim: slice(None, None, max(1, math.ceil(field.sizes[dim] / 8)))
+                        for dim in extras
+                    }).mean(extras, skipna=True)
+                    name = f"{name} (sampled mean preview)"
             field = field.transpose("lat", "lon")
             if field.sizes["lat"] < 2 or field.sizes["lon"] < 2:
                 return None
             lon = np.asarray(field["lon"].values, dtype=float)
             lat = np.asarray(field["lat"].values, dtype=float)
+            if is_mask:
+                mask_field = _mask_map_payload(
+                    field.values, lon.tolist(), lat.tolist(), None,
+                    f"{name.replace('_', ' ').title()} footprint", str(source.name or name))
+                return ("summary", {"mapField": mask_field}) if mask_field else None
             values = np.asarray(field.values, dtype=float)
             if (lon.ndim != 1 or lat.ndim != 1 or values.shape != (len(lat), len(lon))
                     or not np.all(np.isfinite(lon)) or not np.all(np.isfinite(lat))
@@ -153,21 +163,25 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
                        [float(y.max()), float(x.max())]]}
 
 
-def _event_mask_payload(value: dict, root: Any, name: str) -> dict | None:
-    """Show the occupied cells across the saved event mask, not its bounding box."""
+def _mask_map_payload(mask_value: Any, lon: Any, lat: Any, root: Any,
+                      label: str, variable: str) -> dict | None:
+    """Project any georeferenced binary mask onto a sparse map layer."""
     import numpy as np
 
-    coordinates = value.get("coordinates")
-    if not isinstance(coordinates, dict) or value.get("event_mask") is None:
-        return None
-    lon, lat = coordinates.get("lon"), coordinates.get("lat")
     if not isinstance(lon, list) or not isinstance(lat, list) or len(lon) < 2 or len(lat) < 2:
         return None
     x, y = np.asarray(lon, dtype=float), np.asarray(lat, dtype=float)
     if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y))):
         return None
-    mask = np.asarray(_preview_values(value["event_mask"], root))
-    if mask.ndim < 2 or mask.shape[-2:] != (len(lat), len(lon)):
+    if isinstance(mask_value, dict) and "__dataarray_file__" in mask_value:
+        import xarray as xr
+
+        with xr.open_dataarray(_stored_payload(root, mask_value["__dataarray_file__"])) as array:
+            mask = np.asarray(array.values)
+    else:
+        mask = np.asarray(_preview_values(mask_value, root))
+    if (mask.ndim < 2 or mask.shape[-2:] != (len(lat), len(lon))
+            or mask.dtype.kind not in "bifu"):
         return None
     row_step = max(1, math.ceil(len(lat) / PREVIEW_GRID_SIDE))
     col_step = max(1, math.ceil(len(lon) / PREVIEW_GRID_SIDE))
@@ -175,7 +189,13 @@ def _event_mask_payload(value: dict, root: Any, name: str) -> dict | None:
     cols = np.arange(0, len(lon), col_step)
     occupied = np.zeros((len(rows), len(cols)), dtype=bool)
     for field in mask.reshape((-1, len(lat), len(lon))):
-        hits = field if field.dtype == np.bool_ else np.isfinite(field) & (field != 0)
+        if field.dtype.kind == "b":
+            hits = field
+        else:
+            valid = np.isfinite(field)
+            if not np.all(~valid | (field == 0) | (field == 1)):
+                return None
+            hits = valid & (field == 1)
         occupied |= np.logical_or.reduceat(
             np.logical_or.reduceat(hits, rows, axis=0), cols, axis=1)
     if not np.any(occupied):
@@ -183,11 +203,33 @@ def _event_mask_payload(value: dict, root: Any, name: str) -> dict | None:
     return {
         "lon": x[cols].tolist(), "lat": y[rows].tolist(),
         "values": [[1.0 if hit else None for hit in row] for row in occupied],
-        "label": f"{name.replace('_', ' ').title()} footprint (any detected day)",
-        "variable": "event_mask", "units": "detected cells",
+        "label": label, "variable": variable, "units": "mask cells",
         "bounds": [[float(y.min()), float(x.min())], [float(y.max()), float(x.max())]],
-        "discreteLegend": [{"value": 1, "label": "Detected event footprint", "color": "#dc2626"}],
+        "discreteLegend": [{"value": 1, "label": "Mask cells", "color": "#dc2626"}],
     }
+
+
+def _structured_mask_payload(value: dict, root: Any, name: str) -> dict | None:
+    """Use a saved mask, preferring accepted events over candidate masks."""
+    coordinates = value.get("coordinates")
+    if not isinstance(coordinates, dict):
+        return None
+    mask_names = sorted((key for key in value
+                         if key == "mask" or key.endswith("_mask")),
+                        key=lambda key: (key != "event_mask", key))
+    for mask_name in mask_names:
+        title = name.replace("_", " ").title()
+        kind = ("event footprint" if mask_name == "event_mask" else
+                "candidate mask" if isinstance(value.get("events"), list) else "mask footprint")
+        try:
+            field = _mask_map_payload(value[mask_name], coordinates.get("lon"),
+                                      coordinates.get("lat"), root,
+                                      f"{title} {kind} (any selected slice)", mask_name)
+        except (OSError, KeyError, TypeError, ValueError):
+            continue
+        if field:
+            return field
+    return None
 
 
 def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
@@ -206,6 +248,9 @@ def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
                                      f"{name} {field_name}" if field_name == "slope" else name)
             if preview:
                 return preview
+    mask_field = _structured_mask_payload(value, root, str(value.get("event_type") or name))
+    if mask_field:
+        return "summary", {"mapField": mask_field}
     if all(isinstance(value.get(key), dict)
            for key in ("positive_composite", "negative_composite", "difference")):
         fields = []
@@ -390,7 +435,7 @@ def _current_unit(value: Any) -> str | None:
 
 
 def _overlay(event: dict, artifact_id: str, number: int, kind: str,
-             when: Any, depth: Any, *, has_event_mask: bool = False) -> dict | None:
+             when: Any, depth: Any) -> dict | None:
     center = event.get("center") or event.get("centroid")
     if not isinstance(center, dict):
         center = event
@@ -429,12 +474,6 @@ def _overlay(event: dict, artifact_id: str, number: int, kind: str,
                   and math.isfinite(point[key]) for key in ("lon", "lat"))]
         if len(points) >= 2:
             overlay.update(shape="polyline", path=points)
-    if "shape" not in overlay and not has_event_mask and isinstance(bbox, dict):
-        edges = [bbox.get(key) for key in ("lon_min", "lon_max", "lat_min", "lat_max")]
-        if all(isinstance(v, (int, float)) and math.isfinite(v) for v in edges):
-            overlay.update(shape="rectangle", bounds={
-                "lonMin": edges[0], "lonMax": edges[1],
-                "latMin": edges[2], "latMax": edges[3]})
     if "shape" not in overlay and isinstance(radius, (int, float)) and math.isfinite(radius) and radius > 0:
         overlay.update(shape="circle", radiusKm=float(radius))
     if "shape" not in overlay:
@@ -642,12 +681,14 @@ class ProgressAdapter:
                         event_type = str(value.get("event_type") or
                                          ("eddy" if name == "detect_eddies" else
                                           name.removeprefix("detect_").rstrip("s")) or "event")
-                        mask_field = _event_mask_payload(value, self.session.root, event_type)
+                        existing_field = (result.get("workspaceData") or {}).get("mapField")
+                        mask_field = (existing_field if existing_field and
+                                      str(existing_field.get("variable", "")).endswith("mask")
+                                      else _structured_mask_payload(value, self.session.root, event_type))
                         overlays = [overlay for i, item in enumerate(events, 1)
                                     if isinstance(item, dict)
                                     if (overlay := _overlay(item, artifact_id, i, event_type,
-                                                            when, depth,
-                                                            has_event_mask=mask_field is not None))]
+                                                            when, depth))]
                         workspace = {"eventOverlays": overlays}
                         if mask_field:
                             workspace["mapField"] = mask_field
