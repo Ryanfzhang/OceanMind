@@ -11,75 +11,41 @@ composes_with:
 ---
 # Ocean Spatial Field Analysis
 
-## Purpose
+Use this skill when the requested product is a horizontal map of an observed or modelled variable. Read the source metadata and a bounded sample with `inspect_data` before writing code: identify the actual variable name, units, horizontal coordinates, available dates, depth coordinate, and coverage. A data path or variable unknown to `load_dataset` can be read with xarray inside the analysis script after inspecting it; do not silently substitute another variable. Inspect `find_tools("load_dataset")` and `find_tools("compute_spatial_field")` if their signatures are uncertain.
 
-This skill converts an ocean variable into a map-ready two-dimensional field. It supports direct spatial aggregation, feature-depth maps, layer-mean maps, polygon masking, and field-level temporal diagnostics before the final map is made.
+Choose the spatial, time, and vertical scope from the request and available coordinates. `load_dataset` requires `variable`, `lon_range`, and `lat_range`; its optional controls are `time_range`, `season_filter`, `vertical_mode`, `depth_value`, and `depth_range`. Use `vertical_mode="surface"` for surface, `"bottom"` for each column's deepest valid level, `"fixed_depth"` with `depth_value` for a named depth, and `"depth_range"` for an explicitly requested numeric layer. A bottom map is **not** a fixed deepest coordinate or a column mean. Do not invent a depth range for an unspecified vertical scope; ask or inspect the source if the choice changes the answer.
 
-## Workflow
+`compute_spatial_field` reduces any remaining time and depth dimensions to a 2D `lat`/`lon` result with `lon`, `lat`, `values`, and `metadata`. Time choices are `mean`, `max`, `min`, `std`, and `median`; depth choices are `mean`, `max`, `min`, `integral`, and `surface`. The defaults are `mean` for each. Use `integral` only when a depth integral, with its resulting units, is scientifically requested. For a layer mean, subset the requested layer and use `depth_aggregation="mean"`. For bottom or single-depth selection, leave `depth_range=None` at this step and keep a supported depth aggregation such as `"mean"`; no full-column depth reduction is then needed. State the period, vertical choice, aggregations, units, and any missing cells when reporting the map.
 
-### Stage 1: Load the source field
-
-```python
-# IMPORTANT: Planner fills shared analysis scope here before instantiating tool calls.
-variables = [variable]  # <-- MODIFY: requested variable list in load order.
-lon_range = None  # <-- MODIFY: west/east bounds from the user query or selected workspace region.
-lat_range = None  # <-- MODIFY: south/north bounds from the user query or selected workspace region.
-time_range = None  # <-- MODIFY: analysis time window from the user query.
-vertical_mode = 'unspecified'  # <-- MODIFY: surface, bottom, fixed_depth, depth_range, or unspecified.
-depth_value = None  # <-- MODIFY: fixed depth in meters only when the query names one depth.
-depth_range = None  # <-- MODIFY: numeric depth interval only when the query names a layer; surface may use [0, 0].
-depth_aggregation = 'mean'  # <-- MODIFY: how to reduce a depth range.
-
-raw_field = load_dataset(
-    variable=variables[0],
-    lon_range=lon_range,
-    lat_range=lat_range,
-    time_range=time_range,
-    vertical_mode=vertical_mode,
-    depth_value=depth_value,
-    depth_range=depth_range,
-)
-```
-
-### Stage 2: Optional polygon mask
-
-```text
-combined_mask = combine_masks(
-    masks=[region_mask.data, isobath_mask.data],
-    operation=mask_combination_operation,
-)
-```
-
-### Stage 3: Legacy analysis base
-
-```text
-masked_analysis_base = apply_mask(
-    data=raw_field.data,
-    mask=combined_mask.data,
-)
-```
-
-### Stage 4: Optional field temporal analysis
+The following is ordinary Python for one unmasked map. The analysis runner supplies `tools`; its stage manager records both tool calls, their results, and progress. Fill the arguments from the actual request and source metadata, then run it as one saved analysis script:
 
 ```python
-spatial_field = compute_spatial_field(
-    data=raw_field.data,
-    time_range=time_range,
-    time_aggregation=time_aggregation,
-    depth_range=depth_range,
-    depth_aggregation=depth_aggregation,
-)
+from packages.analysis_runtime.stages import stage
+
+
+def run_spatial_map(tools, *, variable, lon_range, lat_range, time_range,
+                    vertical_mode, depth_value=None, depth_range=None,
+                    time_aggregation="mean", depth_aggregation="mean"):
+    with stage("读取原始变量"):
+        field = tools.load_dataset(
+            variable=variable, lon_range=lon_range, lat_range=lat_range,
+            time_range=time_range, vertical_mode=vertical_mode,
+            depth_value=depth_value, depth_range=depth_range,
+        )
+
+    with stage("计算二维空间场"):
+        spatial_map = tools.compute_spatial_field(
+            data=field, time_range=time_range,
+            time_aggregation=time_aggregation,
+            depth_range=depth_range if vertical_mode == "depth_range" else None,
+            depth_aggregation=depth_aggregation,
+            input_refs=[tools.ref(field)],
+        )
+    return spatial_map
 ```
 
+The loader and map tool consume `DataArray` values directly; do not append `.data` to their results. The map tool does **not** accept `lon_range`, `lat_range`, `vertical_mode`, or `depth_value`. If the source has nonstandard coordinate names, rename them to `lat` and `lon` in the analysis code before calling the map tool. If a loader cannot resolve the variable, use the inspected xarray field, apply the same requested subsets, publish a bounded input artifact if lineage is needed, and pass the resulting `DataArray` directly to `tools.compute_spatial_field`.
 
-## Notes
+For a polygon or isobath request, read `ocean_masking_workflow` and choose only the necessary mask builders. `tools.build_polygon_mask(data=field, polygon_points=...)` and `tools.build_isobath_mask(data=field, isobath_depth=..., comparison=...)` return boolean `DataArray` masks. Combine multiple masks with `tools.combine_masks(masks=[...], operation="and")` when the question requires their intersection. Pass the resulting mask as `mask=...` to `tools.compute_spatial_field`; that tool applies it before reductions. `tools.apply_mask(data=field, mask=...)` is useful when another downstream tool lacks a mask argument, but it is not an obligatory extra step here. Record the mask artifact IDs as input references for the final call.
 
-- Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
-- Supported mask builders include: threshold, condition, combined.
-- Workflow code must use assignment-form Python DSL, such as `raw_field = load_dataset(...)`; never use bare tool calls, `save_as=...`, or `$ref:...` JSON references.
-- Bottom/near-bottom/seafloor/benthic requests must use `vertical_mode = 'bottom'` with `depth_value = None` and `depth_range = None`; do not approximate bottom as 8000 m, -8000 m, or any fixed deepest coordinate.
-- Use `depth_range` only for an explicit numeric layer named by the user, such as upper 0-750 m or 100-200 m.
-- `load_dataset` performs the horizontal/vertical subset. Do not pass `lon_range`, `lat_range`, `vertical_mode`, or `depth_value` to `compute_spatial_field`; it only consumes `data`, optional `time_range`, `time_aggregation`, optional `depth_range`, `depth_aggregation`, and optional `mask`.
-- `compute_spatial_field` must use a supported `depth_aggregation`; for bottom maps use `depth_aggregation = 'mean'`, not `'none'` or `None`.
-- For unmasked map requests, pass `raw_field.data` directly to `compute_spatial_field`. For masked requests, build/apply the mask before the map step and pass `masked_analysis_base.data` instead.
-- Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.
+If the request names a feature depth, such as mixed-layer or thermocline depth, inspect the corresponding feature tool and its source requirements, compute that feature field first, and map the feature field. Do not replace a feature-depth calculation with a fixed depth, a layer mean, or the first available level. If the request asks for several independent maps, select the actual slices and use one stage with progress over the requested set; retain each complete result and its time/depth label instead of collapsing them into one unlabeled field.

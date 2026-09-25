@@ -583,6 +583,7 @@ export type QueryApiResponse = {
   active_map_step_id?: string | null;
   workspace_data?: Partial<WorkspaceData>;
   workspace_data_by_result?: Record<string, Partial<WorkspaceData>>;
+  attachments?: Array<{ kind: string; ref: string }>;
   error?: string | null;
   failure_kind?: "capability_boundary" | "llm_format" | "planning" | "execution" | "synthesis" | "transport" | null;
   recoverable?: boolean | null;
@@ -621,6 +622,7 @@ export type AssistantMessagePayload = {
   sourceCards?: SourceCard[];
   workspaceData?: WorkspaceData;
   workspaceDataByResult?: Record<string, WorkspaceData>;
+  attachments?: Array<{ kind: string; ref: string }>;
   activeResultId?: string;
   failureKind?: QueryApiResponse["failure_kind"];
   recoverable?: boolean;

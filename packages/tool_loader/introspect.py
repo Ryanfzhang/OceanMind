@@ -10,15 +10,6 @@ import pkgutil
 from typing import Dict, Callable, Any, get_type_hints, get_origin, get_args
 from pathlib import Path
 
-from packages.tool_loader.registry import (
-    build_param_reference_template,
-    build_result_reference_examples,
-    get_param_contract,
-    get_tool_contract,
-    get_tool_output_type,
-    get_tool_planner_contract,
-)
-
 
 def discover_tools(package_name: str = "domain.ocean") -> Dict[str, Callable]:
     """
@@ -86,6 +77,16 @@ def get_tool_schema(func: Callable) -> Dict[str, Any]:
         >>> print(schema['name'])
         'extract_regional_mean'
     """
+    # Only the legacy schema path needs reference contracts. Discovery and the
+    # LangGraph Python-tool catalog must remain independent of those templates.
+    from packages.tool_loader.registry import (
+        build_param_reference_template,
+        build_result_reference_examples,
+        get_param_contract,
+        get_tool_contract,
+        get_tool_output_type,
+    )
+
     sig = inspect.signature(func)
 
     try:
@@ -176,6 +177,8 @@ def get_planner_tool_spec(func: Callable) -> Dict[str, Any]:
 
     与 `get_tool_schema()` 不同，这里重点是工具编排信息。
     """
+    from packages.tool_loader.registry import get_tool_planner_contract
+
     schema = get_tool_schema(func)
     planner_contract = get_tool_planner_contract(func.__name__)
 

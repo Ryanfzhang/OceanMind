@@ -12,13 +12,21 @@ from packages.tool_loader.introspect import (
     get_tools_cached,
     reload_tools,
 )
-from packages.tool_loader.orchestrator import ToolOrchestrator
-from packages.tool_loader.registry import (
-    TOOL_CONTRACTS,
-    get_tool_contract,
-    get_tool_output_type,
-)
-from packages.tool_loader.validation import validate_tool_params
+
+
+def __getattr__(name: str):
+    """Keep legacy exports available without loading DSL contracts for discovery."""
+    if name == "ToolOrchestrator":
+        from packages.tool_loader.orchestrator import ToolOrchestrator
+        return ToolOrchestrator
+    if name in {"TOOL_CONTRACTS", "get_tool_contract", "get_tool_output_type"}:
+        from packages.tool_loader import registry
+        return getattr(registry, name)
+    if name == "validate_tool_params":
+        from packages.tool_loader.validation import validate_tool_params
+        return validate_tool_params
+    raise AttributeError(name)
+
 
 __all__ = [
     "ToolOrchestrator",

@@ -162,6 +162,9 @@ export async function runDirectVisualization(payload: {
     lat_min: number;
     lat_max: number;
   };
+  selection_mode?: "box" | "point" | "transect" | "polygon" | "none";
+  polygon_points?: [number, number][];
+  transect_points?: [number, number][];
   depth_mode: "fixed" | "feature" | "layer_mean";
   depth_range?: [number, number];
   feature?: "mixed_layer" | "thermocline" | "pycnocline";

@@ -25,14 +25,14 @@ def track_eddies(
     Track eddies through time using nearest-neighbor matching with simple
     physical consistency constraints.
     """
-    u, v = xr.align(u, v, join='inner')
+    u, v = xr.align(u, v, join='exact')
     if 'time' not in u.dims:
         raise ValueError("track_eddies requires velocity fields with a time dimension")
-
-    if 'depth' in u.dims:
-        u = u.isel(depth=0)
-    if 'depth' in v.dims:
-        v = v.isel(depth=0)
+    if set(u.dims) != {'time', 'lat', 'lon'} or set(v.dims) != {'time', 'lat', 'lon'}:
+        raise ValueError(
+            "track_eddies requires time/lat/lon fields; select one depth explicitly "
+            "before calling"
+        )
 
     active_tracks: List[Dict] = []
     completed_tracks: List[Dict] = []

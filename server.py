@@ -301,7 +301,7 @@ def main(argv=None):
                 for port in (args.api_port, args.web_port) + ((80, 443) if nginx_cmd else ()):
                     with socket.socket() as s:
                         s.bind(("0.0.0.0", port))
-                backend = spawn([sys.executable, "-m", "uvicorn", "apps.api.main:app",
+                backend = spawn([sys.executable, "-m", "uvicorn", "apps.api.langgraph_app:app",
                     "--host", "127.0.0.1", "--port", str(args.api_port), "--workers", "1"],
                     ROOT, env, "backend")
                 if not wait_backend(backend, args.api_port, args.startup_timeout):

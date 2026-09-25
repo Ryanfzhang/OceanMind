@@ -24,7 +24,6 @@ import { manualViewState } from "@/lib/mock-data";
 import {
   buildConversationReportPayload,
   buildReportFilename,
-  capturePrimaryFigureSnapshotForMessage,
 } from "@/lib/report-export";
 import {
   formatStepProgressText,
@@ -214,24 +213,37 @@ function buildAdditionalContext(state: ManualViewState, messages: ChatMessage[])
 }
 
 function buildVisualizationPayload(state: ManualViewState) {
+  const selection = buildWorkspaceSelectionContext(state);
+  const point = selection.selected_point;
+  const region = selection.selected_region?.region
+    ?? selection.selected_transect?.padded_region
+    ?? (point
+      ? {
+          lon_range: [point.lon - 1, point.lon + 1] as [number, number],
+          lat_range: [Math.max(-90, point.lat - 1), Math.min(90, point.lat + 1)] as [number, number],
+        }
+      : {
+          lon_range: [state.regionBounds.lonMin, state.regionBounds.lonMax] as [number, number],
+          lat_range: [state.regionBounds.latMin, state.regionBounds.latMax] as [number, number],
+        });
   return {
     dataset: state.dataset,
     variable: state.variable,
     time_range: state.timeRange,
     region: {
-      lon_min: state.regionBounds.lonMin,
-      lon_max: state.regionBounds.lonMax,
-      lat_min: state.regionBounds.latMin,
-      lat_max: state.regionBounds.latMax,
+      lon_min: region.lon_range[0],
+      lon_max: region.lon_range[1],
+      lat_min: region.lat_range[0],
+      lat_max: region.lat_range[1],
     },
+    selection_mode: selection.active_selection,
+    polygon_points: selection.selected_region?.type === "polygon" ? selection.selected_region.points : undefined,
+    transect_points: selection.selected_transect?.points,
     depth_mode: state.depthMode,
     depth_range: state.depthRange,
     feature: state.feature,
     layer_mean_label: state.layerMeanLabel,
-    selected_point: {
-      lat: state.selectedPoint[0],
-      lon: state.selectedPoint[1],
-    },
+    selected_point: point ? { lat: point.lat, lon: point.lon } : undefined,
   };
 }
 
@@ -249,6 +261,9 @@ function configuredDepthLevels(datasetInfo?: DatasetInfo | null): number[] {
 }
 
 function canRunQuickVisualization(state: ManualViewState, datasetInfo?: DatasetInfo | null) {
+  const selection = buildWorkspaceSelectionContext(state);
+  if (state.selectionMode === "transect" && !selection.selected_transect) return false;
+  if (state.selectionMode === "polygon" && selection.selected_region?.type !== "polygon") return false;
   if (configuredVariables(datasetInfo).length === 0) {
     return false;
   }
@@ -256,6 +271,10 @@ function canRunQuickVisualization(state: ManualViewState, datasetInfo?: DatasetI
     return false;
   }
   if (state.depthMode === "feature" && !isDatasetVariableAvailable(datasetInfo, "temp")) {
+    return false;
+  }
+  if (state.depthMode === "feature" && state.feature !== "thermocline"
+      && !isDatasetVariableAvailable(datasetInfo, "salt")) {
     return false;
   }
   if (
@@ -349,6 +368,7 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
     sourceCards: response.source_cards,
     workspaceData,
     workspaceDataByResult,
+    attachments: response.attachments,
     activeResultId: response.active_result_id ?? undefined,
     failureKind: response.failure_kind ?? undefined,
     recoverable: response.recoverable ?? undefined,
@@ -697,25 +717,11 @@ export function OceanWorkspaceApp() {
 
     setIsExportingReport(true);
     try {
-      const snapshots = await Promise.all(
-        messages
-          .filter((message) => message.role === "assistant")
-          .map(async (message) => ({
-            id: message.id,
-            snapshot: await capturePrimaryFigureSnapshotForMessage(message),
-          })),
-      );
-
-      const figureSnapshotsByMessageId = Object.fromEntries(
-        snapshots.map(({ id, snapshot }) => [id, snapshot]),
-      );
-
       const payload = buildConversationReportPayload({
         conversationId,
         datasetInfo,
         exportedAt: new Date().toISOString(),
         messages,
-        figureSnapshotsByMessageId,
       });
       const { blob, filename } = await exportConversationReport(payload);
       const url = URL.createObjectURL(blob);
@@ -725,7 +731,7 @@ export function OceanWorkspaceApp() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } finally {
       setIsExportingReport(false);
     }
@@ -1500,7 +1506,10 @@ export function OceanWorkspaceApp() {
           </div>
           <div className="feed-column">
             <AnalysisFeed
-              canExportReport={messages.some((message) => message.role === "assistant" && Boolean(message.payload))}
+              conversationId={conversationId}
+              canExportReport={conversationId.startsWith("conv_") && messages.some(
+                (message) => message.payload?.attachments?.some((item) => item.kind === "code")
+              )}
               isExportingReport={isExportingReport}
               isBusy={isQuerying}
               isLocked={isQuerying || isVisualizing || isExportingReport}

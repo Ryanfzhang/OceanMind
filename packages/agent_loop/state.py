@@ -1,0 +1,46 @@
+"""Minimal state shared by the single-agent LangGraph loop."""
+
+from __future__ import annotations
+
+from typing import Any, Literal, TypedDict
+
+
+Message = dict[str, Any]
+RunStatus = Literal["running", "completed", "needs_input", "incomplete", "failed"]
+
+
+class AgentState(TypedDict):
+    """Keep message history in OpenAI-compatible order and shape."""
+
+    messages: list[Message]
+    rounds: int
+    status: RunStatus
+    termination_reason: str | None
+    deadline: float | None
+    run_id: str | None
+    run_root: str | None
+    attachments: list[dict[str, str]]
+
+
+def initial_state(
+    user_query: str, *, deadline: float | None = None,
+    run_id: str | None = None, run_root: str | None = None,
+) -> AgentState:
+    """Start a task with its original user message."""
+
+    return {
+        "messages": [{"role": "user", "content": user_query}],
+        "rounds": 0,
+        "status": "running",
+        "termination_reason": None,
+        "deadline": deadline,
+        "run_id": run_id,
+        "run_root": run_root,
+        "attachments": [],
+    }
+
+
+def append_message(state: AgentState, message: Message) -> AgentState:
+    """Return a new state without altering earlier message records."""
+
+    return {**state, "messages": [*state["messages"], message.copy()]}

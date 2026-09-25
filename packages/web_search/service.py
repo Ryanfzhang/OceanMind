@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import httpx
 
-from packages.llm_gateway.config import load_config_value, load_llm_api_key, load_llm_base_url, load_model_name
+from packages.runtime.llm_config import load_config_value, load_llm_api_key, load_llm_base_url, load_model_name
 
 
 class WebSearchService:

@@ -1,337 +1,123 @@
 ---
 skill_id: ocean_environment_health_assessment
-description: Composes an evidence package for environmental health, suitability, risk, or management assessment.
-input_intent: Broad environmental health, suitability, risk, policy, or management question needing multiple indicators and evidence branches.
-output_intent: Integrated environment-health assessment card or evidence package.
+description: Selects relevant ocean diagnostics and explains the strength and limits of environmental-health evidence.
+input_intent: Environmental health, suitability, risk, or management question that may need one or more indicators.
+output_intent: An assessment grounded in the requested diagnostics, with missing evidence stated explicitly.
 avoid_when:
-- Use specific analysis skills for a single requested map, time series, event detection, or diagnostic.
+- Use a specific analysis skill directly for a single requested map, time series, or event detection.
 composes_with:
 - ocean_masking_workflow
 ---
-# Ocean Environment Health Template Composer
+# Ocean Environment Health Assessment
 
-## Purpose
+## Decide what to measure
 
-This skill is a planner-facing diagnostic composer. It combines existing ocean
-analysis tools into the smallest evidence package that can answer broad
-environmental-health, suitability, risk, policy, or management questions.
+Use the user's endpoint to choose diagnostics. This is a decision guide, not a
+four-branch recipe. A question about bottom low-oxygen risk may need only bottom
+oxygen and hypoxia; it does not trigger SST, bloom, and stratification analyses.
+Add another indicator only when the question asks about it or the first result
+leaves a specific explanatory gap. A policy question can use the completed
+diagnostics here, then read `ocean_policy_recommendation` for bounded actions.
 
-It collects evidence only. The final suitability, policy, or management
-judgement is produced later by the summary/result synthesizer from completed
-tool results. Do not jump directly to `assemble_policy_recommendation_report`
-unless the user explicitly asks for a standalone fixed policy report.
+| Question or endpoint | Direct evidence to consider | Read next when needed |
+| --- | --- | --- |
+| Bottom oxygen status, hypoxic days, deficit burden, hotspots | Bottom oxygen field; `detect_hypoxia`; event statistics or summary maps only for the requested measure | `ocean_hypoxia_detection`, `ocean_event_statistics`, `ocean_event_frequency_map` |
+| Warming or heatwave exposure | Surface temperature trend or heatwave detection; distinguish gradual change from events | `ocean_trend_analysis`, `ocean_heatwave_detection` |
+| Bloom or chlorophyll pressure | Surface chlorophyll and, if event exposure is asked, bloom detection and statistics | `ocean_bloom_detection`, `ocean_event_statistics` |
+| Stratification or weak ventilation context | Multilevel temperature and salinity, density-derived N², requested trend or profile | `ocean_stratification_diagnostics`, `ocean_trend_analysis` |
+| A spatial mask, named management zone, or overlapping indicators | Apply a common region, time window, and relevant mask before comparing results | `ocean_masking_workflow` |
 
-Use this skill when a question needs multiple indicators, for example bottom
-oxygen stress, hypoxic days, oxygen-deficit burden, warming, stratification, or
-bloom pressure.
+Read only the relevant calculation skill(s). Their algorithm and parameter
+notes are useful, but some older snippets still use planner wrappers or
+reference strings. Check the live tool signature and pass ordinary Python results
+directly. If no skill covers a requested indicator, discover the available
+tools and compose a small Python calculation; state how the indicator was
+defined and save the derived result.
 
-## Allowed Tools
+## Scope and execution
 
-Only use real tool names. Core evidence tools include:
+- Resolve explicit longitude, latitude, time, depth, units, and threshold
+  before loading. A named sea region needs explicit bounds; use workspace
+  bounds only when the user refers to the selected or drawn region. A named
+  year covers January 1 through December 31 unless the user specifies a season.
+- Check that the dataset actually contains the requested variables and period.
+  Report missing inputs rather than replacing the requested endpoint with a
+  convenient proxy without disclosure.
+- Use `tools.<name>(...)` inside the analysis script so each call and result is
+  recorded. Group related calls with `stage(...)`; for many dates, depths, or
+  regions, place the stage outside the loop and advance its units inside it.
+- `load_dataset` returns an `xarray.DataArray`, not a wrapper with a `.data`
+  field. `compute_area_weighted_mean` returns a timeseries dictionary for
+  `compute_trend`; event detectors return dictionaries whose `events` list can
+  be passed to `compute_event_statistics`.
 
-`load_dataset`, `compute_area_weighted_mean`, `extract_regional_mean`,
-`extract_timeseries`, `compute_trend`, `compute_field_trend`,
-`compute_spatial_field`, `detect_hypoxia`, `detect_algal_blooms`,
-`detect_heatwaves`, `detect_upwelling`, `compute_event_statistics`,
-`compute_event_summary_map`, `compute_event_frequency_map`,
-`compute_event_spatial_distribution`, `compare_event_periods`,
-`assemble_dataset`, `compute_density`,
-`compute_brunt_vaisala_frequency`, `compute_lag_correlation`,
-`resample_timeseries`, `compute_climatology`, `compute_anomaly`,
-`compute_regression_map`, `compute_composite_field`, `apply_mask`,
-`build_threshold_mask`, `build_condition_mask`, `build_polygon_mask`,
-`build_isobath_mask`, `combine_masks`.
-
-Legacy fixed report tools are explicit-only:
-
-`assemble_environment_health_report`, `assemble_policy_recommendation_report`.
-
-## Required Scope
-
-- Resolve `lon_range`, `lat_range`, and `time_range` before any
-  `load_dataset` step.
-- Treat named sea regions as explicit spatial intent. Use approximate known
-  bounds for common regions rather than full dataset extent or workspace bounds.
-- Use workspace bounds only for phrases like current region, selected box,
-  drawn area, or drawn polygon.
-- If a single year is named, use January 1 through December 31 of that year.
-
-## Workflow
-
-### Stage 1: Shared scope
+For example, if the user asks only for bottom hypoxic days, the relevant chain
+is the following. The scope and threshold must be filled from the actual task
+and checked against the oxygen units. These statements run in an active
+analysis script with `tools` and `stage` available:
 
 ```python
-# IMPORTANT: Planner fills these values from the query before emitting workflow_code.
-lon_range = None  # <-- MODIFY: west/east bounds from the user query or selected workspace region.
-lat_range = None  # <-- MODIFY: south/north bounds from the user query or selected workspace region.
-time_range = None  # <-- MODIFY: assessment time window from the user query.
-season_filter = None  # <-- MODIFY: seasonal subset such as spring/summer when requested.
-confidence_level = 0.95  # <-- MODIFY: trend confidence level.
-context_note = 'environment health evidence package'  # <-- MODIFY: short scope note for the assessment.
+with stage("Load bottom oxygen"):
+    oxygen = tools.load_dataset(
+        variable="oxygen", lon_range=lon_range, lat_range=lat_range,
+        time_range=time_range, vertical_mode="bottom",
+    )
+
+with stage("Diagnose hypoxic days"):
+    hypoxia = tools.detect_hypoxia(
+        oxygen=oxygen, vertical_mode="bottom",
+        oxygen_threshold=oxygen_threshold,
+    )
+    hypoxic_days = tools.compute_event_summary_map(
+        event_detection=hypoxia, data=oxygen, summary_mode="event_days",
+        input_refs=[tools.ref(hypoxia), tools.ref(oxygen)],
+    )
 ```
 
-### Stage 2: SST warming branch
+For bottom oxygen trend instead, use the same bottom field, then
+`compute_area_weighted_mean(data=oxygen)` and `compute_trend(timeseries=mean)`.
+For oxygen-deficit burden, request `summary_mode="burden"` on the matching
+detector and field. Do not compute these outputs merely because they are
+available. Use `compute_event_statistics(events=hypoxia["events"],
+group_by="year")` only when event counts or their annual distribution matter.
 
-```python
-sst_field = load_dataset(
-    variable='temp',
-    lon_range=lon_range,
-    lat_range=lat_range,
-    time_range=time_range,
-    season_filter=season_filter,
-    vertical_mode='surface',
-    depth_range=[0, 0],
-)
+## Interpret the evidence
 
-sst_timeseries = compute_area_weighted_mean(
-    data=sst_field.data,
-    lon_range=lon_range,
-    lat_range=lat_range,
-    depth_range=[0, 0],
-    depth_aggregation='mean',
-)
+- Bottom oxygen and hypoxia are direct oxygen-risk endpoints. Surface SST and
+  heatwaves are heat pressure; chlorophyll and blooms screen ecological
+  pressure. Bloom/chlorophyll alone cannot identify a nutrient or discharge
+  source. Stratification is physical vulnerability or timing context, not
+  proof of hypoxia, bloom occurrence, or causation.
+- For hypoxia, use bottom water unless a different depth is explicitly asked.
+  The detector defaults to oxygen below 60 mmol/m³, severe below 20 mmol/m³,
+  minimum 100 km² and three days. Confirm units, cadence, area resolution,
+  and whether those thresholds fit the question before interpreting events.
+- For SST, heatwave and bloom evidence, use a surface field unless the user
+  asks for another layer. For stratification, keep multiple depths of both
+  temperature and salinity; do not reduce them to one layer before density.
+- The current N² tool finite-differences a potential-density field between
+  levels. Mean N² across available model levels (s⁻²) is the generic index;
+  peak N² is for explicit strongest-gradient or pycnocline questions. Report
+  depth range and aggregation; do not call the result exact TEOS-10
+  `gsw.Nsquared` or potential energy anomaly. Keep negative N² and missing
+  pairs visible; do not interpolate them into a stronger claim.
+- A trend from fewer than five years is a short-record change, not a
+  long-term trend. Check `is_significant`, sampling, missing values, and
+  seasonality before claiming a direction. Co-occurrence or correlated
+  trends do not establish a mechanism.
+- Name each finding's region, period, depth, units, method, and supporting
+  saved result. Separate direct measurements, proxy context, and unavailable
+  evidence. If the requested direct endpoint is missing, say it is untested.
 
-sst_trend = compute_trend(
-    timeseries=sst_timeseries,
-    method='linear',
-    confidence_level=confidence_level,
-)
-```
+## Optional fixed report
 
-### Stage 3: Bloom pressure branch
-
-```python
-bloom_field = load_dataset(
-    variable='chlorophyll',
-    lon_range=lon_range,
-    lat_range=lat_range,
-    time_range=time_range,
-    season_filter=season_filter,
-    vertical_mode='surface',
-    depth_range=[0, 0],
-)
-
-bloom_detection = detect_algal_blooms(
-    chlorophyll=bloom_field.data,
-    percentile_threshold=90.0,
-    min_duration_days=3,
-    min_area_km2=0.0,
-    vertical_mode='surface',
-    depth_range=[0, 0],
-)
-
-bloom_statistics = compute_event_statistics(
-    events=bloom_detection.events,
-    group_by='year',
-)
-```
-
-### Stage 4: Bottom oxygen branch
-
-```python
-bottom_oxygen_field = load_dataset(
-    variable='oxygen',
-    lon_range=lon_range,
-    lat_range=lat_range,
-    time_range=time_range,
-    season_filter=season_filter,
-    vertical_mode='bottom',
-)
-
-bottom_oxygen_timeseries = compute_area_weighted_mean(
-    data=bottom_oxygen_field.data,
-    lon_range=lon_range,
-    lat_range=lat_range,
-    depth_aggregation='mean',
-)
-
-bottom_oxygen_trend = compute_trend(
-    timeseries=bottom_oxygen_timeseries,
-    method='linear',
-    confidence_level=confidence_level,
-)
-```
-
-### Stage 5: Stratification branch
-
-```python
-temp_field = load_dataset(
-    variable='temp',
-    lon_range=lon_range,
-    lat_range=lat_range,
-    time_range=time_range,
-    season_filter=season_filter,
-)
-
-salt_field = load_dataset(
-    variable='salt',
-    lon_range=lon_range,
-    lat_range=lat_range,
-    time_range=time_range,
-    season_filter=season_filter,
-)
-
-thermo_dataset = assemble_dataset(
-    variables={
-        'temp': temp_field.data,
-        'salt': salt_field.data,
-    },
-)
-
-density_field = compute_density(
-    data=thermo_dataset.data,
-)
-
-n2_field = compute_brunt_vaisala_frequency(
-    density=density_field.data,
-)
-
-stability_timeseries = compute_area_weighted_mean(
-    data=n2_field.data,
-    lon_range=lon_range,
-    lat_range=lat_range,
-    depth_aggregation='mean',
-)
-
-stability_monthly = resample_timeseries(
-    timeseries=stability_timeseries,
-    freq='MS',
-    method='mean',
-)
-
-stability_climatology = compute_climatology(
-    timeseries=stability_monthly,
-    period='monthly',
-)
-
-stability_anomaly = compute_anomaly(
-    timeseries=stability_monthly,
-    climatology=stability_climatology,
-)
-
-stratification_trend = compute_trend(
-    timeseries=stability_anomaly,
-    method='linear',
-    confidence_level=confidence_level,
-)
-```
-
-### Stage 6: Integrated assessment
-
-```python
-environment_health_assessment = assemble_environment_health_report(
-    branches=[
-        sst_trend,
-        bloom_statistics,
-        bottom_oxygen_trend,
-        stratification_trend,
-    ],
-    context_note=context_note,
-)
-```
-
-Identify the requested evidence branches and emit only the smallest executable diagnostic chain that covers them. For queries that say "do not use bloom frequency", omit the bloom branch from workflow_code and from `branches`.
-
-## Diagnostic Templates
-
-### Bottom Oxygen And Hypoxia
-
-Use for bottom hypoxic days, low-oxygen area, oxygen-deficit burden, hypoxia
-hotspots, or oxygen-risk endpoints.
-
-1. `load_dataset(variable="oxygen", vertical_mode="bottom")` ->
-   `bottom_oxygen_field`
-2. `compute_area_weighted_mean(data="$ref:bottom_oxygen_field.data")` ->
-   `bottom_oxygen_timeseries`
-3. `compute_trend(timeseries="$ref:bottom_oxygen_timeseries")` ->
-   `bottom_oxygen_trend`
-4. `detect_hypoxia(oxygen="$ref:bottom_oxygen_field.data",
-   vertical_mode="bottom")` -> `hypoxia_detection`
-5. `compute_event_statistics(events="$ref:hypoxia_detection.events",
-   group_by="year")` -> `hypoxia_statistics`
-6. `compute_event_summary_map(event_detection="$ref:hypoxia_detection",
-   data="$ref:bottom_oxygen_field.data", summary_mode="event_days")` ->
-   `hypoxic_days`
-7. `compute_event_summary_map(event_detection="$ref:hypoxia_detection",
-   data="$ref:bottom_oxygen_field.data", summary_mode="burden")` ->
-   `hypoxia_oxygen_deficit_burden`
-
-### Warming And Heatwave Pressure
-
-Use for warming overlap, heat stress, or heatwave exposure.
-
-1. `load_dataset(variable="temp", vertical_mode="surface")` -> `sst_field`
-2. `compute_area_weighted_mean(data="$ref:sst_field.data")` ->
-   `sst_timeseries`
-3. `compute_trend(timeseries="$ref:sst_timeseries")` -> `sst_trend`
-4. For heatwave exposure, load surface temperature as `heatwave_field`, run
-   `detect_heatwaves(temp="$ref:heatwave_field.data")`, then summarize with
-   `compute_event_summary_map` using `event_days` and/or `burden`.
-
-### Stratification
-
-Use for overlap with stratification or ventilation-risk context. The stability tool computes density-based N² (s^-2), not a surface-to-bottom density difference: adjacent-level potential-density gradients are averaged by layer thickness, then by regional area. Load multiple depth levels; keep negative N² and exclude missing pairs without interpolation. Describe this as a potential-density-gradient approximation, not full TEOS-10 N². Report the selected depth range and aggregation, and use the trend significance before claiming strengthening stratification. Stratification alone does not establish the cause of hypoxia.
-
-1. `load_dataset(variable="temp")` -> `temp_field`
-2. `load_dataset(variable="salt")` -> `salt_field`
-3. `assemble_dataset(variables={"temp": "$ref:temp_field.data",
-   "salt": "$ref:salt_field.data"})` -> `thermo_dataset`
-4. `compute_density(data="$ref:thermo_dataset.data")` -> `density_field`
-5. `compute_brunt_vaisala_frequency(density="$ref:density_field.data")` ->
-   `n2_field`
-6. `compute_area_weighted_mean(data="$ref:n2_field.data",
-   depth_aggregation="mean")` -> `stability_timeseries`
-7. Resample the stability series monthly and compute monthly anomalies before
-   trend estimation.
-8. `compute_trend(timeseries="$ref:stability_anomaly")` ->
-   `stratification_trend`
-
-### Bloom Or Chlorophyll Pressure
-
-Use for bloom pressure, chlorophyll screening, eutrophication context, or
-red-tide/HAB pressure.
-
-1. `load_dataset(variable="chlorophyll", vertical_mode="surface")` ->
-   `bloom_field`
-2. `detect_algal_blooms(chlorophyll="$ref:bloom_field.data")` ->
-   `bloom_detection`
-3. `compute_event_statistics(events="$ref:bloom_detection.events",
-   group_by="year")` -> `bloom_statistics`
-4. `compute_event_summary_map(event_detection="$ref:bloom_detection",
-   data="$ref:bloom_field.data", summary_mode="event_days")` ->
-   `bloom_event_days`
-5. `compute_event_summary_map(event_detection="$ref:bloom_detection",
-   data="$ref:bloom_field.data", summary_mode="burden")` ->
-   `bloom_chlorophyll_burden`
-
-Treat bloom/chlorophyll as ecological-pressure screening unless nutrient,
-source, or discharge data are explicitly present.
-
-## Management And Policy Questions
-
-- Policy, zoning, monitoring, seasonal-management, aquaculture, and marine
-  ranching questions still need executable diagnostics first.
-- Do not answer "revise management" from the policy skill alone when the query
-  asks for bottom hypoxic days, low-oxygen area, oxygen-deficit burden, hotspot
-  expansion, warming, stratification, or bloom overlap.
-- Build the evidence package here; the summary layer should translate completed
-  evidence into priority zones, evidence strength, limitations, and suggested
-  monitoring or seasonal actions.
-
-## Notes
-
-- Analysis masks are accepted as first-class artifacts; use `apply_mask` or
-  mask-aware tools when a downstream tool does not consume masks directly.
-- Supported mask builders include: threshold, condition, combined.
-- Bottom oxygen must use `vertical_mode="bottom"`, not surface or full-depth
-  averaging.
-- SST, heatwave, bloom, and chlorophyll surface evidence must use
-  `vertical_mode="surface"` unless the user explicitly asks otherwise.
-- Stratification temperature and salinity loads should retain the water column.
-- Define a generic stratification index as mean N2 across the selected water-column levels, with units `s^-2`. Use peak N2 only when the user explicitly asks for peak stratification, the strongest gradient, or pycnocline strength.
-- Describe this as density-derived N2; the current tool finite-differences potential density and is not the exact TEOS-10 `gsw.Nsquared` calculation.
-- Treat stratification as physical vulnerability and timing context for weak ventilation. Do not place stratification alone under bloom pressure, and do not infer bloom occurrence, hypoxia occurrence, or pollution-source responsibility from stratification alone.
-- Use direct bottom-oxygen or hypoxia outputs as oxygen-risk endpoints and direct chlorophyll/bloom outputs as bloom-pressure endpoints.
-- Describe trends from records shorter than five years as short-record changes, not long-term trends, even when the ordinary regression p-value is small.
-- Do not describe the N2 result as potential energy anomaly (PEA); no current tool computes PEA.
-- Event statistics must reference the matching detection result.
+Normally synthesize the requested findings directly from saved artifacts. Use
+`assemble_environment_health_report(branches=..., context_note=...)` only when
+the user asks for its fixed report format and there are relevant, completed,
+compatible evidence items. Its branches are dictionaries with `name`, `result`,
+`role`, and optional `evidence_kind`, `metric`, and `worse_when`; raw detector
+or trend dictionaries generally lack the normalized `output_type` that this
+legacy report expects. Verify that each item is accepted before using it.
+Never pass an empty branch list and describe the resulting default verdict as
+observed environmental stability. Do not invoke a policy report to stand in
+for absent diagnostics.

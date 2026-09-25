@@ -9,7 +9,6 @@ import xarray as xr
 from typing import Dict, List, Tuple
 from scipy.ndimage import label, find_objects
 
-from domain.ocean.data_access.partitioned import materialize_partitioned_xarray
 from domain.ocean.dask_utils import compute_together_with_progress, is_dask_backed, report_phase
 from domain.ocean.events.detection_utils import estimate_grid_spacing_km, report_detection_input
 
@@ -44,24 +43,14 @@ def detect_eddies(
         >>> eddies = detect_eddies(u, v)
         >>> print(f"Found {eddies['statistics']['total_count']} eddies")
     """
-    u = materialize_partitioned_xarray(u)
-    v = materialize_partitioned_xarray(v)
+    for name, field in (("u", u), ("v", v)):
+        if not isinstance(field, xr.DataArray) or set(field.dims) != {"lat", "lon"} or field.ndim != 2:
+            raise ValueError(
+                f"detect_eddies requires a 2D lat/lon DataArray for {name}; "
+                "select one time and depth explicitly before calling"
+            )
+    u, v = xr.align(u, v, join="exact")
     report_detection_input("eddy", u, percent=0.02)
-
-    # 如果有时间和深度维度，取第一个时间步和表层
-    if 'time' in u.dims:
-        u = u.isel(time=0)
-        v = v.isel(time=0)
-
-    depth_dim = None
-    if 'depth' in u.dims:
-        depth_dim = 'depth'
-    elif 'z' in u.dims:
-        depth_dim = 'z'
-
-    if depth_dim is not None:
-        u = u.isel({depth_dim: 0})
-        v = v.isel({depth_dim: 0})
     report_detection_input("eddy horizontal field", u, percent=0.08)
 
     # 计算Okubo-Weiss参数
@@ -265,4 +254,3 @@ def _extract_eddies(
         eddies.append(eddy)
 
     return eddies
-

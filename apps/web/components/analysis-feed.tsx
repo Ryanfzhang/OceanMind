@@ -18,6 +18,7 @@ import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
 import { formatStepProgressText, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
+import { ResultIndexBrowser } from "@/components/result-index-browser";
 
 type QuerySubmitOptions = {
   continuePending?: boolean;
@@ -25,6 +26,7 @@ type QuerySubmitOptions = {
 };
 
 type AnalysisFeedProps = {
+  conversationId?: string | null;
   canExportReport?: boolean;
   isExportingReport?: boolean;
   messages: ChatMessage[];
@@ -490,6 +492,7 @@ function StepCardBlock({
 }
 
 function AssistantBlock({
+  conversationId,
   message,
   onOpenDetail,
   onPromoteMapField,
@@ -498,6 +501,7 @@ function AssistantBlock({
   onSubmitQuery,
   onToggleStepCard,
 }: {
+  conversationId?: string | null;
   message: ChatMessage;
   onOpenDetail?: (card: ResultCardSummary, data: WorkspaceData) => void;
   onPromoteMapField?: (card: ResultCardSummary, data: WorkspaceData, field: MapFieldData) => void;
@@ -515,6 +519,9 @@ function AssistantBlock({
   const displaySourceCards = sourceCards.filter((source) => !isNoUsableExternalSourcesCard(source) && hasUsableSourceUrl(source));
   const webSearchHeader = buildWebSearchHeader(displaySourceCards, chinese);
   const summaryContent = buildCompletedSummaryContent(message);
+  const attachments = (payload?.attachments ?? []).filter(
+    (item) => item.kind === "code" || item.kind === "image_png"
+  );
   const { completedSteps, totalSteps } = getProgressCounts(planSteps, stepCards);
   const progressLabel = totalSteps > 0 ? `[${completedSteps}/${totalSteps}]` : "";
   const showExecutionProgress = shouldShowExecutionProgress(payload);
@@ -592,6 +599,21 @@ function AssistantBlock({
         <div className="findings-section ui-card">
           <h4 className="findings-title ui-card-title">{chinese ? "回复" : "Response"}</h4>
           <MarkdownSummary text={payload.summary} />
+
+          {conversationId && attachments.length > 0 ? (
+            <div className="result-attachments">
+              <strong>Saved code and figures</strong>
+              {attachments.map((item) => {
+                const mode = item.kind === "code" ? "code" : item.kind === "image_png" ? "image" : "artifact";
+                const params = new URLSearchParams({ conversation: conversationId, mode, artifact: item.ref });
+                const href = `/api/results?${params.toString()}`;
+                return <a key={item.ref} href={href} target="_blank" rel="noreferrer">
+                  {item.kind === "code" ? "Python code" : "Analysis figure"}
+                  {` · ${item.ref.slice(-12)}`}
+                </a>;
+              })}
+            </div>
+          ) : null}
 
           {summaryContent.evidence.length > 0 ? (
             <div className="findings-evidence-list">
@@ -1113,6 +1135,7 @@ function isPolicyGuidanceAction(value: unknown): value is PolicyGuidanceAction {
 }
 
 export function AnalysisFeed({
+  conversationId,
   canExportReport = false,
   isExportingReport = false,
   messages,
@@ -1143,13 +1166,15 @@ export function AnalysisFeed({
   return (
     <div className="analysis-feed">
       <div className="feed-toolbar">
+        {conversationId && messages.some((message) => Boolean(message.payload?.stepCards?.length))
+          ? <ResultIndexBrowser conversationId={conversationId} /> : null}
         <button
           className="result-expand-btn"
           disabled={!canExportReport || isLocked}
           onClick={() => onExportReport?.()}
           type="button"
         >
-          {isExportingReport ? "Exporting PDF..." : "Export PDF"}
+          {isExportingReport ? "Exporting notebook..." : "Export notebook"}
         </button>
       </div>
       <div className="feed-thread" ref={threadRef}>
@@ -1160,6 +1185,7 @@ export function AnalysisFeed({
             </div>
           ) : (
             <AssistantBlock
+              conversationId={conversationId}
               key={message.id}
               message={message}
               onOpenDetail={onOpenDetail}

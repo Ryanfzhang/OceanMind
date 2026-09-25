@@ -190,7 +190,7 @@ export function buildConversationReportPayload({
 
 export function buildReportFilename(exportedAt: string) {
   const safe = exportedAt.replace(/[:.]/g, "-");
-  return `oceanmind-conversation-${safe}.pdf`;
+  return `oceanmind-analysis-${safe}.ipynb`;
 }
 
 function createSnapshotCanvas(width = SNAPSHOT_WIDTH, height = SNAPSHOT_HEIGHT) {
