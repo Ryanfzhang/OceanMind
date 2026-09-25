@@ -3,2102 +3,619 @@
     "case_id": 1,
     "source_query_id": 1,
     "category": "base",
+    "task_type": "ocean_timeseries",
     "query": "Calculate the daily SST time series in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Calculate the daily SST time series in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
     "case_id": 2,
-    "source_query_id": 2,
-    "category": "base",
-    "query": "Show the surface salinity time series in the region (118°E-121°E, 38°N-40°N) during 2015",
-    "original_query": "Show the surface salinity time series in the region (118°E-121°E, 38°N-40°N) during 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 3,
-    "source_query_id": 3,
-    "category": "base",
-    "query": "How does the surface chlorophyll concentration change over spring seasons in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "How does the surface chlorophyll concentration change over spring seasons in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 4,
-    "source_query_id": 4,
-    "category": "base",
-    "query": "Calculate the daily temperature time series at 50 m depth in the region (126°E-130°E, 15°N-20°N) from January 1 to February 28, 2015",
-    "original_query": "Calculate the daily temperature time series at 50 m depth in the region (126°E-130°E, 15°N-20°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 5,
     "source_query_id": 5,
     "category": "base",
+    "task_type": "ocean_spatial_field_analysis",
     "query": "Show the spatial distribution of sea surface temperature in the region (113°E-117°E, 19°N-22°N) in January 2015",
     "original_query": "Show the spatial distribution of sea surface temperature in the region (113°E-117°E, 19°N-22°N) in January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 6,
-    "source_query_id": 6,
-    "category": "base",
-    "query": "Display the mean surface salinity field in the region (118°E-121°E, 38°N-40°N) for March 2015",
-    "original_query": "Display the mean surface salinity field in the region (118°E-121°E, 38°N-40°N) for March 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 7,
-    "source_query_id": 7,
-    "category": "base",
-    "query": "What does the SST pattern look like in the region (121°E-124°E, 35°N-38°N) during June 2015?",
-    "original_query": "What does the SST pattern look like in the region (121°E-124°E, 35°N-38°N) during summer 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 8,
-    "source_query_id": 8,
-    "category": "base",
-    "query": "Plot the chlorophyll spatial distribution in the region (123°E-127°E, 28°N-32°N) at the surface in February 2015",
-    "original_query": "Plot the chlorophyll spatial distribution in the region (123°E-127°E, 28°N-32°N) at the surface in February 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 9,
+    "case_id": 3,
     "source_query_id": 9,
     "category": "base",
+    "task_type": "ocean_field_visualization",
     "query": "Load the raw temperature field in the region (118°E-121°E, 38°N-40°N) for the first week of January 2015 without reducing it to a map",
     "original_query": "Load the raw temperature field in the region (118°E-121°E, 38°N-40°N) for the first week of January 2015 without reducing it to a map",
     "time_shortened": false
   },
   {
-    "case_id": 10,
-    "source_query_id": 10,
-    "category": "base",
-    "query": "Show the raw surface salinity data field in the region (113°E-117°E, 19°N-22°N) for January 15, 2015",
-    "original_query": "Show the raw surface salinity data field in the region (113°E-117°E, 19°N-22°N) for January 15, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 11,
-    "source_query_id": 11,
-    "category": "base",
-    "query": "I just want to see the unreduced SST data in the region (123°E-127°E, 28°N-32°N) from January 1-7 2015",
-    "original_query": "I just want to see the unreduced SST data in the region (123°E-127°E, 28°N-32°N) from January 1-7 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 12,
-    "source_query_id": 12,
-    "category": "base",
-    "query": "Visualize the raw 3D temperature field in the region (121°E-124°E, 35°N-38°N) for January 2015 in the upper 200 m",
-    "original_query": "Visualize the raw 3D temperature field in the region (121°E-124°E, 35°N-38°N) for January 2015 in the upper 200 m",
-    "time_shortened": false
-  },
-  {
-    "case_id": 13,
+    "case_id": 4,
     "source_query_id": 13,
     "category": "base",
+    "task_type": "ocean_profile_analysis",
     "query": "Show the vertical temperature profile at 115E, 20N in January 2015",
     "original_query": "Show the vertical temperature profile at 115E, 20N in January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 14,
-    "source_query_id": 14,
-    "category": "base",
-    "query": "Extract the salinity profile at 119E, 38N in the region (118°E-121°E, 38°N-40°N) during March 2015",
-    "original_query": "Extract the salinity profile at 119E, 38N in the region (118°E-121°E, 38°N-40°N) during March 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 15,
-    "source_query_id": 15,
-    "category": "base",
-    "query": "What does the temperature look like vertically at 125E, 30N in the region (123°E-127°E, 28°N-32°N) in summer 2015?",
-    "original_query": "What does the temperature look like vertically at 125E, 30N in the region (123°E-127°E, 28°N-32°N) in summer 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 16,
-    "source_query_id": 16,
-    "category": "base",
-    "query": "Show the oxygen profile at 130E, 15N in the region (126°E-130°E, 15°N-20°N) from surface to 500 m in January 2015",
-    "original_query": "Show the oxygen profile at 130E, 15N in the region (126°E-130°E, 15°N-20°N) from surface to 500 m in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 17,
+    "case_id": 5,
     "source_query_id": 17,
     "category": "base",
+    "task_type": "ocean_heatwave_detection",
     "query": "Detect marine heatwave events in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Detect marine heatwave events in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 18,
-    "source_query_id": 18,
-    "category": "base",
-    "query": "Find marine heatwaves in the region (123°E-127°E, 28°N-32°N) during June 2018",
-    "original_query": "Find marine heatwaves in the region (123°E-127°E, 28°N-32°N) during the summer of 2018",
-    "time_shortened": true
-  },
-  {
-    "case_id": 19,
-    "source_query_id": 19,
-    "category": "base",
-    "query": "Detect surface marine heatwave events above the 95th percentile in the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020",
-    "original_query": "Detect surface marine heatwave events above the 95th percentile in the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 20,
-    "source_query_id": 20,
-    "category": "base",
-    "query": "Detect marine heatwave events in the region (118°E-121°E, 38°N-40°N) from 2015-06-01 to 2015-08-31",
-    "original_query": "Detect marine heatwave events in the region (118°E-121°E, 38°N-40°N) from 2015-06-01 to 2015-08-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 21,
+    "case_id": 6,
     "source_query_id": 21,
     "category": "base",
+    "task_type": "ocean_bloom_detection",
     "query": "Detect algal bloom events in the region (118°E-121°E, 38°N-40°N) from January 1 to February 15, 2015",
     "original_query": "Detect algal bloom events in the region (118°E-121°E, 38°N-40°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 22,
-    "source_query_id": 22,
-    "category": "base",
-    "query": "Find algal blooms in the region (113°E-117°E, 19°N-22°N) during spring 2015",
-    "original_query": "Find algal blooms in the region (113°E-117°E, 19°N-22°N) during spring 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 23,
-    "source_query_id": 23,
-    "category": "base",
-    "query": "Are there surface chlorophyll bloom events in the region (123°E-127°E, 28°N-32°N) during March 2019 and March 2020?",
-    "original_query": "Are there surface chlorophyll bloom events in the region (123°E-127°E, 28°N-32°N) during spring seasons from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 24,
-    "source_query_id": 24,
-    "category": "base",
-    "query": "Detect blooms with a 90th percentile threshold in the region (121°E-124°E, 35°N-38°N) from January 1 to February 28, 2015",
-    "original_query": "Detect blooms with a 90th percentile threshold in the region (121°E-124°E, 35°N-38°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 25,
+    "case_id": 7,
     "source_query_id": 25,
     "category": "base",
+    "task_type": "ocean_hypoxia_detection",
     "query": "Detect bottom-layer hypoxia events in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Detect bottom-layer hypoxia events in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 26,
-    "source_query_id": 26,
-    "category": "base",
-    "query": "Find low-oxygen events in the region (123°E-127°E, 28°N-32°N) during June 2015",
-    "original_query": "Find low-oxygen events in the region (123°E-127°E, 28°N-32°N) during summer 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 27,
-    "source_query_id": 27,
-    "category": "base",
-    "query": "Are there any bottom-layer hypoxic zones in the region (118°E-121°E, 38°N-40°N) during June 2019 and June 2020?",
-    "original_query": "Are there any bottom-layer hypoxic zones in the region (118°E-121°E, 38°N-40°N) during summers from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 28,
-    "source_query_id": 28,
-    "category": "base",
-    "query": "Detect severe hypoxia (oxygen below 2 mg/L) in the region (121°E-124°E, 35°N-38°N) from January 1 to February 28, 2015",
-    "original_query": "Detect severe hypoxia (oxygen below 2 mg/L) in the region (121°E-124°E, 35°N-38°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 29,
+    "case_id": 8,
     "source_query_id": 29,
     "category": "base",
+    "task_type": "ocean_upwelling_detection",
     "query": "Detect upwelling events in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Detect upwelling events in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 30,
-    "source_query_id": 30,
-    "category": "base",
-    "query": "Find upwelling regions in the region (123°E-127°E, 28°N-32°N) during June 2015",
-    "original_query": "Find upwelling regions in the region (123°E-127°E, 28°N-32°N) during summer 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 31,
-    "source_query_id": 31,
-    "category": "base",
-    "query": "Has upwelling occurred in the region (126°E-130°E, 15°N-20°N) from January 1 to February 28, 2015?",
-    "original_query": "Has upwelling occurred in the region (126°E-130°E, 15°N-20°N) from January to June 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 32,
-    "source_query_id": 32,
-    "category": "base",
-    "query": "Detect coastal upwelling with a 10th percentile SST threshold in the region (113°E-117°E, 19°N-22°N) in 2015",
-    "original_query": "Detect coastal upwelling with a 10th percentile SST threshold in the region (113°E-117°E, 19°N-22°N) in 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 33,
+    "case_id": 9,
     "source_query_id": 33,
     "category": "base",
+    "task_type": "ocean_eutrophication_detection",
     "query": "Detect eutrophication events in the region (118°E-121°E, 38°N-40°N) from January 1 to February 15, 2015",
     "original_query": "Detect eutrophication events in the region (118°E-121°E, 38°N-40°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 34,
-    "source_query_id": 34,
-    "category": "base",
-    "query": "Find eutrophication in the region (123°E-127°E, 28°N-32°N) during 2015",
-    "original_query": "Find eutrophication in the region (123°E-127°E, 28°N-32°N) during 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 35,
-    "source_query_id": 35,
-    "category": "base",
-    "query": "Are there any eutrophication events marked by surface chlorophyll enhancement and low bottom oxygen in the region (121°E-124°E, 35°N-38°N) during spring-summer seasons from 2019 to 2020?",
-    "original_query": "Are there any eutrophication events marked by surface chlorophyll enhancement and low bottom oxygen in the region (121°E-124°E, 35°N-38°N) during spring-summer seasons from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 36,
-    "source_query_id": 36,
-    "category": "base",
-    "query": "Detect eutrophication with chlorophyll above the 90th percentile and low oxygen in the region (118°E-121°E, 38°N-40°N) from April to September 2015",
-    "original_query": "Detect eutrophication with chlorophyll above the 90th percentile and low oxygen in the region (118°E-121°E, 38°N-40°N) from April to September 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 37,
+    "case_id": 10,
     "source_query_id": 37,
     "category": "base",
+    "task_type": "ocean_front_detection",
     "query": "Detect temperature fronts in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "original_query": "Detect temperature fronts in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "time_shortened": false
   },
   {
-    "case_id": 38,
-    "source_query_id": 38,
-    "category": "base",
-    "query": "Find SST fronts in the region (123°E-127°E, 28°N-32°N) on March 1, 2015",
-    "original_query": "Find SST fronts in the region (123°E-127°E, 28°N-32°N) on March 1, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 39,
-    "source_query_id": 39,
-    "category": "base",
-    "query": "Detect temperature fronts in the region (121°E-124°E, 35°N-38°N) on January 20, 2015",
-    "original_query": "Detect temperature fronts in the region (121°E-124°E, 35°N-38°N) on January 20, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 40,
-    "source_query_id": 40,
-    "category": "base",
-    "query": "Detect salinity fronts in the region (118°E-121°E, 38°N-40°N) on February 15, 2015",
-    "original_query": "Detect salinity fronts in the region (118°E-121°E, 38°N-40°N) on February 15, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 41,
+    "case_id": 11,
     "source_query_id": 41,
     "category": "base",
+    "task_type": "ocean_eddy_detection",
     "query": "Detect mesoscale eddies in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "original_query": "Detect mesoscale eddies in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "time_shortened": false
   },
   {
-    "case_id": 42,
-    "source_query_id": 42,
-    "category": "base",
-    "query": "Find ocean eddies in the region (126°E-130°E, 15°N-20°N) on March 1, 2015",
-    "original_query": "Find ocean eddies in the region (126°E-130°E, 15°N-20°N) on March 1, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 43,
-    "source_query_id": 43,
-    "category": "base",
-    "query": "Are there any mesoscale eddies in the region (123°E-127°E, 28°N-32°N) on February 10, 2015?",
-    "original_query": "Are there any mesoscale eddies in the region (123°E-127°E, 28°N-32°N) on February 10, 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 44,
-    "source_query_id": 44,
-    "category": "base",
-    "query": "Detect eddies with a minimum radius of 50 km in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
-    "original_query": "Detect eddies with a minimum radius of 50 km in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 45,
+    "case_id": 12,
     "source_query_id": 45,
     "category": "base",
+    "task_type": "ocean_eddy_tracking",
     "query": "Track eddy trajectories in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Track eddy trajectories in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 46,
-    "source_query_id": 46,
-    "category": "base",
-    "query": "Track eddies in the region (126°E-130°E, 15°N-20°N) from January 1 to February 28, 2015",
-    "original_query": "Track eddies in the region (126°E-130°E, 15°N-20°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 47,
-    "source_query_id": 47,
-    "category": "base",
-    "query": "How do eddies move in the region (123°E-127°E, 28°N-32°N) from 2015 to 2016?",
-    "original_query": "How do eddies move in the region (123°E-127°E, 28°N-32°N) from 2015 to 2016?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 48,
-    "source_query_id": 48,
-    "category": "base",
-    "query": "Track eddy paths in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015 with daily resolution",
-    "original_query": "Track eddy paths in the region (113°E-117°E, 19°N-22°N) from January to March 2015 with daily resolution",
-    "time_shortened": true
-  },
-  {
-    "case_id": 49,
+    "case_id": 13,
     "source_query_id": 49,
     "category": "base",
+    "task_type": "ocean_jet_detection",
     "query": "Detect ocean jet streams in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "original_query": "Detect ocean jet streams in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "time_shortened": false
   },
   {
-    "case_id": 50,
-    "source_query_id": 50,
-    "category": "base",
-    "query": "Find ocean jets in the region (126°E-130°E, 15°N-20°N) on March 1, 2015",
-    "original_query": "Find ocean jets in the region (126°E-130°E, 15°N-20°N) on March 1, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 51,
-    "source_query_id": 51,
-    "category": "base",
-    "query": "Are there any strong jet currents in the region (123°E-127°E, 28°N-32°N) on February 10, 2015?",
-    "original_query": "Are there any strong jet currents in the region (123°E-127°E, 28°N-32°N) on February 10, 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 52,
-    "source_query_id": 52,
-    "category": "base",
-    "query": "Detect jets with speed exceeding 0.5 m/s in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
-    "original_query": "Detect jets with speed exceeding 0.5 m/s in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 53,
+    "case_id": 14,
     "source_query_id": 53,
     "category": "base",
+    "task_type": "ocean_meander_detection",
     "query": "Detect current meanders in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "original_query": "Detect current meanders in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
     "time_shortened": false
   },
   {
-    "case_id": 54,
-    "source_query_id": 54,
-    "category": "base",
-    "query": "Find current meanders in the region (126°E-130°E, 15°N-20°N) on March 1, 2015",
-    "original_query": "Find current meanders in the region (126°E-130°E, 15°N-20°N) on March 1, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 55,
-    "source_query_id": 55,
-    "category": "base",
-    "query": "Are there meanders in the region (123°E-127°E, 28°N-32°N) currents on February 10, 2015?",
-    "original_query": "Are there meanders in the region (123°E-127°E, 28°N-32°N) currents on February 10, 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 56,
-    "source_query_id": 56,
-    "category": "base",
-    "query": "Detect meanders with high curvature in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
-    "original_query": "Detect meanders with high curvature in the region (113°E-117°E, 19°N-22°N) on January 15, 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 57,
+    "case_id": 15,
     "source_query_id": 57,
     "category": "base",
+    "task_type": "ocean_lag_correlation",
     "query": "What is the lag correlation between surface SST and surface chlorophyll in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020?",
     "original_query": "What is the lag correlation between surface SST and surface chlorophyll in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020?",
     "time_shortened": true
   },
   {
-    "case_id": 58,
-    "source_query_id": 58,
-    "category": "base",
-    "query": "Compute lag correlation between surface temperature and surface salinity in the region (118°E-121°E, 38°N-40°N) from 2019 to 2020",
-    "original_query": "Compute lag correlation between surface temperature and surface salinity in the region (118°E-121°E, 38°N-40°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 59,
-    "source_query_id": 59,
-    "category": "base",
-    "query": "How are surface SST and upper-50 m oxygen related with time lags in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "How are surface SST and upper-50 m oxygen related with time lags in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 60,
-    "source_query_id": 60,
-    "category": "base",
-    "query": "Calculate the lag correlation between surface SST and surface chlorophyll with max lag 60 days in the region (126°E-130°E, 15°N-20°N) from 2019 to 2020",
-    "original_query": "Calculate the lag correlation between surface SST and surface chlorophyll with max lag 60 days in the region (126°E-130°E, 15°N-20°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 61,
+    "case_id": 16,
     "source_query_id": 61,
     "category": "base",
+    "task_type": "ocean_spatial_diagnostics",
     "query": "Calculate the kinetic energy distribution in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Calculate the kinetic energy distribution in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 62,
-    "source_query_id": 62,
-    "category": "base",
-    "query": "Show the eddy kinetic energy field in the region (126°E-130°E, 15°N-20°N) from January 1 to February 15, 2015",
-    "original_query": "Show the eddy kinetic energy field in the region (126°E-130°E, 15°N-20°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 63,
-    "source_query_id": 63,
-    "category": "base",
-    "query": "What is the surface kinetic energy spatial distribution in the region (123°E-127°E, 28°N-32°N) in January 2015?",
-    "original_query": "What is the surface kinetic energy spatial distribution in the region (123°E-127°E, 28°N-32°N) in January 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 64,
-    "source_query_id": 64,
-    "category": "base",
-    "query": "Compute the strain rate field in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Compute the strain rate field in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 65,
+    "case_id": 17,
     "source_query_id": 65,
     "category": "base",
+    "task_type": "ocean_eof_analysis",
     "query": "Perform EOF analysis on SST in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Perform EOF analysis on SST in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 66,
-    "source_query_id": 66,
-    "category": "base",
-    "query": "Do EOF decomposition of surface salinity in the region (118°E-121°E, 38°N-40°N) from 2019 to 2020",
-    "original_query": "Do EOF decomposition of surface salinity in the region (118°E-121°E, 38°N-40°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 67,
-    "source_query_id": 67,
-    "category": "base",
-    "query": "What are the dominant modes of surface SST variability in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "What are the dominant modes of surface SST variability in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 68,
-    "source_query_id": 68,
-    "category": "base",
-    "query": "Perform EOF analysis on temperature with 5 modes in the region (126°E-130°E, 15°N-20°N) from January 1 to February 28, 2015",
-    "original_query": "Perform EOF analysis on temperature with 5 modes in the region (126°E-130°E, 15°N-20°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 69,
+    "case_id": 18,
     "source_query_id": 69,
     "category": "base",
+    "task_type": "ocean_hovmoller_analysis",
     "query": "Show the time-longitude Hovmoller diagram of temperature in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Show the time-longitude Hovmoller diagram of temperature in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 70,
-    "source_query_id": 70,
-    "category": "base",
-    "query": "Plot a Hovmoller diagram of salinity in the region (118°E-121°E, 38°N-40°N) from January 1 to February 28, 2015",
-    "original_query": "Plot a Hovmoller diagram of salinity in the region (118°E-121°E, 38°N-40°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 71,
-    "source_query_id": 71,
-    "category": "base",
-    "query": "How does the surface SST change along latitude over time in the region (123°E-127°E, 28°N-32°N) from January 1 to February 28, 2015?",
-    "original_query": "How does the surface SST change along latitude over time in the region (123°E-127°E, 28°N-32°N) from January to June 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 72,
-    "source_query_id": 72,
-    "category": "base",
-    "query": "Create a time-longitude Hovmoller diagram of temperature at 50 m depth in the region (126°E-130°E, 15°N-20°N) from January 1 to February 15, 2015",
-    "original_query": "Create a time-longitude Hovmoller diagram of temperature at 50 m depth in the region (126°E-130°E, 15°N-20°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 73,
+    "case_id": 19,
     "source_query_id": 73,
     "category": "base",
+    "task_type": "ocean_histogram_analysis",
     "query": "Show the distribution of SST values in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Show the distribution of SST values in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 74,
-    "source_query_id": 74,
-    "category": "base",
-    "query": "Plot a histogram of salinity in the region (118°E-121°E, 38°N-40°N) during January 2015",
-    "original_query": "Plot a histogram of salinity in the region (118°E-121°E, 38°N-40°N) during January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 75,
-    "source_query_id": 75,
-    "category": "base",
-    "query": "What is the value distribution of upper-50 m temperature in the region (121°E-124°E, 35°N-38°N) in 2015?",
-    "original_query": "What is the value distribution of upper-50 m temperature in the region (121°E-124°E, 35°N-38°N) in 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 76,
-    "source_query_id": 76,
-    "category": "base",
-    "query": "Show the normalized distribution of chlorophyll in the region (123°E-127°E, 28°N-32°N) from January 1 to February 15, 2015 with 50 bins",
-    "original_query": "Show the normalized distribution of chlorophyll in the region (123°E-127°E, 28°N-32°N) from January to March 2015 with 50 bins",
-    "time_shortened": true
-  },
-  {
-    "case_id": 77,
+    "case_id": 20,
     "source_query_id": 77,
     "category": "base",
+    "task_type": "ocean_preprocessing",
     "query": "Apply a 5-day Gaussian low-pass filter to the SST data in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Apply a 5-day Gaussian low-pass filter to the SST data in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 78,
-    "source_query_id": 78,
-    "category": "base",
-    "query": "Smooth the salinity data in the region (118°E-121°E, 38°N-40°N) with a 7-day running mean from January 1 to February 28, 2015",
-    "original_query": "Smooth the salinity data in the region (118°E-121°E, 38°N-40°N) with a 7-day running mean from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 79,
-    "source_query_id": 79,
-    "category": "base",
-    "query": "Apply a temporal low-pass Butterworth filter with cutoff_period 30 days and order 4 along the time dimension to surface temperature in the region (123°E-127°E, 28°N-32°N) from 2015-03-01 to 2015-08-31",
-    "original_query": "Apply a temporal low-pass Butterworth filter with cutoff_period 30 days and order 4 along the time dimension to surface temperature in the region (123°E-127°E, 28°N-32°N) from 2015-03-01 to 2015-08-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 80,
-    "source_query_id": 80,
-    "category": "base",
-    "query": "Apply a 10-day Butterworth low-pass filter to the SST in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Apply a 10-day Butterworth low-pass filter to the SST in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 81,
+    "case_id": 21,
     "source_query_id": 81,
     "category": "base",
+    "task_type": "ocean_derived_spatial_field_analysis",
     "query": "Compute the surface current speed field in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Compute the surface current speed field in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 82,
-    "source_query_id": 82,
-    "category": "base",
-    "query": "Show the surface relative vorticity field in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "original_query": "Show the surface relative vorticity field in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 83,
-    "source_query_id": 83,
-    "category": "base",
-    "query": "What does the surface ocean current speed look like in the region (123°E-127°E, 28°N-32°N) from January 1 to February 15, 2015?",
-    "original_query": "What does the surface ocean current speed look like in the region (123°E-127°E, 28°N-32°N) from January to March 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 84,
-    "source_query_id": 84,
-    "category": "base",
-    "query": "Compute the time-mean upper-200 m buoyancy_frequency derived spatial field using temp and salt in the region (113°E-117°E, 19°N-22°N) from 2015-01-01 to 2015-02-15",
-    "original_query": "Compute the time-mean upper-200 m buoyancy_frequency derived spatial field using temp and salt in the region (113°E-117°E, 19°N-22°N) from 2015-01-01 to 2015-03-31",
-    "time_shortened": true
-  },
-  {
-    "case_id": 85,
+    "case_id": 22,
     "source_query_id": 85,
     "category": "base",
+    "task_type": "ocean_derived_timeseries_analysis",
     "query": "Calculate the time series of mean surface current speed in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Calculate the time series of mean surface current speed in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 86,
-    "source_query_id": 86,
-    "category": "base",
-    "query": "Show the surface vorticity time series in the region (126°E-130°E, 15°N-20°N) from January 1 to February 28, 2015",
-    "original_query": "Show the surface vorticity time series in the region (126°E-130°E, 15°N-20°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 87,
-    "source_query_id": 87,
-    "category": "base",
-    "query": "How does the surface current speed change over time in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "How does the surface current speed change over time in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 88,
-    "source_query_id": 88,
-    "category": "base",
-    "query": "Plot the time series of mean upper-200 m buoyancy frequency in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Plot the time series of mean upper-200 m buoyancy frequency in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 89,
-    "source_query_id": 89,
-    "category": "base",
-    "query": "Show the surface vorticity spatial field in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Show the surface vorticity spatial field in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 90,
-    "source_query_id": 90,
-    "category": "base",
-    "query": "Display the surface current speed spatial map in the region (126°E-130°E, 15°N-20°N) for January 2015",
-    "original_query": "Display the surface current speed spatial map in the region (126°E-130°E, 15°N-20°N) for January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 91,
-    "source_query_id": 91,
-    "category": "base",
-    "query": "What is the spatial pattern of surface ocean vorticity in the region (123°E-127°E, 28°N-32°N) in spring 2015?",
-    "original_query": "What is the spatial pattern of surface ocean vorticity in the region (123°E-127°E, 28°N-32°N) in spring 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 92,
-    "source_query_id": 92,
-    "category": "base",
-    "query": "Compute the time-mean horizontal gradient of surface temperature using the temp variable in the region (113°E-117°E, 19°N-22°N) from 2015-01-01 to 2015-02-15",
-    "original_query": "Compute the time-mean horizontal gradient of surface temperature using the temp variable in the region (113°E-117°E, 19°N-22°N) from 2015-01-01 to 2015-03-31",
-    "time_shortened": true
-  },
-  {
-    "case_id": 93,
+    "case_id": 23,
     "source_query_id": 93,
     "category": "base",
+    "task_type": "ocean_derived_profile_analysis",
     "query": "Show the vertical current speed profile at 115E, 20N in January 2015",
     "original_query": "Show the vertical current speed profile at 115E, 20N in January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 94,
-    "source_query_id": 94,
-    "category": "base",
-    "query": "Extract the vorticity vertical profile at 130E, 15N in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "original_query": "Extract the vorticity vertical profile at 130E, 15N in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 95,
-    "source_query_id": 95,
-    "category": "base",
-    "query": "What does the current speed look like vertically at 125E, 30N in February 2015?",
-    "original_query": "What does the current speed look like vertically at 125E, 30N in February 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 96,
-    "source_query_id": 96,
-    "category": "base",
-    "query": "Show the density profile derived from temp and salt at 115E, 20N from surface to 500 m in January 2015",
-    "original_query": "Show the density profile derived from temp and salt at 115E, 20N from surface to 500 m in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 97,
+    "case_id": 24,
     "source_query_id": 97,
     "category": "base",
+    "task_type": "ocean_derived_hovmoller_analysis",
     "query": "Plot the time-longitude Hovmoller diagram of surface current speed in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Plot the time-longitude Hovmoller diagram of surface current speed in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 98,
-    "source_query_id": 98,
-    "category": "base",
-    "query": "Show a Hovmoller diagram of surface vorticity in the region (126°E-130°E, 15°N-20°N) from January 1 to February 28, 2015",
-    "original_query": "Show a Hovmoller diagram of surface vorticity in the region (126°E-130°E, 15°N-20°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 99,
-    "source_query_id": 99,
-    "category": "base",
-    "query": "How does surface current speed evolve along longitude over time in the region (123°E-127°E, 28°N-32°N) from January 1 to February 28, 2015?",
-    "original_query": "How does surface current speed evolve along longitude over time in the region (123°E-127°E, 28°N-32°N) from January to June 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 100,
-    "source_query_id": 100,
-    "category": "base",
-    "query": "Create a time-latitude Hovmoller of surface current speed in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Create a time-latitude Hovmoller of surface current speed in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 101,
+    "case_id": 25,
     "source_query_id": 101,
     "category": "base",
+    "task_type": "ocean_derived_histogram_analysis",
     "query": "Show the distribution of surface current speed values in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Show the distribution of surface current speed values in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 102,
-    "source_query_id": 102,
-    "category": "base",
-    "query": "Plot the histogram of surface vorticity in the region (126°E-130°E, 15°N-20°N) for January 2015",
-    "original_query": "Plot the histogram of surface vorticity in the region (126°E-130°E, 15°N-20°N) for January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 103,
-    "source_query_id": 103,
-    "category": "base",
-    "query": "What is the distribution of surface ocean current speed in the region (123°E-127°E, 28°N-32°N) from January 1 to February 15, 2015?",
-    "original_query": "What is the distribution of surface ocean current speed in the region (123°E-127°E, 28°N-32°N) from January to March 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 104,
-    "source_query_id": 104,
-    "category": "base",
-    "query": "Show the normalized histogram of surface current speed with 100 bins in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Show the normalized histogram of surface current speed with 100 bins in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 105,
+    "case_id": 26,
     "source_query_id": 105,
     "category": "base",
+    "task_type": "ocean_derived_eof_analysis",
     "query": "Perform EOF analysis on surface current speed in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Perform EOF analysis on surface current speed in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 106,
-    "source_query_id": 106,
-    "category": "base",
-    "query": "Do EOF analysis on surface vorticity in the region (126°E-130°E, 15°N-20°N) from 2019 to 2020",
-    "original_query": "Do EOF analysis on surface vorticity in the region (126°E-130°E, 15°N-20°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 107,
-    "source_query_id": 107,
-    "category": "base",
-    "query": "What are the dominant spatial patterns of surface current speed variability in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "What are the dominant spatial patterns of surface current speed variability in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 108,
-    "source_query_id": 108,
-    "category": "base",
-    "query": "Perform EOF analysis on surface current speed with 3 modes in the region (113°E-117°E, 19°N-22°N) from January 1 to February 28, 2015",
-    "original_query": "Perform EOF analysis on surface current speed with 3 modes in the region (113°E-117°E, 19°N-22°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 109,
+    "case_id": 27,
     "source_query_id": 109,
     "category": "base",
+    "task_type": "ocean_event_statistics",
     "query": "Compute statistics of marine heatwave events in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Compute statistics of marine heatwave events in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 110,
-    "source_query_id": 110,
-    "category": "base",
-    "query": "Calculate event statistics for surface algal blooms in the region (118°E-121°E, 38°N-40°N) during March 2019 and March 2020",
-    "original_query": "Calculate event statistics for surface algal blooms in the region (118°E-121°E, 38°N-40°N) during spring seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 111,
-    "source_query_id": 111,
-    "category": "base",
-    "query": "What are the statistics of upwelling events in the region (123°E-127°E, 28°N-32°N) from January 1 to February 28, 2015?",
-    "original_query": "What are the statistics of upwelling events in the region (123°E-127°E, 28°N-32°N) from January to June 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 112,
-    "source_query_id": 112,
-    "category": "base",
-    "query": "Compute monthly surface heatwave event statistics in the region (113°E-117°E, 19°N-22°N) during warm seasons from 2019 to 2020",
-    "original_query": "Compute monthly surface heatwave event statistics in the region (113°E-117°E, 19°N-22°N) during warm seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 113,
+    "case_id": 28,
     "source_query_id": 113,
     "category": "base",
+    "task_type": "ocean_event_frequency_map",
     "query": "Show the spatial frequency map of marine heatwaves in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Show the spatial frequency map of marine heatwaves in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 114,
-    "source_query_id": 114,
-    "category": "base",
-    "query": "Map the surface bloom frequency in the region (118°E-121°E, 38°N-40°N) during March 2019 and March 2020",
-    "original_query": "Map the surface bloom frequency in the region (118°E-121°E, 38°N-40°N) during spring seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 115,
-    "source_query_id": 115,
-    "category": "base",
-    "query": "Where do surface heatwaves occur most frequently in the region (123°E-127°E, 28°N-32°N) during June 2019 and June 2020?",
-    "original_query": "Where do surface heatwaves occur most frequently in the region (123°E-127°E, 28°N-32°N) during summers from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 116,
-    "source_query_id": 116,
-    "category": "base",
-    "query": "Show the normalized frequency map of bottom-layer hypoxia events in the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020",
-    "original_query": "Show the normalized frequency map of bottom-layer hypoxia events in the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 117,
+    "case_id": 29,
     "source_query_id": 117,
     "category": "base",
+    "task_type": "ocean_event_count_timeseries",
     "query": "How does the number of active marine heatwave days vary over time in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015?",
     "original_query": "How does the number of active marine heatwave days vary over time in the region (113°E-117°E, 19°N-22°N) from January to March 2015?",
     "time_shortened": true
   },
   {
-    "case_id": 118,
-    "source_query_id": 118,
-    "category": "base",
-    "query": "Show the surface bloom event count time series in the region (118°E-121°E, 38°N-40°N) during March 2019 and March 2020",
-    "original_query": "Show the surface bloom event count time series in the region (118°E-121°E, 38°N-40°N) during spring seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 119,
-    "source_query_id": 119,
-    "category": "base",
-    "query": "Compute the monthly count time series of surface marine heatwave events in the region (123°E-127°E, 28°N-32°N) from 2018-06-01 to 2020-08-31",
-    "original_query": "Compute the monthly count time series of surface marine heatwave events in the region (123°E-127°E, 28°N-32°N) from 2018-06-01 to 2020-08-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 120,
-    "source_query_id": 120,
-    "category": "base",
-    "query": "Plot the area-weighted heatwave event count over time in the region (113°E-117°E, 19°N-22°N) from January 1 to February 28, 2015",
-    "original_query": "Plot the area-weighted heatwave event count over time in the region (113°E-117°E, 19°N-22°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 121,
+    "case_id": 30,
     "source_query_id": 121,
     "category": "base",
+    "task_type": "ocean_vertical_integral",
     "query": "Calculate the upper 200 m ocean heat content in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Calculate the upper 200 m ocean heat content in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 122,
-    "source_query_id": 122,
-    "category": "base",
-    "query": "Compute the upper-200 m heat content in the region (126°E-130°E, 15°N-20°N) during January 2015",
-    "original_query": "Compute the upper-200 m heat content in the region (126°E-130°E, 15°N-20°N) during January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 123,
-    "source_query_id": 123,
-    "category": "base",
-    "query": "What is the upper-200 m vertically integrated temperature in the region (123°E-127°E, 28°N-32°N) in 2015?",
-    "original_query": "What is the upper-200 m vertically integrated temperature in the region (123°E-127°E, 28°N-32°N) in 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 124,
-    "source_query_id": 124,
-    "category": "base",
-    "query": "Calculate the heat content between 50 m and 200 m depth in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Calculate the heat content between 50 m and 200 m depth in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 125,
+    "case_id": 31,
     "source_query_id": 125,
     "category": "base",
+    "task_type": "ocean_vertical_structure",
     "query": "Diagnose the vertical structure of the region (113°E-117°E, 19°N-22°N) water column in January 2015, including MLD, thermocline and pycnocline",
     "original_query": "Diagnose the vertical structure of the region (113°E-117°E, 19°N-22°N) water column in January 2015, including MLD, thermocline and pycnocline",
     "time_shortened": false
   },
   {
-    "case_id": 126,
-    "source_query_id": 126,
-    "category": "base",
-    "query": "Determine the mixed layer depth in the region (126°E-130°E, 15°N-20°N) during March 2015",
-    "original_query": "Determine the mixed layer depth in the region (126°E-130°E, 15°N-20°N) during March 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 127,
-    "source_query_id": 127,
-    "category": "base",
-    "query": "What is the thermocline depth in the region (123°E-127°E, 28°N-32°N) in summer 2015?",
-    "original_query": "What is the thermocline depth in the region (123°E-127°E, 28°N-32°N) in summer 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 128,
-    "source_query_id": 128,
-    "category": "base",
-    "query": "Identify the pycnocline depth in the region (118°E-121°E, 38°N-40°N) during January 2015",
-    "original_query": "Identify the pycnocline depth in the region (118°E-121°E, 38°N-40°N) during January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 129,
+    "case_id": 32,
     "source_query_id": 129,
     "category": "base",
+    "task_type": "ocean_event_comparison",
     "query": "Compare the total event count and mean intensity of marine heatwave events in the region (113°E-117°E, 19°N-22°N) between 2011-01-01 to 2011-03-31 and 2015-01-01 to 2015-02-15",
     "original_query": "Compare the total event count and mean intensity of marine heatwave events in the region (113°E-117°E, 19°N-22°N) between 2011-01-01 to 2011-03-31 and 2015-01-01 to 2015-03-31",
     "time_shortened": true
   },
   {
-    "case_id": 130,
-    "source_query_id": 130,
-    "category": "base",
-    "query": "Compare the total event count and mean intensity of surface algal bloom events in the region (118°E-121°E, 38°N-40°N) between 2015-01-01 to 2015-12-31 and 2020-01-01 to 2020-12-31 using the same detection settings for both periods",
-    "original_query": "Compare the total event count and mean intensity of surface algal bloom events in the region (118°E-121°E, 38°N-40°N) between 2015-01-01 to 2015-12-31 and 2020-01-01 to 2020-12-31 using the same detection settings for both periods",
-    "time_shortened": false
-  },
-  {
-    "case_id": 131,
-    "source_query_id": 131,
-    "category": "base",
-    "query": "Are surface heatwaves in the region (123°E-127°E, 28°N-32°N) getting worse from 2019 to 2020?",
-    "original_query": "Are surface heatwaves in the region (123°E-127°E, 28°N-32°N) getting worse from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 132,
-    "source_query_id": 132,
-    "category": "base",
-    "query": "Compare the total event count and mean intensity of bottom-layer hypoxia events with vertical_mode=bottom in the region (121°E-124°E, 35°N-38°N) between 2015-06-01 to 2015-08-31 and 2020-06-01 to 2020-08-31",
-    "original_query": "Compare the total event count and mean intensity of bottom-layer hypoxia events with vertical_mode=bottom in the region (121°E-124°E, 35°N-38°N) between 2015-06-01 to 2015-08-31 and 2020-06-01 to 2020-08-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 133,
+    "case_id": 33,
     "source_query_id": 133,
     "category": "base",
+    "task_type": "ocean_mixed_layer_mean_analysis",
     "query": "Compute the mixed-layer mean temperature in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Compute the mixed-layer mean temperature in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 134,
-    "source_query_id": 134,
-    "category": "base",
-    "query": "Calculate mixed-layer average salinity in the region (118°E-121°E, 38°N-40°N) during January 2015",
-    "original_query": "Calculate mixed-layer average salinity in the region (118°E-121°E, 38°N-40°N) during January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 135,
-    "source_query_id": 135,
-    "category": "base",
-    "query": "What is the average temperature within the mixed layer in the region (123°E-127°E, 28°N-32°N) in spring 2015?",
-    "original_query": "What is the average temperature within the mixed layer in the region (123°E-127°E, 28°N-32°N) in spring 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 136,
-    "source_query_id": 136,
-    "category": "base",
-    "query": "Compute the mixed-layer mean chlorophyll in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Compute the mixed-layer mean chlorophyll in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 137,
+    "case_id": 34,
     "source_query_id": 137,
     "category": "base",
+    "task_type": "ocean_timeseries_resampling",
     "query": "Resample the daily surface SST time series to monthly averages in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020",
     "original_query": "Resample the daily surface SST time series to monthly averages in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020",
     "time_shortened": true
   },
   {
-    "case_id": 138,
-    "source_query_id": 138,
-    "category": "base",
-    "query": "Convert the surface salinity daily time series to weekly averages in the region (118°E-121°E, 38°N-40°N) from 2019 to 2020",
-    "original_query": "Convert the surface salinity daily time series to weekly averages in the region (118°E-121°E, 38°N-40°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 139,
-    "source_query_id": 139,
-    "category": "base",
-    "query": "Can you downsample the surface temperature time series to monthly resolution in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "Can you downsample the surface temperature time series to monthly resolution in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 140,
-    "source_query_id": 140,
-    "category": "base",
-    "query": "Resample the surface SST time series to yearly maxima in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020",
-    "original_query": "Resample the surface SST time series to yearly maxima in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 141,
+    "case_id": 35,
     "source_query_id": 141,
     "category": "base",
+    "task_type": "ocean_timeseries_extraction",
     "query": "Extract the SST time series directly from the loaded field in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
     "original_query": "Extract the SST time series directly from the loaded field in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 142,
-    "source_query_id": 142,
-    "category": "base",
-    "query": "Get the surface salinity time series from the data in the region (118°E-121°E, 38°N-40°N) during 2015",
-    "original_query": "Get the surface salinity time series from the data in the region (118°E-121°E, 38°N-40°N) during 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 143,
-    "source_query_id": 143,
-    "category": "base",
-    "query": "Pull out the temperature time series from the loaded dataset in the region (123°E-127°E, 28°N-32°N) from January 1 to February 28, 2015",
-    "original_query": "Pull out the temperature time series from the loaded dataset in the region (123°E-127°E, 28°N-32°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 144,
-    "source_query_id": 144,
-    "category": "base",
-    "query": "Extract the point time series at 115E, 20N from the temperature field in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Extract the point time series at 115E, 20N from the temperature field in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 145,
+    "case_id": 36,
     "source_query_id": 145,
     "category": "base",
+    "task_type": "ocean_section_analysis",
     "query": "Extract a temperature section along 126E,16N to 130E,20N in the region (126°E-130°E, 15°N-20°N) during January 2015",
     "original_query": "Extract a temperature section along 126E,16N to 130E,20N in the region (126°E-130°E, 15°N-20°N) during January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 146,
-    "source_query_id": 146,
-    "category": "base",
-    "query": "Show a salinity cross-section from 113E,19N to 117E,22N in the region (113°E-117°E, 19°N-22°N) in January 2015",
-    "original_query": "Show a salinity cross-section from 113E,19N to 117E,22N in the region (113°E-117°E, 19°N-22°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 147,
-    "source_query_id": 147,
-    "category": "base",
-    "query": "What does the temperature look like along a transect from Luzon Strait section from (120.5°E, 18.5°N) to (122.0°E, 21.5°N) to the open Pacific in January 2015?",
-    "original_query": "What does the temperature look like along a transect from Luzon Strait section from (120.5°E, 18.5°N) to (122.0°E, 21.5°N) to the open Pacific in January 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 148,
-    "source_query_id": 148,
-    "category": "base",
-    "query": "Extract a temperature section along 126E,16N to 130E,20N with 100 sample points in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "original_query": "Extract a temperature section along 126E,16N to 130E,20N with 100 sample points in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 149,
+    "case_id": 37,
     "source_query_id": 149,
     "category": "base",
+    "task_type": "ocean_transport_analysis",
     "query": "Compute the volume transport across 126E,16N to 130E,20N from January 1 to February 15, 2015",
     "original_query": "Compute the volume transport across 126E,16N to 130E,20N from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 150,
-    "source_query_id": 150,
-    "category": "base",
-    "query": "Calculate the heat transport through Luzon Strait section from (120.5°E, 18.5°N) to (122.0°E, 21.5°N) from January 1 to February 15, 2015",
-    "original_query": "Calculate the heat transport through Luzon Strait section from (120.5°E, 18.5°N) to (122.0°E, 21.5°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 151,
-    "source_query_id": 151,
-    "category": "base",
-    "query": "How much water flows through the section from 113E,19N to 117E,22N in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015?",
-    "original_query": "How much water flows through the section from 113E,19N to 117E,22N in the region (113°E-117°E, 19°N-22°N) from January to March 2015?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 152,
+    "case_id": 38,
     "source_query_id": 153,
     "category": "base",
+    "task_type": "ocean_watermass_analysis",
     "query": "Plot a temperature-salinity diagram for the region (126°E-130°E, 15°N-20°N) upper 300 m in January 2015",
     "original_query": "Plot a temperature-salinity diagram for the region (126°E-130°E, 15°N-20°N) upper 300 m in January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 153,
-    "source_query_id": 154,
-    "category": "base",
-    "query": "Show a T-S diagram for the region (113°E-117°E, 19°N-22°N) upper 200 m in January 2015",
-    "original_query": "Show a T-S diagram for the region (113°E-117°E, 19°N-22°N) upper 200 m in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 154,
-    "source_query_id": 155,
-    "category": "base",
-    "query": "What water masses are present in the region (123°E-127°E, 28°N-32°N) in winter 2015? Show a T-S diagram",
-    "original_query": "What water masses are present in the region (123°E-127°E, 28°N-32°N) in winter 2015? Show a T-S diagram",
-    "time_shortened": false
-  },
-  {
-    "case_id": 155,
-    "source_query_id": 156,
-    "category": "base",
-    "query": "Plot a temperature-salinity diagram for the region (126°E-130°E, 15°N-20°N) upper 500 m in January 2015",
-    "original_query": "Plot a temperature-salinity diagram for the region (126°E-130°E, 15°N-20°N) upper 500 m in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 156,
+    "case_id": 39,
     "source_query_id": 157,
     "category": "base",
+    "task_type": "ocean_regression_analysis",
     "query": "Regress surface SST in the region (126°E-130°E, 15°N-20°N) onto the surface chlorophyll index over 2019-2020",
     "original_query": "Regress surface SST in the region (126°E-130°E, 15°N-20°N) onto the surface chlorophyll index over 2018-2020",
     "time_shortened": true
   },
   {
-    "case_id": 157,
-    "source_query_id": 158,
-    "category": "base",
-    "query": "Compute regression of surface temperature onto the surface salinity index in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020",
-    "original_query": "Compute regression of surface temperature onto the surface salinity index in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 158,
-    "source_query_id": 159,
-    "category": "base",
-    "query": "How does the surface SST field respond to surface chlorophyll changes in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "How does the surface SST field respond to surface chlorophyll changes in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 159,
-    "source_query_id": 160,
-    "category": "base",
-    "query": "Regress surface SST onto the surface chlorophyll index with lag 30 days in the region (126°E-130°E, 15°N-20°N) from 2019 to 2020",
-    "original_query": "Regress surface SST onto the surface chlorophyll index with lag 30 days in the region (126°E-130°E, 15°N-20°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 160,
+    "case_id": 40,
     "source_query_id": 161,
     "category": "base",
+    "task_type": "ocean_composite_analysis",
     "query": "Composite surface SST during positive and negative surface chlorophyll phases in the region (126°E-130°E, 15°N-20°N) over 2019-2020",
     "original_query": "Composite surface SST during positive and negative surface chlorophyll phases in the region (126°E-130°E, 15°N-20°N) over 2018-2020",
     "time_shortened": true
   },
   {
-    "case_id": 161,
-    "source_query_id": 162,
-    "category": "base",
-    "query": "Compute surface SST composites for high and low surface salinity periods in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020",
-    "original_query": "Compute surface SST composites for high and low surface salinity periods in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 162,
-    "source_query_id": 163,
-    "category": "base",
-    "query": "How does the surface SST pattern differ between high-chlorophyll and low-chlorophyll spring months in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "How does the surface SST pattern differ between high-chlorophyll and low-chlorophyll spring months in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 163,
-    "source_query_id": 164,
-    "category": "base",
-    "query": "Composite surface SST during positive and negative surface chlorophyll phases with the 30th percentile (quantile=0.3) threshold in the region (126°E-130°E, 15°N-20°N) over 2019-2020",
-    "original_query": "Composite surface SST during positive and negative surface chlorophyll phases with the 30th percentile (quantile=0.3) threshold in the region (126°E-130°E, 15°N-20°N) over 2018-2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 164,
+    "case_id": 41,
     "source_query_id": 165,
     "category": "base",
+    "task_type": "ocean_spectral_analysis",
     "query": "What are the dominant periods of surface SST variability in the region (126°E-130°E, 15°N-20°N) from 2019 to 2020?",
     "original_query": "What are the dominant periods of surface SST variability in the region (126°E-130°E, 15°N-20°N) from 2018 to 2020?",
     "time_shortened": true
   },
   {
-    "case_id": 165,
-    "source_query_id": 166,
-    "category": "base",
-    "query": "Compute the power spectrum of surface salinity in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020",
-    "original_query": "Compute the power spectrum of surface salinity in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 166,
-    "source_query_id": 167,
-    "category": "base",
-    "query": "What periodic signals exist in the surface temperature time series of the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "What periodic signals exist in the surface temperature time series of the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 167,
-    "source_query_id": 168,
-    "category": "base",
-    "query": "Perform spectral analysis on surface SST with Welch method and a Hann window in the region (126°E-130°E, 15°N-20°N) from 2019 to 2020",
-    "original_query": "Perform spectral analysis on surface SST with Welch method and a Hann window in the region (126°E-130°E, 15°N-20°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 168,
+    "case_id": 42,
     "source_query_id": 169,
     "category": "base",
+    "task_type": "ocean_budget_analysis",
     "query": "Analyze the upper-100 m temperature budget in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2019 to 2020 and compare local tendency with horizontal advection",
     "original_query": "Analyze the upper-100 m temperature budget in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2018 to 2020 and compare local tendency with horizontal advection",
     "time_shortened": true
   },
   {
-    "case_id": 169,
-    "source_query_id": 170,
-    "category": "base",
-    "query": "Compute the heat budget in the region (113°E-117°E, 19°N-22°N) upper ocean from January 1 to February 15, 2015",
-    "original_query": "Compute the heat budget in the region (113°E-117°E, 19°N-22°N) upper ocean from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 170,
-    "source_query_id": 171,
-    "category": "base",
-    "query": "What drives the temperature changes in the region (123°E-127°E, 28°N-32°N) upper 50 m during warm seasons from 2019 to 2020?",
-    "original_query": "What drives the temperature changes in the region (123°E-127°E, 28°N-32°N) upper 50 m during warm seasons from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 171,
-    "source_query_id": 172,
-    "category": "base",
-    "query": "Analyze the upper-100 m salinity budget in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2019 to 2020",
-    "original_query": "Analyze the upper-100 m salinity budget in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 172,
+    "case_id": 43,
     "source_query_id": 173,
     "category": "base",
+    "task_type": "ocean_inventory_analysis",
     "query": "Compute the upper-200 m heat-content-like volume inventory in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2019 to 2020, restricted to the shelf shallower than 200 m",
     "original_query": "Compute the upper-200 m heat-content-like volume inventory in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2018 to 2020, restricted to the shelf shallower than 200 m",
     "time_shortened": true
   },
   {
-    "case_id": 173,
-    "source_query_id": 174,
-    "category": "base",
-    "query": "Calculate the shelf heat inventory in the region (113°E-117°E, 19°N-22°N) from January 1 to February 15, 2015",
-    "original_query": "Calculate the shelf heat inventory in the region (113°E-117°E, 19°N-22°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 174,
-    "source_query_id": 175,
-    "category": "base",
-    "query": "What is the total heat stored in the upper 200 m of the region (123°E-127°E, 28°N-32°N) shelf during warm seasons from 2019 to 2020?",
-    "original_query": "What is the total heat stored in the upper 200 m of the region (123°E-127°E, 28°N-32°N) shelf during warm seasons from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 175,
-    "source_query_id": 176,
-    "category": "base",
-    "query": "Compute the upper-100 m salinity inventory on the shelf in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2019 to 2020",
-    "original_query": "Compute the upper-100 m salinity inventory on the shelf in the region (126°E-130°E, 15°N-20°N) during warm seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 176,
+    "case_id": 44,
     "source_query_id": 177,
     "category": "base",
+    "task_type": "ocean_anomaly_analysis",
     "query": "Show the monthly SST anomaly field in the region (113°E-117°E, 19°N-22°N) for January 1 to February 15, 2015 relative to the monthly climatology",
     "original_query": "Show the monthly SST anomaly field in the region (113°E-117°E, 19°N-22°N) for January to March 2015 relative to the monthly climatology",
     "time_shortened": true
   },
   {
-    "case_id": 177,
-    "source_query_id": 178,
-    "category": "base",
-    "query": "Compute the salinity anomaly in the region (118°E-121°E, 38°N-40°N) for January 2015",
-    "original_query": "Compute the salinity anomaly in the region (118°E-121°E, 38°N-40°N) for January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 178,
-    "source_query_id": 179,
-    "category": "base",
-    "query": "How does the SST in the region (123°E-127°E, 28°N-32°N) differ from normal in spring 2015?",
-    "original_query": "How does the SST in the region (123°E-127°E, 28°N-32°N) differ from normal in spring 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 179,
-    "source_query_id": 180,
-    "category": "base",
-    "query": "Show the monthly SST anomaly field in the region (121°E-124°E, 35°N-38°N) from January 1 to February 15, 2015 relative to the monthly climatology",
-    "original_query": "Show the monthly SST anomaly field in the region (121°E-124°E, 35°N-38°N) from January to March 2015 relative to the monthly climatology",
-    "time_shortened": true
-  },
-  {
-    "case_id": 180,
+    "case_id": 45,
     "source_query_id": 181,
     "category": "base",
+    "task_type": "ocean_climatology_analysis",
     "query": "Calculate the monthly SST climatology in the region (113°E-117°E, 19°N-22°N) during 2015",
     "original_query": "Calculate the monthly SST climatology in the region (113°E-117°E, 19°N-22°N) during 2015",
     "time_shortened": false
   },
   {
-    "case_id": 181,
-    "source_query_id": 182,
-    "category": "base",
-    "query": "Compute the seasonal surface salinity climatology in the region (118°E-121°E, 38°N-40°N) from 2019 to 2020",
-    "original_query": "Compute the seasonal surface salinity climatology in the region (118°E-121°E, 38°N-40°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 182,
-    "source_query_id": 183,
-    "category": "base",
-    "query": "What is the typical annual surface SST cycle in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "What is the typical annual surface SST cycle in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 183,
-    "source_query_id": 184,
-    "category": "base",
-    "query": "Calculate the weekly surface SST climatology in the region (121°E-124°E, 35°N-38°N) from 2019 to 2020",
-    "original_query": "Calculate the weekly surface SST climatology in the region (121°E-124°E, 35°N-38°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 184,
+    "case_id": 46,
     "source_query_id": 185,
     "category": "base",
+    "task_type": "ocean_dynamics_diagnostics",
     "query": "Diagnose Richardson number in the region (113°E-117°E, 19°N-22°N) upper 50 m from January 1 to February 15, 2015",
     "original_query": "Diagnose Richardson number in the region (113°E-117°E, 19°N-22°N) upper 50 m from January to March 2015",
     "time_shortened": true
   },
   {
-    "case_id": 185,
-    "source_query_id": 186,
-    "category": "base",
-    "query": "Compute the Rossby number in the region (126°E-130°E, 15°N-20°N) from January 1 to February 15, 2015",
-    "original_query": "Compute the Rossby number in the region (126°E-130°E, 15°N-20°N) from January to March 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 186,
-    "source_query_id": 187,
-    "category": "base",
-    "query": "Compute the upper-50 m Richardson number spatial field in the region (123°E-127°E, 28°N-32°N) from 2015-01-01 to 2015-01-31",
-    "original_query": "Compute the upper-50 m Richardson number spatial field in the region (123°E-127°E, 28°N-32°N) from 2015-01-01 to 2015-01-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 187,
-    "source_query_id": 188,
-    "category": "base",
-    "query": "Calculate the strain-rate field in the region (113°E-117°E, 19°N-22°N) from 2015-01-01 to 2015-02-15",
-    "original_query": "Calculate the strain-rate field in the region (113°E-117°E, 19°N-22°N) from 2015-01-01 to 2015-03-31",
-    "time_shortened": true
-  },
-  {
-    "case_id": 188,
+    "case_id": 47,
     "source_query_id": 189,
     "category": "base",
+    "task_type": "ocean_layer_mean_analysis",
     "query": "Compute the mean temperature between the surface and thermocline in the region (113°E-117°E, 19°N-22°N) during January 2015",
     "original_query": "Compute the mean temperature between the surface and thermocline in the region (113°E-117°E, 19°N-22°N) during January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 189,
-    "source_query_id": 190,
-    "category": "base",
-    "query": "Calculate the salinity average between the MLD and thermocline in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "original_query": "Calculate the salinity average between the MLD and thermocline in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 190,
-    "source_query_id": 191,
-    "category": "base",
-    "query": "What is the average temperature in the layer above the thermocline in the region (123°E-127°E, 28°N-32°N) in winter 2015?",
-    "original_query": "What is the average temperature in the layer above the thermocline in the region (123°E-127°E, 28°N-32°N) in winter 2015?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 191,
-    "source_query_id": 192,
-    "category": "base",
-    "query": "Compute the mean temperature between 0 and 100 m in the region (113°E-117°E, 19°N-22°N) during January 2015",
-    "original_query": "Compute the mean temperature between 0 and 100 m in the region (113°E-117°E, 19°N-22°N) during January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 192,
+    "case_id": 48,
     "source_query_id": 193,
     "category": "base",
+    "task_type": "ocean_masking_workflow",
     "query": "Mask the shelf region shallower than 200 m in the region (126°E-130°E, 15°N-20°N) and show the SST field in January 2015",
     "original_query": "Mask the shelf region shallower than 200 m in the region (126°E-130°E, 15°N-20°N) and show the SST field in January 2015",
     "time_shortened": false
   },
   {
-    "case_id": 193,
-    "source_query_id": 194,
-    "category": "base",
-    "query": "Apply a depth mask to keep only the continental shelf in the region (113°E-117°E, 19°N-22°N) and show the temperature in January 2015",
-    "original_query": "Apply a depth mask to keep only the continental shelf in the region (113°E-117°E, 19°N-22°N) and show the temperature in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 194,
-    "source_query_id": 195,
-    "category": "base",
-    "query": "Show the SST only in deep-ocean areas (deeper than 200 m) in the region (123°E-127°E, 28°N-32°N) in January 2015",
-    "original_query": "Show the SST only in deep-ocean areas (deeper than 200 m) in the region (123°E-127°E, 28°N-32°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 195,
-    "source_query_id": 196,
-    "category": "base",
-    "query": "Build a polygon mask with vertices at (126.5°E, 15.5°N), (128.5°E, 15.5°N), (129.5°E, 18.5°N), (127.0°E, 19.0°N), apply it to surface SST, and show the monthly-mean masked SST field in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "original_query": "Build a polygon mask with vertices at (126.5°E, 15.5°N), (128.5°E, 15.5°N), (129.5°E, 18.5°N), (127.0°E, 19.0°N), apply it to surface SST, and show the monthly-mean masked SST field in the region (126°E-130°E, 15°N-20°N) in January 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 196,
+    "case_id": 49,
     "source_query_id": 197,
     "category": "base",
+    "task_type": "ocean_trend_analysis",
     "query": "Compute the surface SST linear trend in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020",
     "original_query": "Compute the surface SST linear trend in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020",
     "time_shortened": true
   },
   {
-    "case_id": 197,
-    "source_query_id": 198,
-    "category": "base",
-    "query": "Calculate the surface salinity trend in the region (118°E-121°E, 38°N-40°N) from 2019 to 2020",
-    "original_query": "Calculate the surface salinity trend in the region (118°E-121°E, 38°N-40°N) from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 198,
-    "source_query_id": 199,
-    "category": "base",
-    "query": "Is the surface SST warming in the region (123°E-127°E, 28°N-32°N) from 2019 to 2020?",
-    "original_query": "Is the surface SST warming in the region (123°E-127°E, 28°N-32°N) from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 199,
-    "source_query_id": 200,
-    "category": "base",
-    "query": "Compute the surface SST trend field in the region (113°E-117°E, 19°N-22°N) from 2019 to 2020 with 95% confidence",
-    "original_query": "Compute the surface SST trend field in the region (113°E-117°E, 19°N-22°N) from 2018 to 2020 with 95% confidence",
-    "time_shortened": true
-  },
-  {
-    "case_id": 200,
+    "case_id": 50,
     "source_query_id": 201,
     "category": "interpretation",
+    "task_type": "ocean_stratification_diagnostics",
     "query": "Using upper-200 m density_gradient stratification diagnostics together with bottom-layer oxygen, assess whether stronger stratification could help maintain low oxygen in the region (121°E-124°E, 35°N-38°N) from 2018-06-01 to 2020-08-31",
     "original_query": "Using upper-200 m density_gradient stratification diagnostics together with bottom-layer oxygen, assess whether stronger stratification could help maintain low oxygen in the region (121°E-124°E, 35°N-38°N) from 2018-06-01 to 2020-08-31",
     "time_shortened": false
   },
   {
-    "case_id": 201,
-    "source_query_id": 202,
-    "category": "interpretation",
-    "query": "Using upper-100 m density_gradient and vertical stability diagnostics together with surface chlorophyll, assess whether stronger upper-ocean stratification could confine chlorophyll near the surface in the region (123°E-127°E, 28°N-32°N) from 2018-03-01 to 2018-05-31",
-    "original_query": "Using upper-100 m density_gradient and vertical stability diagnostics together with surface chlorophyll, assess whether stronger upper-ocean stratification could confine chlorophyll near the surface in the region (123°E-127°E, 28°N-32°N) from 2018-03-01 to 2018-05-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 202,
-    "source_query_id": 203,
-    "category": "interpretation",
-    "query": "Using upper-200 m density_gradient stratification diagnostics and surface temperature anomalies, assess whether stronger density layering could help warm anomalies persist in the region (126°E-130°E, 15°N-20°N) from 2018-06-01 to 2020-08-31",
-    "original_query": "Using upper-200 m density_gradient stratification diagnostics and surface temperature anomalies, assess whether stronger density layering could help warm anomalies persist in the region (126°E-130°E, 15°N-20°N) from 2018-06-01 to 2020-08-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 203,
-    "source_query_id": 204,
-    "category": "interpretation",
-    "query": "Compare mixed-layer versus thermocline separation and the upper-200 m density-gradient profile at 123E, 35N in the region (121°E-124°E, 35°N-38°N) during summer 2018",
-    "original_query": "Compare mixed-layer versus thermocline separation and the upper-200 m density-gradient profile at 123E, 35N in the region (121°E-124°E, 35°N-38°N) during summer 2018",
-    "time_shortened": false
-  },
-  {
-    "case_id": 204,
+    "case_id": 51,
     "source_query_id": 205,
     "category": "interpretation",
+    "task_type": "ocean_horizontal_advection_attribution",
     "query": "Is the surface temperature anomaly in the region (126°E-130°E, 15°N-20°N) during June 2019 and June 2020 more consistent with horizontal advection or local tendency?",
     "original_query": "Is the surface temperature anomaly in the region (126°E-130°E, 15°N-20°N) during summers from 2018 to 2020 more consistent with horizontal advection or local tendency?",
     "time_shortened": true
   },
   {
-    "case_id": 205,
-    "source_query_id": 206,
-    "category": "interpretation",
-    "query": "Does horizontal advection organize the bottom-layer low-oxygen expansion in the region (121°E-124°E, 35°N-38°N) during summer 2018?",
-    "original_query": "Does horizontal advection organize the bottom-layer low-oxygen expansion in the region (121°E-124°E, 35°N-38°N) during summer 2018?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 206,
-    "source_query_id": 207,
-    "category": "interpretation",
-    "query": "Explain whether surface chlorophyll hotspot shifts in the region (123°E-127°E, 28°N-32°N) during springs from 2019 to 2020 are more consistent with transport than with local accumulation",
-    "original_query": "Explain whether surface chlorophyll hotspot shifts in the region (123°E-127°E, 28°N-32°N) during springs from 2018 to 2020 are more consistent with transport than with local accumulation",
-    "time_shortened": true
-  },
-  {
-    "case_id": 207,
-    "source_query_id": 208,
-    "category": "interpretation",
-    "query": "Rank local tendency versus horizontal advection for salinity anomalies in the upper 50 m of the region (113°E-117°E, 19°N-22°N) from January 1 to February 28, 2015",
-    "original_query": "Rank local tendency versus horizontal advection for salinity anomalies in the upper 50 m of the region (113°E-117°E, 19°N-22°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 208,
+    "case_id": 52,
     "source_query_id": 209,
     "category": "interpretation",
+    "task_type": "ocean_partial_budget_closure",
     "query": "Build a bottom-layer partial oxygen budget in the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020 and show how large the residual remains",
     "original_query": "Build a bottom-layer partial oxygen budget in the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020 and show how large the residual remains",
     "time_shortened": true
   },
   {
-    "case_id": 209,
-    "source_query_id": 210,
-    "category": "interpretation",
-    "query": "Compute the partial surface temperature budget in the region (126°E-130°E, 15°N-20°N) during June 2019 and June 2020 and compare the resolved terms with the residual",
-    "original_query": "Compute the partial surface temperature budget in the region (126°E-130°E, 15°N-20°N) during summers from 2018 to 2020 and compare the resolved terms with the residual",
-    "time_shortened": true
-  },
-  {
-    "case_id": 210,
-    "source_query_id": 211,
-    "category": "interpretation",
-    "query": "Can the resolved surface chlorophyll budget in the region (123°E-127°E, 28°N-32°N) during spring 2018 be closed well enough to rank mechanisms?",
-    "original_query": "Can the resolved surface chlorophyll budget in the region (123°E-127°E, 28°N-32°N) during spring 2018 be closed well enough to rank mechanisms?",
-    "time_shortened": false
-  },
-  {
-    "case_id": 211,
-    "source_query_id": 212,
-    "category": "interpretation",
-    "query": "Show the upper-50 m partial salinity budget in the region (113°E-117°E, 19°N-22°N) from January 1 to February 28, 2015 and quantify the residual uncertainty",
-    "original_query": "Show the upper-50 m partial salinity budget in the region (113°E-117°E, 19°N-22°N) from January to June 2015 and quantify the residual uncertainty",
-    "time_shortened": true
-  },
-  {
-    "case_id": 212,
+    "case_id": 53,
     "source_query_id": 213,
     "category": "interpretation",
+    "task_type": "ocean_mesoscale_organization_analysis",
     "query": "Are the surface chlorophyll hotspots in the region (123°E-127°E, 28°N-32°N) during springs from 2019 to 2020 organized more by fronts and mesoscale flow than by the background field?",
     "original_query": "Are the surface chlorophyll hotspots in the region (123°E-127°E, 28°N-32°N) during springs from 2018 to 2020 organized more by fronts and mesoscale flow than by the background field?",
     "time_shortened": true
   },
   {
-    "case_id": 213,
-    "source_query_id": 214,
-    "category": "interpretation",
-    "query": "Using detected bottom-layer hypoxia events plus event-condition contrast against front proximity, eddy influence, and tracer-gradient alignment, assess whether mesoscale structure shapes the low-oxygen boundary in the region (121°E-124°E, 35°N-38°N) from 2018-06-01 to 2018-08-31",
-    "original_query": "Using detected bottom-layer hypoxia events plus event-condition contrast against front proximity, eddy influence, and tracer-gradient alignment, assess whether mesoscale structure shapes the low-oxygen boundary in the region (121°E-124°E, 35°N-38°N) from 2018-06-01 to 2018-08-31",
-    "time_shortened": false
-  },
-  {
-    "case_id": 214,
-    "source_query_id": 215,
-    "category": "interpretation",
-    "query": "Explain whether the surface warm anomaly pattern in the region (126°E-130°E, 15°N-20°N) during summer 2018 is aligned more with fronts, eddies, or the background flow",
-    "original_query": "Explain whether the surface warm anomaly pattern in the region (126°E-130°E, 15°N-20°N) during summer 2018 is aligned more with fronts, eddies, or the background flow",
-    "time_shortened": false
-  },
-  {
-    "case_id": 215,
-    "source_query_id": 216,
-    "category": "interpretation",
-    "query": "Map where mesoscale organization is strongest for surface bloom activity in the region (113°E-117°E, 19°N-22°N) during spring 2015",
-    "original_query": "Map where mesoscale organization is strongest for surface bloom activity in the region (113°E-117°E, 19°N-22°N) during spring 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 216,
+    "case_id": 54,
     "source_query_id": 217,
     "category": "interpretation",
+    "task_type": "ocean_event_mechanism_linkage",
     "query": "What upper-200 m temperature conditions usually precede bottom-layer hypoxia events in the region (121°E-124°E, 35°N-38°N) from 2018-06-01 to 2018-08-31?",
     "original_query": "What upper-200 m temperature conditions usually precede bottom-layer hypoxia events in the region (121°E-124°E, 35°N-38°N) from 2018-06-01 to 2018-08-31?",
     "time_shortened": false
   },
   {
-    "case_id": 217,
-    "source_query_id": 218,
-    "category": "interpretation",
-    "query": "Show the lead-lag structure between surface chlorophyll and bloom days in the region (123°E-127°E, 28°N-32°N) during March 2019 and March 2020",
-    "original_query": "Show the lead-lag structure between surface chlorophyll and bloom days in the region (123°E-127°E, 28°N-32°N) during spring seasons from 2018 to 2020",
-    "time_shortened": true
-  },
-  {
-    "case_id": 218,
-    "source_query_id": 219,
-    "category": "interpretation",
-    "query": "Compare heatwave-day surface temperature conditions against the background state in the region (113°E-117°E, 19°N-22°N) during 2015",
-    "original_query": "Compare heatwave-day surface temperature conditions against the background state in the region (113°E-117°E, 19°N-22°N) during 2015",
-    "time_shortened": false
-  },
-  {
-    "case_id": 219,
-    "source_query_id": 220,
-    "category": "interpretation",
-    "query": "For bottom-layer oxygen as the driver field, first detect hypoxia events, then compute event precursor composites and event-versus-background contrast around those events in the region (118°E-121°E, 38°N-40°N) from 2015-04-01 to 2015-09-30",
-    "original_query": "For bottom-layer oxygen as the driver field, first detect hypoxia events, then compute event precursor composites and event-versus-background contrast around those events in the region (118°E-121°E, 38°N-40°N) from 2015-04-01 to 2015-09-30",
-    "time_shortened": false
-  },
-  {
-    "case_id": 220,
+    "case_id": 55,
     "source_query_id": 221,
     "category": "interpretation",
+    "task_type": "ocean_oxygen_chla_coupling",
     "query": "Diagnose whether bottom-layer oxygen and surface chlorophyll are coupled with short lags in the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020",
     "original_query": "Diagnose whether bottom-layer oxygen and surface chlorophyll are coupled with short lags in the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020",
     "time_shortened": true
   },
   {
-    "case_id": 221,
-    "source_query_id": 222,
-    "category": "interpretation",
-    "query": "Does surface chlorophyll lead bottom-layer oxygen drawdown in the region (118°E-121°E, 38°N-40°N) during June 2019 and June 2020?",
-    "original_query": "Does surface chlorophyll lead bottom-layer oxygen drawdown in the region (118°E-121°E, 38°N-40°N) during summers from 2018 to 2020?",
-    "time_shortened": true
-  },
-  {
-    "case_id": 222,
-    "source_query_id": 223,
-    "category": "interpretation",
-    "query": "Explain whether upper-50 m oxygen and surface chlorophyll vary synchronously or mostly independently in the region (123°E-127°E, 28°N-32°N) during spring 2018",
-    "original_query": "Explain whether upper-50 m oxygen and surface chlorophyll vary synchronously or mostly independently in the region (123°E-127°E, 28°N-32°N) during spring 2018",
-    "time_shortened": false
-  },
-  {
-    "case_id": 223,
-    "source_query_id": 224,
-    "category": "interpretation",
-    "query": "Diagnose oxygen-chlorophyll coupling in the upper 50 m of the region (113°E-117°E, 19°N-22°N) from January 1 to February 28, 2015",
-    "original_query": "Diagnose oxygen-chlorophyll coupling in the upper 50 m of the region (113°E-117°E, 19°N-22°N) from January to June 2015",
-    "time_shortened": true
-  },
-  {
-    "case_id": 224,
+    "case_id": 56,
     "source_query_id": 225,
     "category": "interpretation",
+    "task_type": "ocean_proxy_counterfactual_experiment",
     "query": "Run a proxy counterfactual by removing the anomaly component from surface temperature in the region (126°E-130°E, 15°N-20°N) during June 2019 and June 2020 and compare the outcome",
     "original_query": "Run a proxy counterfactual by removing the anomaly component from surface temperature in the region (126°E-130°E, 15°N-20°N) during summers from 2018 to 2020 and compare the outcome",
     "time_shortened": true
   },
   {
-    "case_id": 225,
-    "source_query_id": 226,
-    "category": "interpretation",
-    "query": "Replace the bottom-layer oxygen field with its climatology in the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020 and compare the regional response",
-    "original_query": "Replace the bottom-layer oxygen field with its climatology in the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020 and compare the regional response",
-    "time_shortened": true
-  },
-  {
-    "case_id": 226,
-    "source_query_id": 227,
-    "category": "interpretation",
-    "query": "Test whether surface bloom patterns in the region (123°E-127°E, 28°N-32°N) are sensitive to retaining only the background component during spring 2018",
-    "original_query": "Test whether surface bloom patterns in the region (123°E-127°E, 28°N-32°N) are sensitive to retaining only the background component during spring 2018",
-    "time_shortened": false
-  },
-  {
-    "case_id": 227,
-    "source_query_id": 228,
-    "category": "interpretation",
-    "query": "Run a proxy counterfactual on surface temperature in the region (113°E-117°E, 19°N-22°N) during 2015 by keeping only the mesoscale component with cutoff period 2.0 and compare the mesoscale-only field with the baseline field",
-    "original_query": "Run a proxy counterfactual on surface temperature in the region (113°E-117°E, 19°N-22°N) during 2015 by keeping only the mesoscale component with cutoff period 2.0 and compare the mesoscale-only field with the baseline field",
-    "time_shortened": false
-  },
-  {
-    "case_id": 228,
+    "case_id": 57,
     "source_query_id": 229,
     "category": "interpretation",
+    "task_type": "ocean_mechanism_ranking",
     "query": "In the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020, first compute an upper-200 m stratification-control score, a horizontal-advection score for bottom-layer oxygen, and a surface-chlorophyll versus bottom-oxygen coupling score, then rank these candidate mechanisms for low-oxygen persistence",
     "original_query": "In the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020, first compute an upper-200 m stratification-control score, a horizontal-advection score for bottom-layer oxygen, and a surface-chlorophyll versus bottom-oxygen coupling score, then rank these candidate mechanisms for low-oxygen persistence",
     "time_shortened": true
   },
   {
-    "case_id": 229,
-    "source_query_id": 230,
-    "category": "interpretation",
-    "query": "In the region (123°E-127°E, 28°N-32°N) during springs from 2019 to 2020, compute surface mesoscale-organization, flow-alignment, and bloom-coupling proxy scores, then rank the most supported mechanism for algal-bloom hotspots",
-    "original_query": "In the region (123°E-127°E, 28°N-32°N) during springs from 2018 to 2020, compute surface mesoscale-organization, flow-alignment, and bloom-coupling proxy scores, then rank the most supported mechanism for algal-bloom hotspots",
-    "time_shortened": true
-  },
-  {
-    "case_id": 230,
-    "source_query_id": 231,
-    "category": "interpretation",
-    "query": "For surface warm-anomaly persistence in the region (126°E-130°E, 15°N-20°N) during June 2019 and June 2020, run exactly these three diagnostics in order: (1) a surface temperature horizontal-advection score using temp, u, and v, (2) an upper-200 m density_gradient stratification score using temp and salt, and (3) a surface mesoscale-organization score using temperature and currents. Then rank only these three candidate mechanisms. Do not add any other diagnostics.",
-    "original_query": "For surface warm-anomaly persistence in the region (126°E-130°E, 15°N-20°N) during summers from 2018 to 2020, run exactly these three diagnostics in order: (1) a surface temperature horizontal-advection score using temp, u, and v, (2) an upper-200 m density_gradient stratification score using temp and salt, and (3) a surface mesoscale-organization score using temperature and currents. Then rank only these three candidate mechanisms. Do not add any other diagnostics.",
-    "time_shortened": true
-  },
-  {
-    "case_id": 231,
-    "source_query_id": 232,
-    "category": "interpretation",
-    "query": "In the region (118°E-121°E, 38°N-40°N) during June 2015, run exactly these three diagnostics in order for shelf low oxygen: (1) an upper-200 m density_gradient stratification score using temp and salt, (2) a bottom-layer oxygen partial-budget score using oxygen, u, and v with local tendency plus horizontal advection only, and (3) a surface-chlorophyll versus bottom-oxygen coupling score using surface chlorophyll and bottom-layer oxygen. Then rank only these three candidate mechanisms. Do not add any other diagnostics.",
-    "original_query": "In the region (118°E-121°E, 38°N-40°N) during summer 2015, run exactly these three diagnostics in order for shelf low oxygen: (1) an upper-200 m density_gradient stratification score using temp and salt, (2) a bottom-layer oxygen partial-budget score using oxygen, u, and v with local tendency plus horizontal advection only, and (3) a surface-chlorophyll versus bottom-oxygen coupling score using surface chlorophyll and bottom-layer oxygen. Then rank only these three candidate mechanisms. Do not add any other diagnostics.",
-    "time_shortened": true
-  },
-  {
-    "case_id": 232,
+    "case_id": 58,
     "source_query_id": 233,
     "category": "interpretation",
+    "task_type": "ocean_evidence_synthesis",
     "query": "For bottom-layer hypoxia in the region (121°E-124°E, 35°N-38°N) during June 2019 and June 2020, use only these three evidence branches in this order: (1) an upper-200 m density_gradient stratification score, (2) a bottom-oxygen horizontal-advection score using oxygen, u, and v, and (3) a proxy-counterfactual diagnostic for bottom oxygen with no extra evidence branches. Then separate the final claims into supported, limited, and not testable. Do not run any other diagnostics.",
     "original_query": "For bottom-layer hypoxia in the region (121°E-124°E, 35°N-38°N) during summers from 2018 to 2020, use only these three evidence branches in this order: (1) an upper-200 m density_gradient stratification score, (2) a bottom-oxygen horizontal-advection score using oxygen, u, and v, and (3) a proxy-counterfactual diagnostic for bottom oxygen with no extra evidence branches. Then separate the final claims into supported, limited, and not testable. Do not run any other diagnostics.",
     "time_shortened": true
   },
   {
-    "case_id": 233,
-    "source_query_id": 234,
-    "category": "interpretation",
-    "query": "For surface algal-bloom hotspots in the region (123°E-127°E, 28°N-32°N) during springs from 2019 to 2020, use only these four diagnostics in this order: (1) a surface mesoscale-organization score, (2) an upper-100 m density_gradient stratification score using temp and salt, (3) a surface chlorophyll horizontal-advection score using chla, u, and v, and (4) a bloom-linkage diagnostic based on detected surface bloom events. Then grade support for these candidate mechanisms only, separating supported, limited, and not testable claims. Do not add any other diagnostics.",
-    "original_query": "For surface algal-bloom hotspots in the region (123°E-127°E, 28°N-32°N) during springs from 2018 to 2020, use only these four diagnostics in this order: (1) a surface mesoscale-organization score, (2) an upper-100 m density_gradient stratification score using temp and salt, (3) a surface chlorophyll horizontal-advection score using chla, u, and v, and (4) a bloom-linkage diagnostic based on detected surface bloom events. Then grade support for these candidate mechanisms only, separating supported, limited, and not testable claims. Do not add any other diagnostics.",
-    "time_shortened": true
-  },
-  {
-    "case_id": 234,
-    "source_query_id": 235,
-    "category": "interpretation",
-    "query": "For surface warm-anomaly persistence in the region (126°E-130°E, 15°N-20°N) during June 2019 and June 2020, use exactly these three existing evidence branches only, in this order: (1) an upper-200 m density_gradient stratification score, (2) a surface horizontal-advection score using temp, u, and v, and (3) a surface mesoscale-organization score using temperature and currents. Then check whether the claim 'horizontal advection is the dominant driver' is supported, limited, or overstated. Do not generate any additional diagnostics.",
-    "original_query": "For surface warm-anomaly persistence in the region (126°E-130°E, 15°N-20°N) during summers from 2018 to 2020, use exactly these three existing evidence branches only, in this order: (1) an upper-200 m density_gradient stratification score, (2) a surface horizontal-advection score using temp, u, and v, and (3) a surface mesoscale-organization score using temperature and currents. Then check whether the claim 'horizontal advection is the dominant driver' is supported, limited, or overstated. Do not generate any additional diagnostics.",
-    "time_shortened": true
-  },
-  {
-    "case_id": 235,
-    "source_query_id": 236,
-    "category": "interpretation",
-    "query": "Assemble a graded evidence report for summer 2015 bottom-layer low-oxygen persistence in the region (118°E-121°E, 38°N-40°N) using exactly these three evidence branches only: (1) an upper-200 m stratification branch based on temperature and salinity, (2) an oxygen-chlorophyll coupling branch using bottom-layer oxygen and surface chlorophyll, and (3) a horizontal-advection branch using bottom-layer oxygen, u, and v. Then separate the final claims into supported, limited, and not testable. Do not add any other evidence branches.",
-    "original_query": "Assemble a graded evidence report for summer 2015 bottom-layer low-oxygen persistence in the region (118°E-121°E, 38°N-40°N) using exactly these three evidence branches only: (1) an upper-200 m stratification branch based on temperature and salinity, (2) an oxygen-chlorophyll coupling branch using bottom-layer oxygen and surface chlorophyll, and (3) a horizontal-advection branch using bottom-layer oxygen, u, and v. Then separate the final claims into supported, limited, and not testable. Do not add any other evidence branches.",
-    "time_shortened": false
-  },
-  {
-    "case_id": 236,
+    "case_id": 59,
     "source_query_id": 237,
     "category": "interpretation",
+    "task_type": "ocean_environment_health_assessment",
     "query": "For the region (121.5°E-123.0°E, 35.5°N-37.0°N) from 2019 to 2020, combine sea-surface temperature trend, bloom-event frequency change, bottom-oxygen trend, and stratification-strength change to produce an overall assessment of marine environmental health and grade the support strength of each evidence branch.",
     "original_query": "For the region (121.5°E-123.0°E, 35.5°N-37.0°N) from 2017 to 2020, combine sea-surface temperature trend, bloom-event frequency change, bottom-oxygen trend, and stratification-strength change to produce an overall assessment of marine environmental health and grade the support strength of each evidence branch.",
     "time_shortened": true
   },
   {
-    "case_id": 237,
-    "source_query_id": 238,
-    "category": "interpretation",
-    "query": "Has marine environmental health in the region (119.0°E-120.2°E, 38.3°N-39.3°N) gotten worse from 2019 to 2020? Use sea-surface temperature trend, bloom-event frequency change, bottom-oxygen trend, and stratification-strength change to explain the answer and identify policy and monitoring priorities.",
-    "original_query": "Has marine environmental health in the region (119.0°E-120.2°E, 38.3°N-39.3°N) gotten worse from 2017 to 2020? Use sea-surface temperature trend, bloom-event frequency change, bottom-oxygen trend, and stratification-strength change to explain the answer and identify policy and monitoring priorities.",
-    "time_shortened": true
-  },
-  {
-    "case_id": 238,
-    "source_query_id": 239,
-    "category": "interpretation",
-    "query": "Using only sea-surface temperature trend, bloom-event frequency change, and bottom-oxygen trend, assess whether marine environmental conditions deteriorated in the region (124.0°E-125.5°E, 29.0°N-30.5°N) from 2019 to 2020 and grade the support strength of each branch.",
-    "original_query": "Using only sea-surface temperature trend, bloom-event frequency change, and bottom-oxygen trend, assess whether marine environmental conditions deteriorated in the region (124.0°E-125.5°E, 29.0°N-30.5°N) from 2019 to 2020 and grade the support strength of each branch.",
-    "time_shortened": false
-  },
-  {
-    "case_id": 239,
-    "source_query_id": 240,
-    "category": "interpretation",
-    "query": "For the region (114.0°E-115.5°E, 19.5°N-20.8°N) from 2019 to 2020, use only sea-surface temperature trend, bottom-oxygen trend, and stratification-strength change to produce an overall marine environmental-health assessment. Do not use bloom frequency.",
-    "original_query": "For the region (114.0°E-115.5°E, 19.5°N-20.8°N) from 2017 to 2020, use only sea-surface temperature trend, bottom-oxygen trend, and stratification-strength change to produce an overall marine environmental-health assessment. Do not use bloom frequency.",
-    "time_shortened": true
-  },
-  {
-    "case_id": 240,
+    "case_id": 60,
     "source_query_id": null,
     "category": "water_mass_mechanism",
+    "task_type": "water_mass_identification",
     "query": "In the northern South China Sea (113–117°E, 19–22°N), identify upper-300 m water masses from temperature and salinity during June 1–15, 2019. Explain which mixing or transport mechanisms the available data can support.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 241,
+    "case_id": 61,
     "source_query_id": null,
     "category": "water_mass_mechanism",
+    "task_type": "plume_attribution",
     "query": "What explains the low-salinity surface water near the Pearl River mouth (113–116°E, 20–23°N) during June 1–15, 2019? Compare freshwater influence and current-driven transport, and state what cannot be established without river discharge data.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 242,
+    "case_id": 62,
     "source_query_id": null,
     "category": "water_mass_mechanism",
-    "query": "Compare the upper-200 m temperature–salinity structure east of Taiwan (121–125°E, 22–26°N) in January 1–15 and July 1–15, 2019. What evidence would support Kuroshio intrusion versus seasonal surface heating?",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 243,
-    "source_query_id": null,
-    "category": "water_mass_mechanism",
-    "query": "Why might bottom oxygen be low in the Bohai Sea (118–121°E, 38–40°N) during August 1–15, 2019? Examine stratification, currents, and surface chlorophyll, and separate association from causation.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 244,
-    "source_query_id": null,
-    "category": "water_mass_mechanism",
-    "query": "During June 1–15, 2019, do temperature and salinity anomalies on the East China Sea shelf (123–127°E, 28–32°N) suggest a changed water mass or local surface forcing? Show the diagnostic evidence and its limits.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 245,
-    "source_query_id": null,
-    "category": "water_mass_mechanism",
+    "task_type": "unsupported_nutrient_evidence",
     "query": "Can nitrate supply explain the chlorophyll pattern near the South China Sea shelf break (115–118°E, 18–21°N) during June 1–15, 2019? Use available variables where possible and explicitly identify any missing evidence.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 246,
+    "case_id": 63,
     "source_query_id": null,
     "category": "environmental_policy",
+    "task_type": "evidence_based_hypoxia_policy",
     "query": "Draft a monitoring and mitigation plan for summer bottom-water hypoxia in the Bohai Sea (118–121°E, 38–40°N). Use August 1–15, 2019 CMOMS evidence where useful; distinguish supported findings from policy assumptions.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 247,
+    "case_id": 64,
     "source_query_id": null,
     "category": "environmental_policy",
-    "query": "For recurring algal blooms off the Yangtze estuary (121–124°E, 29–33°N), propose a practical early-warning and response policy. Analyze March 1–15, 2019 chlorophyll and physical conditions, and explain what additional observations are needed.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 248,
-    "source_query_id": null,
-    "category": "environmental_policy",
-    "query": "A coastal authority wants to reduce marine heatwave impacts near Hong Kong (113–116°E, 20–23°N). Recommend monitoring triggers and response actions using June 1–15, 2019 temperature as an example, with uncertainty clearly stated.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 249,
-    "source_query_id": null,
-    "category": "environmental_policy",
-    "query": "What evidence should be required before restricting nutrient discharges to address low oxygen in the Bohai Sea? Explain monitoring design, causal limitations, and how the policy should be evaluated.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 250,
-    "source_query_id": null,
-    "category": "environmental_policy",
+    "task_type": "marine_protected_area_policy",
     "query": "Design a transparent decision framework for a proposed marine protected area in the northern South China Sea. Which ecological and oceanographic indicators, stakeholders, and trade-offs should officials assess?",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 251,
-    "source_query_id": null,
-    "category": "environmental_policy",
-    "query": "Compare two policy options for East China Sea coastal algal blooms: stronger nutrient controls and expanded real-time monitoring. Give a phased recommendation, measurable success criteria, and key uncertainties.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 252,
+    "case_id": 65,
     "source_query_id": null,
     "category": "general",
+    "task_type": "web_fact_lookup",
     "query": "中国海最深的地方在哪里，大约有多深？请说明你采用的‘中国海’范围并给出可靠来源。",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 253,
+    "case_id": 66,
     "source_query_id": null,
     "category": "general",
-    "query": "什么是海洋热浪？常用定义中的持续时间和温度阈值是什么？",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 254,
-    "source_query_id": null,
-    "category": "general",
+    "task_type": "direct_ocean_explanation",
     "query": "What is the difference between an eddy and an ocean front? Give a concise explanation without loading a dataset.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 255,
-    "source_query_id": null,
-    "category": "general",
-    "query": "What are the main seas bordering mainland China, and how do their typical depths differ? Cite reliable sources.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 256,
-    "source_query_id": null,
-    "category": "general",
-    "query": "为什么海水越深不一定越冷？请解释温跃层和水团的作用。",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 257,
-    "source_query_id": null,
-    "category": "general",
-    "query": "What can a temperature–salinity diagram reveal about water masses, and what can it not establish on its own?",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 258,
+    "case_id": 67,
     "source_query_id": null,
     "category": "novel_code",
+    "task_type": "custom_centroid",
     "query": "For June 1–7, 2019, calculate the daily longitude and latitude of the top-decile surface-chlorophyll centroid in 113–117°E, 19–22°N. Show its day-to-day displacement and the code used; this custom centroid need not match a named skill.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 259,
+    "case_id": 68,
     "source_query_id": null,
     "category": "novel_code",
+    "task_type": "custom_vertical_contrast",
     "query": "Define a daily vertical temperature-contrast index as the regional mean at the surface minus the regional mean at 100 m in 118–121°E, 38–40°N for January 1–15, 2019. Write the calculation, plot or tabulate the index, and interpret missing depths honestly.",
     "original_query": null,
     "time_shortened": false
   },
   {
-    "case_id": 260,
+    "case_id": 69,
     "source_query_id": null,
     "category": "novel_code",
-    "query": "In 123–125°E, 29–31°N during March 1–15, 2019, calculate a custom daily chlorophyll patchiness index: spatial standard deviation divided by spatial mean, with safe handling of zero or missing means. Report the series and code.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 261,
-    "source_query_id": null,
-    "category": "novel_code",
-    "query": "At 115°E, 20°N in June 1–20, 2019, find the first day of three consecutive days when surface temperature exceeds the 75th percentile of that 20-day series. Write ordinary Python for the run-length rule and state if no day qualifies.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 262,
-    "source_query_id": null,
-    "category": "novel_code",
-    "query": "For 118–121°E, 38–40°N during August 1–15, 2019, create a daily bottom-oxygen spatial inequality score using the Gini coefficient across valid grid cells. Implement the statistic in code and show how missing values were handled.",
-    "original_query": null,
-    "time_shortened": false
-  },
-  {
-    "case_id": 263,
-    "source_query_id": null,
-    "category": "novel_code",
+    "task_type": "custom_lag_correlation",
     "query": "At 124°E, 30°N from March 1–20, 2019, compute lagged correlations between surface chlorophyll and temperature for lags −3 through +3 days using your own short Python routine. Explain the sign convention and why correlation does not establish causation.",
     "original_query": null,
     "time_shortened": false
