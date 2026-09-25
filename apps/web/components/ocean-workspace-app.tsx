@@ -8,7 +8,6 @@ import { ChartTray } from "@/components/chart-tray";
 import {
   exportConversationReport,
   getActiveDataset,
-  isLikelyStreamTransportError,
   pingApi,
   runDirectVisualization,
   runWorkspaceQueryStream,
@@ -328,11 +327,6 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
                   ? "transport"
                   : "planning",
           detail: failureSummary,
-          failureKind: response.failure_kind,
-          recoverable: response.recoverable ?? undefined,
-          planSteps: mapPlanSteps(response),
-          stepCards,
-          timings: response.timings,
         })
       : null;
 
@@ -433,115 +427,28 @@ type FailureResponseStage = "planning" | "execution" | "synthesis" | "transport"
 
 function normalizeFailureDetail(detail?: string | null) {
   const cleaned = (detail ?? "").trim();
-  return cleaned || "The backend did not provide a more specific detail.";
-}
-
-function stepProgressSentence(planSteps: PlanStep[], stepCards: StepCard[]) {
-  const total = Math.max(planSteps.length, stepCards.length);
-  if (total === 0) {
-    return "";
-  }
-  const completed = stepCards.filter((step) => step.status === "completed").length;
-  const failedStep = stepCards.find((step) => step.status === "failed");
-  const failedLabel = failedStep?.human_label ?? failedStep?.technical_label;
-  const stoppedAt = failedLabel ? ` Stopped at: ${failedLabel}.` : "";
-  return `Workflow progress: ${completed}/${total} steps completed.${stoppedAt}`;
-}
-
-function probableCauseText(stage: FailureResponseStage, detail: string, failureKind?: QueryApiResponse["failure_kind"]) {
-  const lowered = detail.toLowerCase();
-  if (lowered.includes("missing fields") || lowered.includes("missing the fields")) {
-    return "Likely cause: the request is missing a required analysis input, so the workflow could not be completed safely.";
-  }
-  if (
-    lowered.includes("no finite values") ||
-    lowered.includes("no data") ||
-    lowered.includes("all-nan") ||
-    lowered.includes("zero-size") ||
-    lowered.includes("outside the dataset")
-  ) {
-    return "Likely cause: the selected time, region, depth, or mask produced an empty data slice.";
-  }
-  if (failureKind === "llm_format" || lowered.includes("json") || lowered.includes("contract") || lowered.includes("format")) {
-    return "Likely cause: the model output did not match the structured workflow contract the backend needs.";
-  }
-  if (stage === "planning") {
-    return "Likely causes include an unsupported combination of requested operations, ambiguous inputs, or a planner output that failed validation.";
-  }
-  if (stage === "execution") {
-    return "Likely causes include an empty data selection, an incompatible depth or mask, or a tool input that did not match the planned step.";
-  }
-  if (stage === "synthesis") {
-    return "The computation may have finished, but the final written summary could not be produced in the required format.";
-  }
-  if (stage === "transport") {
-    return "The backend may still have started work, but the live stream ended before a complete final payload arrived.";
-  }
-  return "Likely causes include unavailable data for the selected controls or an unsupported visualization request.";
-}
-
-function nextActionText(stage: FailureResponseStage, recoverable?: boolean) {
-  if (stage === "planning") {
-    return "Try restating the analysis with explicit variable, time range, region, output type, and any drawn geometry you want used.";
-  }
-  if (stage === "execution") {
-    return "Try broadening the time/region/depth selection, removing a restrictive mask, or simplifying the requested diagnostic.";
-  }
-  if (stage === "synthesis") {
-    return "The generated step results can still be inspected; rerunning the summary is usually enough.";
-  }
-  if (stage === "transport") {
-    return "Resubmit the request after keeping the current progress visible.";
-  }
-  return recoverable === false ? "This request may need a different setup." : "Adjust the controls or query and try again.";
+  if (cleaned === "deadline_exceeded") return "The analysis time limit was reached before an answer was ready.";
+  if (cleaned === "max_rounds_exceeded") return "The model-decision limit was reached before an answer was ready.";
+  return buildClientFailureMessage(cleaned || "The backend did not provide a specific reason.");
 }
 
 function buildFailureResponseCopy({
   stage,
   detail,
-  current,
-  stepLabel,
-  failureKind,
-  recoverable,
-  planSteps,
-  stepCards,
-  timings,
 }: {
   stage: FailureResponseStage;
   detail?: string | null;
-  current?: AssistantMessagePayload;
-  stepLabel?: string;
-  failureKind?: QueryApiResponse["failure_kind"];
-  recoverable?: boolean;
-  planSteps?: PlanStep[];
-  stepCards?: StepCard[];
-  timings?: Record<string, number>;
 }) {
-  const safeDetail = normalizeFailureDetail(detail);
-  const nextPlanSteps = planSteps ?? current?.planSteps ?? [];
-  const nextStepCards = stepCards ?? current?.stepCards ?? [];
-  const progress = stepProgressSentence(nextPlanSteps, nextStepCards);
-  const timingText = formatTimings(timings ?? current?.timings);
-  const stoppedAt = stepLabel ? ` Stopped at: ${stepLabel}.` : "";
   const summaryByStage: Record<FailureResponseStage, string> = {
-    planning: "I could not prepare an executable workflow for this request.",
-    execution: `I ran the workflow, but it stopped before producing a reliable final result.${stoppedAt}`,
-    synthesis: "The analysis ran, but the final written summary could not be generated reliably.",
-    transport: "The backend response stream ended before a complete final response arrived.",
-    visualization: "The quick visualization request did not complete.",
+    planning: "I could not prepare the analysis plan.",
+    execution: "I could not complete the analysis.",
+    synthesis: "I could not prepare the final answer.",
+    transport: "I could not complete the request.",
+    visualization: "I could not create the visualization.",
   };
-  const note = [
-    progress,
-    `What happened: ${safeDetail}`,
-    probableCauseText(stage, safeDetail, failureKind),
-    nextActionText(stage, recoverable),
-    timingText,
-  ]
-    .filter(Boolean)
-    .join(" ");
   return {
-    summary: summaryByStage[stage],
-    note,
+    summary: `${summaryByStage[stage]} Reason: ${normalizeFailureDetail(detail)}`,
+    note: "",
   };
 }
 
@@ -678,10 +585,6 @@ export function OceanWorkspaceApp() {
       const responseCopy = buildFailureResponseCopy({
         stage: "visualization",
         detail: message,
-        failureKind: "execution",
-        recoverable: true,
-        planSteps: [],
-        stepCards: [],
       });
       setMessages((previous) => [
         ...previous,
@@ -807,8 +710,21 @@ export function OceanWorkspaceApp() {
       },
     ]);
 
-    let receivedBackendEvent = false;
     let receivedFinalEvent = false;
+    let streamErrorDetail: string | null = null;
+    const finishTransportFailure = (detail: string) => {
+      const responseCopy = buildFailureResponseCopy({ stage: "transport", detail });
+      setMessages((previous) =>
+        updateAssistantMessage(previous, pendingAssistantId, (current) => ({
+          ...current,
+          state: "failed",
+          summary: responseCopy.summary,
+          note: responseCopy.note,
+          failureKind: "transport",
+          recoverable: true,
+        }))
+      );
+    };
 
     try {
       await runWorkspaceQueryStream(
@@ -825,8 +741,6 @@ export function OceanWorkspaceApp() {
           trust_env: false,
         },
         (streamEvent: QueryStreamEnvelope) => {
-          receivedBackendEvent = true;
-
           if (streamEvent.event === "execution_event") {
             const payload = streamEvent.payload;
             const eventType = typeof payload.type === "string" ? payload.type : "";
@@ -941,14 +855,8 @@ export function OceanWorkspaceApp() {
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
                   state: "running",
-                  summary:
-                    typeof payload.plan_summary === "string" && payload.plan_summary
-                      ? payload.plan_summary
-                      : "Plan updated after recovery. Continuing execution.",
-                  note:
-                    typeof payload.reason === "string" && payload.reason
-                      ? payload.reason
-                      : "The workflow was updated and execution is continuing.",
+                  summary: "Continuing the analysis...",
+                  note: "The workflow was updated and execution is continuing.",
                   skillsUsed: Array.isArray(payload.skills_used)
                     ? payload.skills_used.filter((item): item is string => typeof item === "string")
                     : current.skillsUsed,
@@ -960,33 +868,13 @@ export function OceanWorkspaceApp() {
             }
 
             if (eventType === "planning_failed") {
-              const detail =
-                typeof payload.error === "string"
-                  ? payload.error
-                  : "The planner failed, but the backend did not report a specific missing field or execution reason.";
               setMessages((previous) =>
-                updateAssistantMessage(previous, pendingAssistantId, (current) => {
-                  const failureKind =
-                    typeof payload.failure_kind === "string"
-                      ? payload.failure_kind as QueryApiResponse["failure_kind"]
-                      : current.failureKind;
-                  const recoverable = typeof payload.recoverable === "boolean" ? payload.recoverable : current.recoverable;
-                  const responseCopy = buildFailureResponseCopy({
-                    stage: "planning",
-                    detail,
-                    current,
-                    failureKind,
-                    recoverable,
-                  });
-                  return {
-                    ...current,
-                    state: "failed",
-                    summary: responseCopy.summary,
-                    note: responseCopy.note,
-                    failureKind,
-                    recoverable,
-                  };
-                })
+                updateAssistantMessage(previous, pendingAssistantId, (current) => ({
+                  ...current,
+                  state: "running",
+                  summary: "Continuing the analysis...",
+                  note: "",
+                }))
               );
               return;
             }
@@ -1124,65 +1012,23 @@ export function OceanWorkspaceApp() {
             if (eventType === "step_failed") {
               const stepId = String(payload.step_id ?? "");
               const stepCard = payload.step_card as StepCard | undefined;
-              const detail = typeof payload.error === "string" ? payload.error : "The analysis step could not be completed.";
-              const stepLabel =
-                typeof stepCard?.human_label === "string"
-                  ? stepCard.human_label
-                  : describeTool(typeof payload.tool === "string" ? payload.tool : null);
               setMessages((previous) =>
-                updateAssistantMessage(previous, pendingAssistantId, (current) => {
-                  const nextPlanSteps = updatePlanStepStatus(current.planSteps, stepId, "failed");
-                  const nextStepCards = stepCard ? mergeOrAppendStepCard(current.stepCards ?? [], stepCard) : current.stepCards;
-                  const failureKind =
-                    typeof payload.failure_kind === "string"
-                      ? payload.failure_kind as QueryApiResponse["failure_kind"]
-                      : current.failureKind;
-                  const recoverable = typeof payload.recoverable === "boolean" ? payload.recoverable : current.recoverable;
-                  if (recoverable !== false) {
-                    const recoveryStepCard = stepCard
-                      ? {
+                updateAssistantMessage(previous, pendingAssistantId, (current) => ({
+                    ...current,
+                    state: "running",
+                    summary: "Continuing the analysis...",
+                    note: "",
+                    planSteps: updatePlanStepStatus(current.planSteps, stepId, "active"),
+                    stepCards: stepCard
+                      ? mergeOrAppendStepCard(current.stepCards ?? [], {
                           ...stepCard,
-                          status: "running" as const,
+                          status: "running",
                           error: undefined,
                           is_expanded: false,
-                          progress: stepCard.progress ?? {
-                            phase: "reflection",
-                            message: "Checking whether this step can recover",
-                          },
-                        }
-                      : undefined;
-                    return {
-                      ...current,
-                      state: "running",
-                      summary: `Retrying: ${stepLabel}`,
-                      note: "The step reported a recoverable runtime issue, so I am retrying before showing a final answer.",
-                      planSteps: updatePlanStepStatus(current.planSteps, stepId, "active"),
-                      stepCards: recoveryStepCard
-                        ? mergeOrAppendStepCard(current.stepCards ?? [], recoveryStepCard)
-                        : current.stepCards,
-                    };
-                  }
-                  const responseCopy = buildFailureResponseCopy({
-                    stage: "execution",
-                    detail,
-                    current,
-                    stepLabel,
-                    failureKind,
-                    recoverable,
-                    planSteps: nextPlanSteps,
-                    stepCards: nextStepCards,
-                  });
-                  return {
-                    ...current,
-                    state: "failed",
-                    summary: responseCopy.summary,
-                    note: responseCopy.note,
-                    planSteps: nextPlanSteps,
-                    stepCards: nextStepCards,
-                    failureKind,
-                    recoverable,
-                  };
-                })
+                          progress: { phase: "reflection", message: "Continuing analysis" },
+                        })
+                      : current.stepCards,
+                }))
               );
               return;
             }
@@ -1242,8 +1088,6 @@ export function OceanWorkspaceApp() {
             }
 
             if (eventType === "synthesis_started" || eventType === "synthesis_retry_started") {
-              const attempt = typeof payload.attempt === "number" ? payload.attempt : null;
-              const maxAttempts = typeof payload.max_attempts === "number" ? payload.max_attempts : null;
               setMessages((previous) =>
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
@@ -1252,44 +1096,20 @@ export function OceanWorkspaceApp() {
                     current.skillsUsed?.includes("ocean_environment_health_assessment")
                       ? "Generating environmental assessment..."
                       : "Generating result synthesis...",
-                  note:
-                    attempt && maxAttempts && maxAttempts > 1
-                      ? `LLM synthesis attempt ${attempt}/${maxAttempts}.`
-                      : "LLM synthesis is running.",
+                  note: "Preparing the final answer.",
                 }))
               );
               return;
             }
 
             if (eventType === "synthesis_attempt_failed" || eventType === "synthesis_failed") {
-              const error =
-                typeof payload.error === "string"
-                  ? payload.error
-                  : "The final summary could not be generated reliably.";
-              const finalFailure = eventType === "synthesis_failed";
               setMessages((previous) =>
-                updateAssistantMessage(previous, pendingAssistantId, (current) => {
-                  const failureKind =
-                    typeof payload.failure_kind === "string"
-                      ? payload.failure_kind as QueryApiResponse["failure_kind"]
-                      : current.failureKind;
-                  const recoverable = typeof payload.recoverable === "boolean" ? payload.recoverable : current.recoverable;
-                  const responseCopy = buildFailureResponseCopy({
-                    stage: "synthesis",
-                    detail: error,
-                    current,
-                    failureKind,
-                    recoverable,
-                  });
-                  return {
-                    ...current,
-                    state: finalFailure ? "failed" : "running",
-                    summary: finalFailure ? responseCopy.summary : "Retrying result synthesis...",
-                    note: finalFailure ? responseCopy.note : "The first summary attempt did not validate, so I am regenerating it before showing a final answer.",
-                    failureKind: finalFailure ? failureKind : current.failureKind,
-                    recoverable: finalFailure ? recoverable : current.recoverable,
-                  };
-                })
+                updateAssistantMessage(previous, pendingAssistantId, (current) => ({
+                  ...current,
+                  state: "running",
+                  summary: "Preparing the final answer...",
+                  note: "",
+                }))
               );
               return;
             }
@@ -1340,37 +1160,10 @@ export function OceanWorkspaceApp() {
           }
 
           if (streamEvent.event === "error") {
-            const detail =
+            streamErrorDetail =
               typeof streamEvent.payload.detail === "string"
                 ? streamEvent.payload.detail
                 : "The live query could not return a complete result. Please try again.";
-            setMessages((previous) =>
-              updateAssistantMessage(previous, pendingAssistantId, (current) => {
-                const failureKind =
-                  typeof streamEvent.payload.failure_kind === "string"
-                    ? streamEvent.payload.failure_kind as QueryApiResponse["failure_kind"]
-                    : current.failureKind;
-                const recoverable =
-                  typeof streamEvent.payload.recoverable === "boolean"
-                    ? streamEvent.payload.recoverable
-                    : current.recoverable;
-                const responseCopy = buildFailureResponseCopy({
-                  stage: "transport",
-                  detail,
-                  current,
-                  failureKind,
-                  recoverable,
-                });
-                return {
-                  ...current,
-                  state: "failed",
-                  summary: responseCopy.summary,
-                  note: responseCopy.note,
-                  failureKind,
-                  recoverable,
-                };
-              })
-            );
             return;
           }
 
@@ -1423,78 +1216,13 @@ export function OceanWorkspaceApp() {
           }
         },
       );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown API error";
-      const publicMessage = buildClientFailureMessage(message);
-      if (receivedBackendEvent && !receivedFinalEvent && isLikelyStreamTransportError(error)) {
-        setMessages((previous) =>
-          previous.map((item) => {
-            if (item.id !== pendingAssistantId || !item.payload) {
-              return item;
-            }
-            const responseCopy = buildFailureResponseCopy({
-              stage: "transport",
-              detail: publicMessage,
-              current: item.payload,
-              failureKind: "transport",
-              recoverable: true,
-            });
-            return {
-              ...item,
-              text: responseCopy.summary,
-              payload: {
-                ...item.payload,
-                state:
-                  item.payload.state === "completed" ||
-                  item.payload.state === "clarification" ||
-                  item.payload.state === "failed"
-                    ? item.payload.state
-                    : "running",
-                summary: responseCopy.summary,
-                note: responseCopy.note,
-                failureKind: "transport",
-                recoverable: true,
-              },
-            };
-          })
-        );
-        return;
+      if (!receivedFinalEvent) {
+        finishTransportFailure(streamErrorDetail ?? "The response stream ended before a final result was received.");
       }
-
-      setMessages((previous) =>
-        previous.map((item) =>
-          item.id === pendingAssistantId
-            ? (() => {
-                const responseCopy = buildFailureResponseCopy({
-                  stage: "transport",
-                  detail: publicMessage,
-                  failureKind: "transport",
-                  recoverable: true,
-                  planSteps: [],
-                  stepCards: [],
-                });
-                return {
-                  ...item,
-                  text: responseCopy.summary,
-                  payload: {
-                    state: "failed",
-                    summary: responseCopy.summary,
-                    note: responseCopy.note,
-                    planSteps: [],
-                    resultCards: [],
-                    stepCards: [],
-                    findings: [],
-                    sourceCards: [],
-                    workspaceData: EMPTY_WORKSPACE_DATA,
-                    activeResultId: undefined,
-                    failureKind: "transport",
-                    recoverable: true,
-                  },
-                };
-              })()
-            : item
-        )
-      );
+    } catch (error) {
+      if (!receivedFinalEvent) {
+        finishTransportFailure(error instanceof Error ? error.message : "Unknown API error");
+      }
     } finally {
       setIsQuerying(false);
     }

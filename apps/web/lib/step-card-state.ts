@@ -145,6 +145,9 @@ export function formatStepProgressText(progress?: StepProgress, chinese = false)
   if (!progress) {
     return "";
   }
+  if (progress.phase === "compute_failed" || /\b(failed|failure|error|stopped)\b/i.test(progress.message ?? "")) {
+    return chinese ? "正在继续分析" : "Continuing analysis";
+  }
   const phaseLabels: Record<string, { en: string; zh: string }> = {
     resolving_sources: { en: "Resolving data source", zh: "正在定位数据源" },
     opening_source: { en: "Opening data source", zh: "正在打开数据源" },
@@ -159,7 +162,6 @@ export function formatStepProgressText(progress?: StepProgress, chinese = false)
     solving_streamfunction: { en: "Solving streamfunction", zh: "正在反演流函数" },
     applying_regional_gauge: { en: "Applying regional gauge", zh: "正在应用区域定标" },
     preparing_map_payload: { en: "Preparing map payload", zh: "正在准备地图数据" },
-    compute_failed: { en: "Compute failed", zh: "计算失败" },
     partition_started: { en: "Computing partition", zh: "正在计算分区" },
     partition_complete: { en: "Partition complete", zh: "分区完成" },
     reflection: { en: "Updating workflow", zh: "正在更新工作流" },

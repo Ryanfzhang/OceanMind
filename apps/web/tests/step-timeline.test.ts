@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { displayLooseResults, displayStepTimeline } from "../lib/step-card-state";
+import { displayLooseResults, displayStepTimeline, formatStepProgressText } from "../lib/step-card-state";
 import type { ResultCardSummary, StepCard } from "../lib/types";
 
 function step(id: string, label: string, status: StepCard["status"], attempt_id: string): StepCard {
@@ -109,4 +109,10 @@ test("a superseded step does not duplicate its result as a loose card", () => {
     headline: "Old event map", description: "", renderer: "event", metrics: [],
   };
   assert.deepEqual(displayLooseResults([card], [oldStep]), []);
+});
+
+test("an interim compute failure stays out of the visible progress text", () => {
+  assert.equal(formatStepProgressText({ phase: "compute_failed", message: "Computation failed: retrying" }), "Continuing analysis");
+  assert.equal(formatStepProgressText({ phase: "computing", message: "1 source failed" }), "Continuing analysis");
+  assert.equal(formatStepProgressText({ phase: "computing", message: "Computing 1 source" }), "Computing · Computing 1 source");
 });
