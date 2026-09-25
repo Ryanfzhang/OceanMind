@@ -163,7 +163,8 @@ def _linux_command(
     executable: Path, root: Path, data: tuple[Path, ...], worker_args: list[str],
 ) -> list[str]:
     command = [str(_BWRAP_EXEC), "--unshare-user", "--unshare-pid", "--unshare-net",
-               "--unshare-ipc", "--unshare-uts", "--die-with-parent", "--new-session"]
+               "--unshare-ipc", "--unshare-uts", "--die-with-parent", "--new-session",
+               "--tmpfs", "/tmp"]
     mounts = {Path("/usr"), _path(sys.prefix, directory=True),
               _path(sys.base_prefix, directory=True),
               _path(_PROJECT_ROOT / "packages", directory=True),
@@ -187,7 +188,7 @@ def _linux_command(
                for parent in path.parents if parent.is_symlink()}
     for path in sorted(aliases, key=lambda item: (len(item.parts), str(item))):
         command.extend(("--symlink", os.readlink(path), str(path)))
-    command.extend(("--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+    command.extend(("--dev", "/dev", "--proc", "/proc",
                     "--bind", str(root), str(root)))
     for name in ("code", "logs"):
         protected = _path(root / name, directory=True)
@@ -240,7 +241,7 @@ except OSError as error:
     symlink_write_errno = error.errno
 try:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection:
-        network_errno = connection.connect_ex(("127.0.0.1", 9))
+        network_errno = connection.connect_ex(("1.1.1.1", 53))
 except OSError as error:
     network_errno = error.errno
 try:
