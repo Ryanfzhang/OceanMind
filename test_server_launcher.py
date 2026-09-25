@@ -55,9 +55,31 @@ class LauncherTests(unittest.TestCase):
             server.prepare_frontend(str(self.root / "node"), {"PATH": ""})
             self.assertEqual(run.call_count, 2)
 
+    def test_frontend_rebuilds_when_source_changes(self):
+        web = self.root / "web"
+        page = web / "app/page.tsx"
+        page.parent.mkdir(parents=True)
+        page.write_text("export default function Page() { return null; }")
+        npm = self.root / "node_modules/npm/bin/npm-cli.js"
+        npm.parent.mkdir(parents=True)
+        npm.touch()
+        cli = web / "node_modules/next/dist/bin/next"
+        build = web / ".next/BUILD_ID"
+        def execute(command, **kwargs):
+            target = build if command[-1] == "build" else cli
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch()
+            return subprocess.CompletedProcess(command, 0)
+        with patch.object(server, "WEB", web), patch.object(server.subprocess, "run", side_effect=execute) as run:
+            server.prepare_frontend(str(self.root / "node"), {"PATH": ""})
+            page.write_text("export default function Page() { return <main />; }")
+            server.prepare_frontend(str(self.root / "node"), {"PATH": ""})
+            self.assertEqual(run.call_count, 3)
+            self.assertEqual(run.call_args.args[0][-1], "build")
+
     def test_frontend_check_does_not_install(self):
         with patch.object(server, "WEB", self.root / "web"), patch.object(server.subprocess, "run") as run:
-            with self.assertRaisesRegex(RuntimeError, "not prepared"):
+            with self.assertRaisesRegex(RuntimeError, "missing/outdated"):
                 server.prepare_frontend("node", {"PATH": ""}, check=True)
             run.assert_not_called()
 

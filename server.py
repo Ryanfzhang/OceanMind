@@ -1,5 +1,6 @@
 """Cross-platform supervisor for OceanMind's backend and frontend."""
 import argparse
+import hashlib
 import logging
 from logging.handlers import RotatingFileHandler
 import os
@@ -182,14 +183,34 @@ def prepare_nginx(args, paths):
 def prepare_frontend(node, env, dev=False, check=False):
     cli = WEB / "node_modules/next/dist/bin/next"
     build = WEB / ".next/BUILD_ID"
-    if cli.is_file() and (dev or build.is_file()):
+    dependency_files = [WEB / "package.json", WEB / "package-lock.json"]
+    source_files = [
+        *dependency_files,
+        *(WEB / name for name in ("next.config.mjs", "tsconfig.json", "next-env.d.ts")),
+        *(path for name in ("app", "components", "lib", "public")
+          for path in (WEB / name).rglob("*") if path.is_file() and not path.name.startswith(".")),
+    ]
+    def fingerprint(paths):
+        digest = hashlib.sha256()
+        for path in sorted(paths):
+            if path.is_file():
+                digest.update(str(path.relative_to(WEB)).encode("utf-8"))
+                digest.update(path.read_bytes())
+        return digest.hexdigest()
+    dependencies_hash = fingerprint(dependency_files)
+    source_hash = fingerprint(source_files)
+    dependency_stamp = STATE / "frontend-dependencies.sha256"
+    build_stamp = STATE / "frontend-build.sha256"
+    needs_install = not cli.is_file() or not dependency_stamp.is_file() or dependency_stamp.read_text() != dependencies_hash
+    needs_build = not dev and (not build.is_file() or not build_stamp.is_file()
+                               or build_stamp.read_text() != source_hash or needs_install)
+    if not needs_install and not needs_build:
         return str(cli)
     if check:
-        raise RuntimeError("Frontend is not prepared yet. Run start-server.bat once; it installs and builds automatically.")
+        raise RuntimeError("Frontend dependencies or build are missing/outdated. Run start-server.sh (or start-server.bat) to prepare them.")
     # Never change dependencies underneath an already running instance.
     with InstanceLock():
-        installed = False
-        if not cli.is_file():
+        if needs_install:
             npm = shutil.which("npm", path=env["PATH"])
             candidates = [Path(node).parent / "node_modules/npm/bin/npm-cli.js"]
             if npm:
@@ -201,16 +222,18 @@ def prepare_frontend(node, env, dev=False, check=False):
                 command = [npm]
             else:
                 raise RuntimeError("npm not found alongside Node. Install Node.js including npm in the ocean environment.")
-            print("OceanMind: installing frontend dependencies (first launch)...", flush=True)
+            print("OceanMind: installing frontend dependencies...", flush=True)
             result = subprocess.run(command + ["ci", "--include=dev"], cwd=WEB, env=env)
             if result.returncode:
                 raise RuntimeError("Frontend dependency installation failed; see npm output above.")
-            installed = True
-        if not dev and (installed or not build.is_file()):
-            print("OceanMind: building frontend (first launch)...", flush=True)
+            STATE.mkdir(exist_ok=True)
+            dependency_stamp.write_text(dependencies_hash)
+        if needs_build:
+            print("OceanMind: building frontend...", flush=True)
             result = subprocess.run([node, str(cli), "build"], cwd=WEB, env=env)
             if result.returncode:
                 raise RuntimeError("Frontend build failed; see output above.")
+            build_stamp.write_text(source_hash)
         if not cli.is_file() or (not dev and not build.is_file()):
             raise RuntimeError("Frontend setup did not produce the required files.")
     return str(cli)

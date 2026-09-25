@@ -99,7 +99,9 @@ def load_agent_model_config(project_root=None) -> AgentModelConfig:
     base_url = load_config_value("AGENT_BASE_URL", project_root) or load_config_value(
         "OPENAI_BASE_URL", project_root, AGENT_DEFAULT_BASE_URL
     )
-    model = load_config_value("AGENT_MODEL", project_root, AGENT_DEFAULT_MODEL)
+    model = (load_config_value("AGENT_MODEL", project_root)
+             or load_config_value("OPENAI_MODEL", project_root)
+             or AGENT_DEFAULT_MODEL)
     return AgentModelConfig(
         base_url=base_url.strip().rstrip("/"),
         api_key=api_key.strip(),

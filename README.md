@@ -1,4 +1,4 @@
-# OceanMind: A multi-agent AI system for ocean diagnosis
+# OceanMind: A LangGraph AI system for ocean diagnosis
 
 <p align="center">Ask ocean questions in natural language and get planned, traceable analyses of time-dependent 3D ocean data.</p>
 
@@ -8,7 +8,7 @@
 
 **Contents**
 
-- [OceanMind: A multi-agent AI system for ocean diagnosis](#oceanmind-a-multi-agent-ai-system-for-ocean-diagnosis)
+- [OceanMind: A LangGraph AI system for ocean diagnosis](#oceanmind-a-langgraph-ai-system-for-ocean-diagnosis)
   - [Architecture](#architecture)
   - [Quick Start](#quick-start)
     - [Step 1: Install dependencies](#step-1-install-dependencies)
@@ -23,13 +23,14 @@
 ## Architecture
 
 OceanMind is a natural-language workspace for analyzing time-dependent,
-three-dimensional ocean data. It combines LLM-guided planning, executable
-ocean-analysis tools, and an interactive map/chat interface to produce maps,
-time series, statistics, and evidence-based interpretations.
+three-dimensional ocean data. A LangGraph agent can answer directly, search
+the web, read skills for method guidance, and write Python that calls ocean
+analysis tools. The interactive map/chat interface displays intermediate
+results, maps, time series, statistics, and evidence-based interpretations.
 
 - Natural-language analysis over Zarr and NetCDF datasets.
-- Reusable workflows for spatial, temporal, vertical, event, and diagnostic
-  analysis.
+- Reusable tools and optional skill guidance for spatial, temporal, vertical,
+  event, and diagnostic analysis, including questions without a matching skill.
 - Transparent plans, intermediate results, and interactive visualizations.
 - A Next.js frontend backed by FastAPI and ocean-domain Python tools.
 
@@ -60,11 +61,14 @@ cp .env.example .env
 ```env
 OPENAI_API_KEY="your_api_key"
 OPENAI_BASE_URL="https://api.deepseek.com"
-OPENAI_MODEL="deepseek-v4-pro"
+OPENAI_MODEL="deepseek-flash"
 ```
 
 Set `data_path` in `configs/dataset_config.yaml` to the directory containing
-your ocean dataset. The other options in `.env.example` are optional.
+your ocean dataset and update its metadata for that dataset. Set
+`CARTO_BASEMAP_API_KEY` in `.env` for the interactive map. The agent and
+API-backed web search use `OPENAI_MODEL` by default; `AGENT_MODEL` and
+`WEB_SEARCH_MODEL` are optional overrides.
 
 ### Step 3: Start
 
@@ -80,8 +84,13 @@ Windows:
 .\start-server.bat
 ```
 
-The launcher prepares the frontend on first use and starts both services. Open
+The launcher installs frontend dependencies and rebuilds the frontend when its
+source changes, then starts both services. Open
 [http://localhost:3000](http://localhost:3000).
+
+To stop the launcher from another terminal, run `bash start-server.sh stop`
+(or `start-server.bat stop` on Windows). The default frontend host is
+`127.0.0.1`; use `--web-host 0.0.0.0` only when direct network access is intended.
 
 ## Use CMEMS for Global Ocean Diagnosis
 

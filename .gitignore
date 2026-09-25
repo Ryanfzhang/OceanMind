@@ -35,7 +35,6 @@ certs/
 
 *.md
 !README.md
-!goal.md
 !skills/
 !skills/*/
 !skills/*/SKILL.md
