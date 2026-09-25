@@ -65,8 +65,8 @@ oxygen_field = load_dataset(
 
 ```python
 eutrophication_detection = detect_eutrophication(
-    chlorophyll=chlorophyll_field.data,
-    oxygen=oxygen_field.data,
+    chlorophyll=chlorophyll_field,
+    oxygen=oxygen_field,
     chlorophyll_percentile=chlorophyll_percentile,
     oxygen_threshold=oxygen_threshold,
     min_duration_days=min_duration_days,
@@ -83,7 +83,7 @@ eutrophication_detection = detect_eutrophication(
 ```python
 eutrophic_days = compute_event_summary_map(
     event_detection=eutrophication_detection,
-    data=chlorophyll_field.data,
+    data=chlorophyll_field,
     summary_mode='event_days',
 )
 ```
@@ -93,7 +93,7 @@ eutrophic_days = compute_event_summary_map(
 ```python
 eutrophication_chlorophyll_burden = compute_event_summary_map(
     event_detection=eutrophication_detection,
-    data=chlorophyll_field.data,
+    data=chlorophyll_field,
     summary_mode='burden',
 )
 ```

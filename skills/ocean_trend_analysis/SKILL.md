@@ -41,7 +41,7 @@ raw_data = load_dataset(
 
 ```text
 combined_mask = combine_masks(
-    masks=[region_mask.data, isobath_mask.data],
+    masks=[region_mask, isobath_mask],
     operation=mask_combination_operation,
 )
 ```
@@ -50,8 +50,8 @@ combined_mask = combine_masks(
 
 ```text
 masked_data = apply_mask(
-    data=raw_data.data,
-    mask=combined_mask.data,
+    data=raw_data,
+    mask=combined_mask,
 )
 ```
 
@@ -59,7 +59,7 @@ masked_data = apply_mask(
 
 ```python
 timeseries = extract_regional_mean(
-    data=raw_data.data,
+    data=raw_data,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -80,7 +80,7 @@ trend_result = compute_trend(
 
 ```text
 field_trend_result = compute_field_trend(
-    data=raw_data.data,
+    data=raw_data,
     confidence_level=confidence_level,
 )
 ```
@@ -90,5 +90,5 @@ field_trend_result = compute_field_trend(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- For unmasked trend requests, use `raw_data.data` directly. For masked trend requests, use `masked_data.data` in the chosen trend branch.
+- For unmasked trend requests, use `raw_data` directly. For masked trend requests, use `masked_data` in the chosen trend branch.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

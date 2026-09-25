@@ -51,7 +51,7 @@ oxygen_field = load_dataset(
 
 ```python
 hypoxia_detection = detect_hypoxia(
-    oxygen=oxygen_field.data,
+    oxygen=oxygen_field,
     oxygen_threshold=oxygen_threshold,
     severe_threshold=severe_threshold,
     min_area_km2=min_area_km2,
@@ -68,7 +68,7 @@ hypoxia_detection = detect_hypoxia(
 ```python
 hypoxic_days = compute_event_summary_map(
     event_detection=hypoxia_detection,
-    data=oxygen_field.data,
+    data=oxygen_field,
     summary_mode='event_days',
 )
 ```
@@ -78,7 +78,7 @@ hypoxic_days = compute_event_summary_map(
 ```python
 hypoxia_oxygen_deficit_burden = compute_event_summary_map(
     event_detection=hypoxia_detection,
-    data=oxygen_field.data,
+    data=oxygen_field,
     summary_mode='burden',
 )
 ```

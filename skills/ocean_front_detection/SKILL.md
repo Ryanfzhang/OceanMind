@@ -41,7 +41,7 @@ front_field = load_dataset(
 
 ```python
 front_detection = detect_fronts(
-    data=front_field.data,
+    data=front_field,
     variable=variables[0],
     gradient_threshold=gradient_threshold,
     min_length_km=min_length_km,

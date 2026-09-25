@@ -49,8 +49,8 @@ salt_field = load_dataset(
 
 ```python
 ts_diagram = compute_ts_diagram(
-    temp=temp_field.data,
-    salt=salt_field.data,
+    temp=temp_field,
+    salt=salt_field,
     max_points=max_points,
     sampling=sampling,
 )
@@ -60,11 +60,11 @@ ts_diagram = compute_ts_diagram(
 
 ```text
 ts_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 
 density_field = compute_density(
-    data=ts_dataset.data,
+    data=ts_dataset,
 )
 ```
 
@@ -72,7 +72,7 @@ density_field = compute_density(
 
 ```text
 isopycnal_surface = extract_isopycnal_surface(
-    density=density_field.data,
+    density=density_field,
     target_sigma0=target_sigma0,
 )
 ```
@@ -81,8 +81,8 @@ isopycnal_surface = extract_isopycnal_surface(
 
 ```text
 isopycnal_layer_mean = compute_isopycnal_layer_mean(
-    data=temp_field.data,
-    density=density_field.data,
+    data=temp_field,
+    density=density_field,
     sigma0_upper=sigma0_upper,
     sigma0_lower=sigma0_lower,
 )

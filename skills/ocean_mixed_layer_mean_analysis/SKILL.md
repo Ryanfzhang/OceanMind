@@ -63,7 +63,7 @@ salt_data = load_dataset(
 
 ```python
 ts_dataset = assemble_dataset(
-    variables={'temp': temp_data.data, 'salt': salt_data.data},
+    variables={'temp': temp_data, 'salt': salt_data},
 )
 ```
 
@@ -71,7 +71,7 @@ ts_dataset = assemble_dataset(
 
 ```python
 density_field = compute_density(
-    data=ts_dataset.data,
+    data=ts_dataset,
 )
 ```
 
@@ -79,7 +79,7 @@ density_field = compute_density(
 
 ```python
 mld_field = identify_mixed_layer_depth(
-    density=density_field.data,
+    density=density_field,
 )
 ```
 
@@ -87,8 +87,8 @@ mld_field = identify_mixed_layer_depth(
 
 ```python
 mld_mean_field = compute_mixed_layer_mean(
-    data=var_data.data,
-    mixed_layer_depth=mld_field.data,
+    data=var_data,
+    mixed_layer_depth=mld_field,
 )
 ```
 

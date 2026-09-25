@@ -40,7 +40,7 @@ raw_field = load_dataset(
 
 ```python
 analysis_timeseries = extract_regional_mean(
-    data=raw_field.data,
+    data=raw_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -52,7 +52,7 @@ analysis_timeseries = extract_regional_mean(
 
 ```text
 analysis_timeseries = extract_point_timeseries(
-    data=raw_field.data,
+    data=raw_field,
     lon=location_lon,
     lat=location_lat,
     depth_range=depth_range,

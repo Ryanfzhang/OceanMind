@@ -51,7 +51,7 @@ temperature_field = load_dataset(
 
 ```python
 heatwave_detection = detect_heatwaves(
-    temp=temperature_field.data,
+    temp=temperature_field,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
     min_area_km2=min_area_km2,
@@ -67,7 +67,7 @@ heatwave_detection = detect_heatwaves(
 ```python
 marine_heatwave_days = compute_event_summary_map(
     event_detection=heatwave_detection,
-    data=temperature_field.data,
+    data=temperature_field,
     summary_mode='event_days',
 )
 ```
@@ -77,7 +77,7 @@ marine_heatwave_days = compute_event_summary_map(
 ```python
 marine_heatwave_burden = compute_event_summary_map(
     event_detection=heatwave_detection,
-    data=temperature_field.data,
+    data=temperature_field,
     summary_mode='burden',
 )
 ```

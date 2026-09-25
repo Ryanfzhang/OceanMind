@@ -52,7 +52,7 @@ chlorophyll_field = load_dataset(
 
 ```python
 bloom_detection = detect_algal_blooms(
-    chlorophyll=chlorophyll_field.data,
+    chlorophyll=chlorophyll_field,
     threshold=threshold,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
@@ -70,7 +70,7 @@ bloom_detection = detect_algal_blooms(
 ```python
 bloom_event_days = compute_event_summary_map(
     event_detection=bloom_detection,
-    data=chlorophyll_field.data,
+    data=chlorophyll_field,
     summary_mode='event_days',
 )
 ```
@@ -80,7 +80,7 @@ bloom_event_days = compute_event_summary_map(
 ```python
 bloom_chlorophyll_burden = compute_event_summary_map(
     event_detection=bloom_detection,
-    data=chlorophyll_field.data,
+    data=chlorophyll_field,
     summary_mode='burden',
 )
 ```

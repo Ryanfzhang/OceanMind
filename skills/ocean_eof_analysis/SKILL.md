@@ -39,7 +39,7 @@ eof_input = load_dataset(
 
 ```python
 eof_result = perform_eof_analysis(
-    data=eof_input.data,
+    data=eof_input,
     n_modes=n_modes,
     preprocessing=preprocessing,
     weight_by_latitude=weight_by_latitude,

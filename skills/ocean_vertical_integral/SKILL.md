@@ -39,7 +39,7 @@ raw_data = load_dataset(
 
 ```python
 integral_field = compute_vertical_integral(
-    data=raw_data.data,
+    data=raw_data,
     depth_range=depth_range,
 )
 ```

@@ -48,7 +48,7 @@ raw_field = load_dataset(
 
 ```python
 histogram_result = compute_histogram(
-    data=raw_field.data,
+    data=raw_field,
     n_bins=n_bins,
     bin_range=bin_range,
     normalize=normalize,

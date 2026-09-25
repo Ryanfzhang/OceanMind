@@ -43,7 +43,7 @@ raw_data = load_dataset(
 
 ```text
 combined_mask = combine_masks(
-    masks=[region_mask.data, isobath_mask.data],
+    masks=[region_mask, isobath_mask],
     operation=mask_combination_operation,
 )
 ```
@@ -52,8 +52,8 @@ combined_mask = combine_masks(
 
 ```text
 masked_data = apply_mask(
-    data=raw_data.data,
-    mask=combined_mask.data,
+    data=raw_data,
+    mask=combined_mask,
 )
 ```
 
@@ -61,7 +61,7 @@ masked_data = apply_mask(
 
 ```python
 layer_mean_field = compute_layer_mean(
-    data=raw_data.data,
+    data=raw_data,
     upper_bound_value=upper_bound_value,
     lower_bound_value=lower_bound_value,
 )
@@ -81,13 +81,13 @@ temp_field = load_dataset(
 )
 
 thermocline_depth_field = identify_thermocline_depth(
-    temp=temp_field.data,
+    temp=temp_field,
 )
 
 layer_mean_field = compute_layer_mean(
-    data=raw_data.data,
+    data=raw_data,
     upper_bound_value=0.0,
-    lower_bound_field=thermocline_depth_field.data,
+    lower_bound_field=thermocline_depth_field,
 )
 ```
 
@@ -113,25 +113,25 @@ salt_field = load_dataset(
 )
 
 thermo_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 
 mld_field = identify_mixed_layer_depth(
-    density=density_field.data,
+    density=density_field,
 )
 
 thermocline_depth_field = identify_thermocline_depth(
-    temp=temp_field.data,
+    temp=temp_field,
 )
 
 layer_mean_field = compute_layer_mean(
-    data=raw_data.data,
-    upper_bound_field=mld_field.data,
-    lower_bound_field=thermocline_depth_field.data,
+    data=raw_data,
+    upper_bound_field=mld_field,
+    lower_bound_field=thermocline_depth_field,
 )
 ```
 
@@ -139,7 +139,7 @@ layer_mean_field = compute_layer_mean(
 
 ```python
 timeseries = extract_regional_mean(
-    data=layer_mean_field.data,
+    data=layer_mean_field,
     lon_range=lon_range,
     lat_range=lat_range,
 )
@@ -149,7 +149,7 @@ timeseries = extract_regional_mean(
 
 ```python
 spatial_field_result = compute_spatial_field(
-    data=layer_mean_field.data,
+    data=layer_mean_field,
     time_range=time_range,
     time_aggregation='mean',
 )
@@ -160,10 +160,10 @@ spatial_field_result = compute_spatial_field(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- For ordinary fixed-depth layer means, use `raw_data.data` with numeric upper/lower bounds.
+- For ordinary fixed-depth layer means, use `raw_data` with numeric upper/lower bounds.
 - For "upper 50 m", set `upper_bound_value = 0.0` and `lower_bound_value = 50.0`; do not pass feature-bound fields.
-- For "above thermocline", use `upper_bound_value=0.0` and `lower_bound_field=thermocline_depth_field.data`.
-- For "between MLD and thermocline", use `upper_bound_field=mld_field.data` and `lower_bound_field=thermocline_depth_field.data`.
+- For "above thermocline", use `upper_bound_value=0.0` and `lower_bound_field=thermocline_depth_field`.
+- For "between MLD and thermocline", use `upper_bound_field=mld_field` and `lower_bound_field=thermocline_depth_field`.
 - Never use unsupported parameter names such as `lower_bound_feature`, `upper_bound_feature`, or `feature`.
 - Loader contract: never pass `depth_aggregation` to `load_dataset`; loader depth controls are `vertical_mode`, `depth_value`, and `depth_range`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

@@ -51,7 +51,7 @@ salt_data = load_dataset(
 
 ```python
 ts_dataset = assemble_dataset(
-    variables={'temp': temp_data.data, 'salt': salt_data.data},
+    variables={'temp': temp_data, 'salt': salt_data},
 )
 ```
 
@@ -59,7 +59,7 @@ ts_dataset = assemble_dataset(
 
 ```python
 density_field = compute_density(
-    data=ts_dataset.data,
+    data=ts_dataset,
 )
 ```
 
@@ -67,7 +67,7 @@ density_field = compute_density(
 
 ```python
 mixed_layer_depth = identify_mixed_layer_depth(
-    density=density_field.data,
+    density=density_field,
 )
 ```
 
@@ -75,7 +75,7 @@ mixed_layer_depth = identify_mixed_layer_depth(
 
 ```python
 thermocline_depth = identify_thermocline_depth(
-    temp=temp_data.data,
+    temp=temp_data,
 )
 ```
 
@@ -83,7 +83,7 @@ thermocline_depth = identify_thermocline_depth(
 
 ```python
 pycnocline_depth = identify_pycnocline_depth(
-    density=density_field.data,
+    density=density_field,
 )
 ```
 
@@ -91,6 +91,6 @@ pycnocline_depth = identify_pycnocline_depth(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- Compute `density_field = compute_density(data=ts_dataset.data)` before calling mixed-layer or pycnocline tools.
+- Compute `density_field = compute_density(data=ts_dataset)` before calling mixed-layer or pycnocline tools.
 - Treat `mixed_layer_depth`, `thermocline_depth`, and `pycnocline_depth` as the final artifacts; do not reassemble these diagnostic outputs with `assemble_dataset`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

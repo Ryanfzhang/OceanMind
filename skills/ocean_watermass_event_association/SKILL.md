@@ -77,7 +77,7 @@ salt_field = load_dataset(
 
 ```python
 bloom_detection = detect_algal_blooms(
-    chlorophyll=chlorophyll_field.data,
+    chlorophyll=chlorophyll_field,
     threshold=threshold,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
@@ -94,11 +94,11 @@ bloom_detection = detect_algal_blooms(
 
 ```python
 thermo_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 ```
 
@@ -106,10 +106,10 @@ density_field = compute_density(
 
 ```python
 watermass_association = compute_watermass_event_association(
-    event_field=chlorophyll_field.data,
-    temp=temp_field.data,
-    salt=salt_field.data,
-    density=density_field.data,
+    event_field=chlorophyll_field,
+    temp=temp_field,
+    salt=salt_field,
+    density=density_field,
     event_detection=bloom_detection,
     lon_range=lon_range,
     lat_range=lat_range,

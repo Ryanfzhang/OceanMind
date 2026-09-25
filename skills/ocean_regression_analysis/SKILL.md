@@ -56,7 +56,7 @@ index_field = load_dataset(
 
 ```python
 index_timeseries = extract_regional_mean(
-    data=index_field.data,
+    data=index_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -68,7 +68,7 @@ index_timeseries = extract_regional_mean(
 
 ```python
 regression_map = compute_regression_map(
-    field=field_data.data,
+    field=field_data,
     index_timeseries=index_timeseries,
     lag=lag,
     remove_seasonal_cycle=remove_seasonal_cycle,

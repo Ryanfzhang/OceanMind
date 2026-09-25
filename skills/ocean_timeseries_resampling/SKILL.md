@@ -40,7 +40,7 @@ raw_data = load_dataset(
 
 ```python
 raw_timeseries = extract_regional_mean(
-    data=raw_data.data,
+    data=raw_data,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,

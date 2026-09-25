@@ -48,7 +48,7 @@ chla_field = load_dataset(
 
 ```python
 oxygen_timeseries = extract_regional_mean(
-    data=oxygen_field.data,
+    data=oxygen_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -56,7 +56,7 @@ oxygen_timeseries = extract_regional_mean(
 )
 
 chla_timeseries = extract_regional_mean(
-    data=chla_field.data,
+    data=chla_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,

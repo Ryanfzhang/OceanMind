@@ -39,7 +39,7 @@ raw_data = load_dataset(
 
 ```python
 timeseries = extract_timeseries(
-    data=raw_data.data,
+    data=raw_data,
     lon_range=lon_range,
     lat_range=lat_range,
 )

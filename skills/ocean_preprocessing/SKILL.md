@@ -44,7 +44,7 @@ raw_field = load_dataset(
 
 ```python
 processed_field = filter_data(
-    data=raw_field.data,
+    data=raw_field,
     filter_type=filter_type,
     cutoff_period=cutoff_period,
     dimension=dimension,
@@ -57,7 +57,7 @@ processed_field = filter_data(
 
 ```text
 processed_field = interpolate_data(
-    data=raw_field.data,
+    data=raw_field,
     lon_points=lon_points,
     lat_points=lat_points,
     depth_points=depth_points,

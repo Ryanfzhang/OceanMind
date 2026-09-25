@@ -44,7 +44,7 @@ raw_data = load_dataset(
 
 ```text
 combined_mask = combine_masks(
-    masks=[region_mask.data, isobath_mask.data],
+    masks=[region_mask, isobath_mask],
     operation=mask_combination_operation,
 )
 ```
@@ -53,8 +53,8 @@ combined_mask = combine_masks(
 
 ```text
 masked_data = apply_mask(
-    data=raw_data.data,
-    mask=combined_mask.data,
+    data=raw_data,
+    mask=combined_mask,
 )
 ```
 
@@ -62,7 +62,7 @@ masked_data = apply_mask(
 
 ```python
 timeseries = extract_regional_mean(
-    data=raw_data.data,
+    data=raw_data,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -105,8 +105,8 @@ climatology_data = load_dataset(
 
 ```text
 masked_climatology_data = apply_mask(
-    data=climatology_data.data,
-    mask=combined_mask.data,
+    data=climatology_data,
+    mask=combined_mask,
 )
 ```
 
@@ -114,7 +114,7 @@ masked_climatology_data = apply_mask(
 
 ```python
 field_climatology = compute_field_climatology(
-    data=climatology_data.data,
+    data=climatology_data,
     period=period,
 )
 ```
@@ -123,8 +123,8 @@ field_climatology = compute_field_climatology(
 
 ```python
 anomaly_field = compute_field_anomaly(
-    data=raw_data.data,
-    climatology=field_climatology.data,
+    data=raw_data,
+    climatology=field_climatology,
     period=period,
 )
 ```
@@ -133,7 +133,7 @@ anomaly_field = compute_field_anomaly(
 
 ```python
 spatial_field_result = compute_spatial_field(
-    data=anomaly_field.data,
+    data=anomaly_field,
     depth_range=depth_range,
     depth_aggregation=depth_aggregation,
 )
@@ -144,7 +144,7 @@ spatial_field_result = compute_spatial_field(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- For unmasked anomaly requests, use `raw_data.data` and `climatology_data.data` directly. For masked requests, use the corresponding masked artifacts in the selected branch.
+- For unmasked anomaly requests, use `raw_data` and `climatology_data` directly. For masked requests, use the corresponding masked artifacts in the selected branch.
 - Loader contract: never pass `depth_aggregation` to `load_dataset`; loader depth controls are `vertical_mode`, `depth_value`, and `depth_range`.
 - `compute_climatology`, `compute_field_climatology`, and `compute_field_anomaly` support `period='monthly'` or `period='seasonal'` only. Put spring/summer/winter/autumn intent in `season_filter`, not in `period`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

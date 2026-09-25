@@ -48,7 +48,7 @@ salt_field = load_dataset(
 
 ```python
 thermo_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 ```
 
@@ -56,7 +56,7 @@ thermo_dataset = assemble_dataset(
 
 ```python
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 ```
 
@@ -64,7 +64,7 @@ density_field = compute_density(
 
 ```python
 n2_field = compute_brunt_vaisala_frequency(
-    density=density_field.data,
+    density=density_field,
 )
 ```
 
@@ -72,7 +72,7 @@ n2_field = compute_brunt_vaisala_frequency(
 
 ```python
 stability_timeseries = compute_area_weighted_mean(
-    data=n2_field.data,
+    data=n2_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -84,7 +84,7 @@ stability_timeseries = compute_area_weighted_mean(
 
 ```text
 density_gradient_profile = compute_density_gradient_profile(
-    density=density_field.data,
+    density=density_field,
     lon=profile_point_lon,
     lat=profile_point_lat,
     method='nearest',

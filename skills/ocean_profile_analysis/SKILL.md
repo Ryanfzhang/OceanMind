@@ -42,7 +42,7 @@ raw_profile_field = load_dataset(
 
 ```text
 trend_field = compute_field_trend(
-    data=raw_profile_field.data,
+    data=raw_profile_field,
     confidence_level=trend_confidence_level,
 )
 ```
@@ -51,7 +51,7 @@ trend_field = compute_field_trend(
 
 ```python
 vertical_profile = extract_vertical_profile(
-    data=raw_profile_field.data,
+    data=raw_profile_field,
     lon=profile_lon,
     lat=profile_lat,
     method=profile_method,
@@ -63,6 +63,6 @@ vertical_profile = extract_vertical_profile(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- Use `raw_profile_field.data` for ordinary profile requests; use `trend_field.data` only when the user explicitly asks for a trend profile.
+- Use `raw_profile_field` for ordinary profile requests; use `trend_field` only when the user explicitly asks for a trend profile.
 - Point profile loader contract: for a point profile, load a small non-zero lon/lat window around `profile_lon`/`profile_lat`; never use zero-width ranges such as `lon_range=[profile_lon, profile_lon]` or `lat_range=[profile_lat, profile_lat]`. The exact point is selected only in `extract_vertical_profile(lon=profile_lon, lat=profile_lat, ...)`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

@@ -52,21 +52,21 @@ salt_field = load_dataset(
 )
 
 thermo_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 
 stratification_field = compute_stratification_index(
-    density=density_field.data,
+    density=density_field,
     depth_range=strat_depth_range,
     method='density_gradient',
 )
 
 stratification_timeseries = extract_regional_mean(
-    data=stratification_field.data,
+    data=stratification_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=strat_depth_range,
@@ -120,11 +120,11 @@ v_field = load_dataset(
 )
 
 local_tendency_field = compute_local_tendency(
-    data=tracer_field.data,
+    data=tracer_field,
 )
 
 local_tendency_timeseries = extract_regional_mean(
-    data=local_tendency_field.data,
+    data=local_tendency_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=tracer_depth_range,
@@ -132,9 +132,9 @@ local_tendency_timeseries = extract_regional_mean(
 )
 
 horizontal_advection_timeseries = compute_tracer_horizontal_advection_timeseries(
-    data=tracer_field.data,
-    u_data=u_field.data,
-    v_data=v_field.data,
+    data=tracer_field,
+    u_data=u_field,
+    v_data=v_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=tracer_depth_range,
@@ -176,12 +176,12 @@ baseline_field = load_dataset(
 )
 
 counterfactual_field = remove_field_anomaly_component(
-    data=baseline_field.data,
+    data=baseline_field,
     period='seasonal',
 )
 
 baseline_timeseries = extract_regional_mean(
-    data=baseline_field.data,
+    data=baseline_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=counterfactual_depth_range,
@@ -189,8 +189,8 @@ baseline_timeseries = extract_regional_mean(
 )
 
 counterfactual_outcome = run_proxy_counterfactual_experiment(
-    baseline=baseline_field.data,
-    counterfactual=counterfactual_field.data,
+    baseline=baseline_field,
+    counterfactual=counterfactual_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=counterfactual_depth_range,
@@ -231,14 +231,14 @@ chlorophyll_field = load_dataset(
 )
 
 oxygen_timeseries = extract_regional_mean(
-    data=oxygen_field.data,
+    data=oxygen_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_aggregation=depth_aggregation,
 )
 
 chlorophyll_timeseries = extract_regional_mean(
-    data=chlorophyll_field.data,
+    data=chlorophyll_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=[0, 0],
@@ -289,29 +289,29 @@ v_surface = load_dataset(
 )
 
 front_proximity = compute_front_proximity_index(
-    data=chlorophyll_surface.data,
+    data=chlorophyll_surface,
     percentile=90.0,
 )
 
 eddy_influence = compute_eddy_influence_mask(
-    u_data=u_surface.data,
-    v_data=v_surface.data,
+    u_data=u_surface,
+    v_data=v_surface,
     percentile=90.0,
 )
 
 gradient_alignment = compute_tracer_gradient_alignment(
-    data=chlorophyll_surface.data,
-    u_data=u_surface.data,
-    v_data=v_surface.data,
+    data=chlorophyll_surface,
+    u_data=u_surface,
+    v_data=v_surface,
 )
 
 flow_context = compute_flow_structure_context(
-    u_data=u_surface.data,
-    v_data=v_surface.data,
+    u_data=u_surface,
+    v_data=v_surface,
 )
 
 bloom_detection = detect_algal_blooms(
-    chlorophyll=chlorophyll_surface.data,
+    chlorophyll=chlorophyll_surface,
     threshold=1.0,
     min_duration_days=5,
     min_area_km2=500,
@@ -322,7 +322,7 @@ bloom_detection = detect_algal_blooms(
 )
 
 bloom_linkage = compute_event_lead_lag_regression(
-    field=chlorophyll_surface.data,
+    field=chlorophyll_surface,
     events=bloom_detection.events,
     lon_range=lon_range,
     lat_range=lat_range,

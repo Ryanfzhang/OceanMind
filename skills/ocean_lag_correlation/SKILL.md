@@ -53,7 +53,7 @@ raw_data2 = load_dataset(
 
 ```python
 timeseries1 = extract_regional_mean(
-    data=raw_data1.data,
+    data=raw_data1,
     lon_range=lon_range,
     lat_range=lat_range,
 )
@@ -63,7 +63,7 @@ timeseries1 = extract_regional_mean(
 
 ```python
 timeseries2 = extract_regional_mean(
-    data=raw_data2.data,
+    data=raw_data2,
     lon_range=lon_range,
     lat_range=lat_range,
 )

@@ -1,8 +1,10 @@
 """A skill is optional guidance inside the existing agent loop."""
 
 import json
+import re
 
 from packages.agent_loop.graph import build_graph
+from packages.agent_loop.skills import DEFAULT_SKILLS_ROOT
 from packages.agent_loop.state import initial_state
 
 
@@ -23,6 +25,14 @@ class ScriptedModel:
         self.seen.append((messages, tools))
         response = next(self.responses)
         return response(messages, tools) if callable(response) else response
+
+
+def test_skill_examples_pass_results_without_stripping_xarray_coordinates():
+    for path in DEFAULT_SKILLS_ROOT.glob("*/SKILL.md"):
+        source = path.read_text(encoding="utf-8")
+        assert not re.search(r"\b[A-Za-z_]\w*\.data\b", source), path
+    watermass = (DEFAULT_SKILLS_ROOT / "ocean_watermass_analysis" / "SKILL.md").read_text()
+    assert "temp=temp_field" in watermass and "salt=salt_field" in watermass
 
 
 def test_index_is_metadata_and_body_arrives_only_after_read(tmp_path):

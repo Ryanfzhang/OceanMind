@@ -51,8 +51,8 @@ v_field = load_dataset(
 
 ```python
 jet_detection = detect_jets(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     speed_threshold=speed_threshold,
     percentile_threshold=percentile_threshold,
     min_length_km=min_length_km,

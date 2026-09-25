@@ -43,7 +43,7 @@ event_field = load_dataset(
     depth_range=depth_range,
 )
 event_detection = detect_heatwaves(
-    temp=event_field.data,
+    temp=event_field,
     vertical_mode=vertical_mode,
     depth_value=depth_value,
     depth_range=depth_range,
@@ -51,7 +51,7 @@ event_detection = detect_heatwaves(
 )
 event_frequency_map = compute_event_frequency_map(
     event_detection=event_detection,
-    data=event_field.data,
+    data=event_field,
     lon_range=lon_range,
     lat_range=lat_range,
     normalize=normalize,

@@ -40,7 +40,7 @@ raw_field = load_dataset(
 
 ```text
 combined_mask = combine_masks(
-    masks=[region_mask.data, isobath_mask.data],
+    masks=[region_mask, isobath_mask],
     operation=mask_combination_operation,
 )
 ```
@@ -49,8 +49,8 @@ combined_mask = combine_masks(
 
 ```text
 masked_field = apply_mask(
-    data=raw_field.data,
-    mask=combined_mask.data,
+    data=raw_field,
+    mask=combined_mask,
 )
 ```
 
@@ -58,7 +58,7 @@ masked_field = apply_mask(
 
 ```python
 inventory_timeseries = compute_area_integral(
-    data=raw_field.data,
+    data=raw_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -70,7 +70,7 @@ inventory_timeseries = compute_area_integral(
 
 ```text
 volume_inventory_timeseries = compute_volume_integral(
-    data=raw_field.data,
+    data=raw_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -82,5 +82,5 @@ volume_inventory_timeseries = compute_volume_integral(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- For unmasked inventory requests, pass `raw_field.data` directly. For masked requests, pass `masked_field.data` to the selected integral tool.
+- For unmasked inventory requests, pass `raw_field` directly. For masked requests, pass `masked_field` to the selected integral tool.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

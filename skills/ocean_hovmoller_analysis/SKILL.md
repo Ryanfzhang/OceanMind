@@ -45,8 +45,8 @@ raw_hovmoller_field = load_dataset(
 
 ```text
 masked_analysis_base = apply_mask(
-    data=raw_hovmoller_field.data,
-    mask=region_mask.data,
+    data=raw_hovmoller_field,
+    mask=region_mask,
 )
 ```
 
@@ -54,7 +54,7 @@ masked_analysis_base = apply_mask(
 
 ```python
 hovmoller_result = compute_hovmoller(
-    data=raw_hovmoller_field.data,
+    data=raw_hovmoller_field,
     diagram_type=diagram_type,
     fixed_lat=fixed_lat,
     fixed_lon=fixed_lon,
@@ -71,7 +71,7 @@ hovmoller_result = compute_hovmoller(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- For unmasked Hovmoller requests, pass `raw_hovmoller_field.data` directly. For masked requests, pass `masked_analysis_base.data`.
+- For unmasked Hovmoller requests, pass `raw_hovmoller_field` directly. For masked requests, pass `masked_analysis_base`.
 - Hovmoller axis contract: `diagram_type='time_lon'` means retain longitude on the output axis, so set `fixed_lat` or `fixed_lat_range`; `diagram_type='time_lat'` means retain latitude on the output axis, so set `fixed_lon` or `fixed_lon_range`. Mnemonic: time_lon -> fixed_lat, time_lat -> fixed_lon.
 - Fixed-depth contract: `compute_hovmoller` accepts either `depth` or `depth_range`, never both. Prefer one representation consistently: for "at 50 m", either load with `depth_range=[50, 50]` and pass only `depth_range=depth_range` to `compute_hovmoller`, or load the full vertical field and pass only `depth=50`. Do not emit `depth=...` and `depth_range=...` in the same `compute_hovmoller` call.
 - For `diagram_type='time_depth'`, use `fixed_lon`/`fixed_lat` for a point Hovmoller or `fixed_lon_range`/`fixed_lat_range` for a regional average.

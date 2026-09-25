@@ -42,7 +42,7 @@ tracer_field = load_dataset(
 
 ```python
 front_proximity = compute_front_proximity_index(
-    data=tracer_field.data,
+    data=tracer_field,
     percentile=front_percentile,
 )
 ```
@@ -51,7 +51,7 @@ front_proximity = compute_front_proximity_index(
 
 ```python
 front_proximity_map = compute_spatial_field(
-    data=front_proximity.data,
+    data=front_proximity,
     time_range=time_range,
     time_aggregation='mean',
     depth_range=depth_range,

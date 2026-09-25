@@ -56,7 +56,7 @@ index_field = load_dataset(
 
 ```python
 index_timeseries = extract_regional_mean(
-    data=index_field.data,
+    data=index_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -68,7 +68,7 @@ index_timeseries = extract_regional_mean(
 
 ```python
 composite_result = compute_composite_field(
-    field=field_data.data,
+    field=field_data,
     index_timeseries=index_timeseries,
     quantile=quantile,
     lag=lag,

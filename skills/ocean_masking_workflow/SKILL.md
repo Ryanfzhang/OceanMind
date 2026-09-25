@@ -46,7 +46,7 @@ raw_data = load_dataset(
 
 ```python
 polygon_mask = build_polygon_mask(
-    data=raw_data.data,
+    data=raw_data,
     polygon_points=mask_polygon,
 )
 ```
@@ -55,7 +55,7 @@ polygon_mask = build_polygon_mask(
 
 ```python
 isobath_mask = build_isobath_mask(
-    data=raw_data.data,
+    data=raw_data,
     isobath_depth=mask_isobath_depth,
     comparison=mask_isobath_comparison,
 )
@@ -65,7 +65,7 @@ isobath_mask = build_isobath_mask(
 
 ```text
 condition_mask = build_condition_mask(
-    fields={'field': raw_data.data},
+    fields={'field': raw_data},
     expression=mask_condition_expression,
     mask_name='condition_mask',
 )
@@ -75,7 +75,7 @@ condition_mask = build_condition_mask(
 
 ```python
 final_mask = combine_masks(
-    masks=[polygon_mask.data, isobath_mask.data],
+    masks=[polygon_mask, isobath_mask],
     operation=mask_combination_operation,
     invert=mask_invert,
 )
@@ -85,8 +85,8 @@ final_mask = combine_masks(
 
 ```python
 masked_data = apply_mask(
-    data=raw_data.data,
-    mask=final_mask.data,
+    data=raw_data,
+    mask=final_mask,
 )
 ```
 
@@ -94,7 +94,7 @@ masked_data = apply_mask(
 
 ```python
 spatial_field_result = compute_spatial_field(
-    data=masked_data.data,
+    data=masked_data,
     time_range=time_range,
     time_aggregation=time_aggregation,
     depth_range=depth_range,
@@ -106,7 +106,7 @@ spatial_field_result = compute_spatial_field(
 
 ```python
 timeseries = extract_regional_mean(
-    data=masked_data.data,
+    data=masked_data,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,

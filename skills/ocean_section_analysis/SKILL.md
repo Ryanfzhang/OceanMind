@@ -42,8 +42,8 @@ section_source = load_dataset(
 
 ```text
 masked_section_source = apply_mask(
-    data=section_source.data,
-    mask=region_mask.data,
+    data=section_source,
+    mask=region_mask,
 )
 ```
 
@@ -51,7 +51,7 @@ masked_section_source = apply_mask(
 
 ```python
 section_result = extract_transect_section(
-    data=section_source.data,
+    data=section_source,
     transect_points=transect_points,
     n_samples=n_samples,
     method=method,
@@ -77,5 +77,5 @@ section_hovmoller = compute_section_hovmoller(
 
 - Analysis masks are accepted as first-class artifacts; use `apply_mask` or mask-aware tools when a downstream tool does not consume masks directly.
 - Supported mask builders include: threshold, condition, combined.
-- For ordinary section requests, pass `section_source.data` directly. For masked section requests, pass `masked_section_source.data`.
+- For ordinary section requests, pass `section_source` directly. For masked section requests, pass `masked_section_source`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

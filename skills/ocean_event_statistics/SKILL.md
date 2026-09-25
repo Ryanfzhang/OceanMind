@@ -47,7 +47,7 @@ temperature_field = load_dataset(
 
 ```python
 event_detection = detect_heatwaves(
-    temp=temperature_field.data,
+    temp=temperature_field,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
     min_area_km2=min_area_km2,

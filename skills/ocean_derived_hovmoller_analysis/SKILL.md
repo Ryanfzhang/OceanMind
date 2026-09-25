@@ -64,7 +64,7 @@ v_field = load_dataset(
 
 ```python
 polygon_mask = build_polygon_mask(
-    data=u_field.data,
+    data=u_field,
     polygon_points=mask_polygon,
 )
 ```
@@ -73,7 +73,7 @@ polygon_mask = build_polygon_mask(
 
 ```python
 isobath_mask = build_isobath_mask(
-    data=u_field.data,
+    data=u_field,
     isobath_depth=mask_isobath_depth,
     comparison=mask_isobath_comparison,
 )
@@ -83,7 +83,7 @@ isobath_mask = build_isobath_mask(
 
 ```python
 analysis_mask = combine_masks(
-    masks=[polygon_mask.data, isobath_mask.data],
+    masks=[polygon_mask, isobath_mask],
     operation='and',
 )
 ```
@@ -94,8 +94,8 @@ For current-speed Hovmoller requests (`field_type='speed'`), always compute spee
 
 ```python
 derived_field = compute_speed_from_uv(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
 )
 ```
 
@@ -103,8 +103,8 @@ For relative-vorticity Hovmoller requests (`field_type='vorticity'`), call `comp
 
 ```python
 derived_field = compute_derived_field(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     field_type='vorticity',
 )
 ```
@@ -115,8 +115,8 @@ For strain, kinetic energy, eddy kinetic energy, divergence, or Rossby number Ho
 
 ```python
 derived_field = compute_strain_rate(
-    u_data=u_field.data,
-    v_data=v_field.data,
+    u_data=u_field,
+    v_data=v_field,
 )
 ```
 
@@ -126,8 +126,8 @@ Use `compute_kinetic_energy`, `compute_eddy_kinetic_energy`, `compute_divergence
 
 ```python
 masked_derived_field = apply_mask(
-    data=derived_field.data,
-    mask=analysis_mask.data,
+    data=derived_field,
+    mask=analysis_mask,
 )
 ```
 
@@ -135,7 +135,7 @@ masked_derived_field = apply_mask(
 
 ```python
 hovmoller_result = compute_hovmoller(
-    data=masked_derived_field.data,
+    data=masked_derived_field,
     diagram_type=diagram_type,
     fixed_lat=fixed_lat,
     fixed_lon=fixed_lon,
@@ -155,7 +155,7 @@ hovmoller_result = compute_hovmoller(
 - "Areas deeper than/equal to N m" is a bathymetry/isobath mask, not the diagram's vertical `depth_range`.
 - Loader contract: never pass `depth_aggregation` to `load_dataset`; loader depth controls are `vertical_mode`, `depth_value`, and `depth_range`.
 - Current speed contract: whenever the requested diagnostic is current speed or surface current speed, the derivation step must be `compute_speed_from_uv(u=..., v=...)`, then feed that artifact into `compute_hovmoller`.
-- Relative vorticity contract: for vorticity Hovmoller output, use `compute_derived_field(u=u_field.data, v=v_field.data, field_type='vorticity')`; never use `u_data` or `v_data` with `compute_derived_field`.
+- Relative vorticity contract: for vorticity Hovmoller output, use `compute_derived_field(u=u_field, v=v_field, field_type='vorticity')`; never use `u_data` or `v_data` with `compute_derived_field`.
 - For Hovmoller output, preserve the requested time/depth/longitude/latitude dimensions until `compute_hovmoller`; do not reduce with `compute_spatial_field`.
 - Hovmoller axis contract: `diagram_type='time_lon'` means retain longitude on the output axis, so set `fixed_lat` or `fixed_lat_range`; `diagram_type='time_lat'` means retain latitude on the output axis, so set `fixed_lon` or `fixed_lon_range`. Mnemonic: time_lon -> fixed_lat, time_lat -> fixed_lon.
 - Fixed-depth contract: `compute_hovmoller` accepts either `depth` or `depth_range`, never both. Prefer one representation consistently: for "at 50 m", either load with `depth_range=[50, 50]` and pass only `depth_range=depth_range` to `compute_hovmoller`, or load the full vertical field and pass only `depth=50`. Do not emit `depth=...` and `depth_range=...` in the same `compute_hovmoller` call.

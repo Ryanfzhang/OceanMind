@@ -51,7 +51,7 @@ event_field = load_dataset(
 
 ```python
 event_detection = detect_heatwaves(
-    temp=event_field.data,
+    temp=event_field,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
     min_area_km2=min_area_km2,
@@ -70,7 +70,7 @@ event_count_timeseries = compute_event_timeseries_count(
 )
 ```
 
-For bloom-count requests, use `detect_algal_blooms(chlorophyll=event_field.data, ...)` instead of `detect_heatwaves`. For hypoxia-count requests, use `detect_hypoxia(oxygen=event_field.data, ...)`.
+For bloom-count requests, use `detect_algal_blooms(chlorophyll=event_field, ...)` instead of `detect_heatwaves`. For hypoxia-count requests, use `detect_hypoxia(oxygen=event_field, ...)`.
 
 
 ## Notes

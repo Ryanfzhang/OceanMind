@@ -61,7 +61,7 @@ raw_p2 = load_dataset(
 
 ```python
 events_p1 = detect_heatwaves(
-    temp=raw_p1.data,
+    temp=raw_p1,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
     min_area_km2=min_area_km2,
@@ -76,7 +76,7 @@ events_p1 = detect_heatwaves(
 
 ```python
 events_p2 = detect_heatwaves(
-    temp=raw_p2.data,
+    temp=raw_p2,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
     min_area_km2=min_area_km2,

@@ -46,8 +46,8 @@ v_field = load_dataset(
 
 ```python
 eddy_tracking = track_eddies(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
 )
 ```
 

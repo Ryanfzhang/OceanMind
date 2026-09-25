@@ -55,7 +55,7 @@ driver_field = load_dataset(
 
 ```python
 event_detection = detect_hypoxia(
-    oxygen=event_field.data,
+    oxygen=event_field,
     oxygen_threshold=2.0,
     min_area_km2=0.0,
     min_duration_days=1,
@@ -72,7 +72,7 @@ event_statistics = compute_event_statistics(
 )
 
 driver_timeseries = extract_regional_mean(
-    data=driver_field.data,
+    data=driver_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=driver_depth_range,
@@ -92,7 +92,7 @@ The supported optional tools are `compute_event_precursor_composite(field=..., e
 
 Only when the user explicitly requests a grid/subregion partition, use `compute_event_condition_contrast` with `partition_mode='lon_lat_grid'`, `subregion_grid=[2, 2]`, and `subregion_weighting='area_weighted'`.
 
-For bloom events, use `detect_algal_blooms(chlorophyll=event_field.data, ...)`. For heatwave events, use `detect_heatwaves(temp=event_field.data, ...)`.
+For bloom events, use `detect_algal_blooms(chlorophyll=event_field, ...)`. For heatwave events, use `detect_heatwaves(temp=event_field, ...)`.
 
 
 ## Notes

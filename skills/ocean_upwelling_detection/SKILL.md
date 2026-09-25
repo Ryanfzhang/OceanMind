@@ -50,7 +50,7 @@ temperature_field = load_dataset(
 
 ```python
 upwelling_detection = detect_upwelling(
-    temp=temperature_field.data,
+    temp=temperature_field,
     percentile_threshold=percentile_threshold,
     min_duration_days=min_duration_days,
     min_area_km2=min_area_km2,
@@ -66,7 +66,7 @@ upwelling_detection = detect_upwelling(
 ```python
 upwelling_days = compute_event_summary_map(
     event_detection=upwelling_detection,
-    data=temperature_field.data,
+    data=temperature_field,
     summary_mode='event_days',
 )
 ```
@@ -76,7 +76,7 @@ upwelling_days = compute_event_summary_map(
 ```python
 upwelling_cold_anomaly_burden = compute_event_summary_map(
     event_detection=upwelling_detection,
-    data=temperature_field.data,
+    data=temperature_field,
     summary_mode='burden',
 )
 ```

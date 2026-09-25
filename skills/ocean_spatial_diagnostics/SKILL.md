@@ -57,8 +57,8 @@ v_field = load_dataset(
 
 ```python
 speed_field = compute_speed_from_uv(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
 )
 ```
 
@@ -66,8 +66,8 @@ For kinetic energy, eddy kinetic energy, strain, divergence, or Rossby number, c
 
 ```python
 diagnostic_field = compute_kinetic_energy(
-    u_data=u_field.data,
-    v_data=v_field.data,
+    u_data=u_field,
+    v_data=v_field,
 )
 ```
 
@@ -77,7 +77,7 @@ Use `compute_eddy_kinetic_energy(u_data=..., v_data=...)` for EKE, `compute_stra
 
 ```python
 spatial_diagnostic = compute_spatial_field(
-    data=speed_field.data,
+    data=speed_field,
     time_range=time_range,
     time_aggregation=time_aggregation,
     depth_range=depth_range,
@@ -92,5 +92,5 @@ spatial_diagnostic = compute_spatial_field(
 - Supported mask builders include: threshold, condition, combined.
 - Loader contract: never pass `depth_aggregation` to `load_dataset`; loader depth controls are `vertical_mode`, `depth_value`, and `depth_range`.
 - Do not invent additional map-specific tool names. Compute the diagnostic field first, then pass it to `compute_spatial_field`.
-- In Stage 4, use `data=diagnostic_field.data` when Stage 3 used `compute_kinetic_energy`, `compute_eddy_kinetic_energy`, `compute_strain_rate`, `compute_divergence`, or `compute_rossby_number`; use `data=speed_field.data` only for current speed.
+- In Stage 4, use `data=diagnostic_field` when Stage 3 used `compute_kinetic_energy`, `compute_eddy_kinetic_energy`, `compute_strain_rate`, `compute_divergence`, or `compute_rossby_number`; use `data=speed_field` only for current speed.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

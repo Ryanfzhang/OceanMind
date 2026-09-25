@@ -58,8 +58,8 @@ v_field = load_dataset(
 
 ```python
 spatial_diagnostic = compute_spatial_vorticity_map(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     time_range=time_range,
     time_aggregation=time_aggregation,
     depth_range=depth_range,
@@ -73,12 +73,12 @@ Choose exactly one diagnostic field tool for non-vorticity map requests, then re
 
 ```python
 diagnostic_field = compute_strain_rate(
-    u_data=u_field.data,
-    v_data=v_field.data,
+    u_data=u_field,
+    v_data=v_field,
 )
 
 spatial_diagnostic = compute_spatial_field(
-    data=diagnostic_field.data,
+    data=diagnostic_field,
     time_range=time_range,
     time_aggregation=time_aggregation,
     depth_range=depth_range,
@@ -112,26 +112,26 @@ salt_field = load_dataset(
 )
 
 thermo_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 
 n2_field = compute_derived_field(
-    density=density_field.data,
+    density=density_field,
     field_type='buoyancy_frequency',
 )
 
 richardson_field = compute_richardson_number(
-    n2_data=n2_field.data,
-    u_data=u_field.data,
-    v_data=v_field.data,
+    n2_data=n2_field,
+    u_data=u_field,
+    v_data=v_field,
 )
 
 spatial_diagnostic = compute_spatial_field(
-    data=richardson_field.data,
+    data=richardson_field,
     time_range=time_range,
     time_aggregation=time_aggregation,
     depth_range=depth_range,

@@ -50,8 +50,8 @@ v_field = load_dataset(
 
 ```python
 meander_detection = detect_meanders(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     curvature_threshold=curvature_threshold,
     percentile_threshold=percentile_threshold,
     min_length_km=min_length_km,

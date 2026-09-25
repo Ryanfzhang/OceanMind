@@ -70,11 +70,11 @@ v_field = load_dataset(
 
 ```python
 local_tendency_field = compute_local_tendency(
-    data=tracer_field.data,
+    data=tracer_field,
 )
 
 local_tendency_timeseries = compute_area_weighted_mean(
-    data=local_tendency_field.data,
+    data=local_tendency_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -82,9 +82,9 @@ local_tendency_timeseries = compute_area_weighted_mean(
 )
 
 horizontal_advection_timeseries = compute_tracer_horizontal_advection_timeseries(
-    data=tracer_field.data,
-    u_data=u_field.data,
-    v_data=v_field.data,
+    data=tracer_field,
+    u_data=u_field,
+    v_data=v_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,

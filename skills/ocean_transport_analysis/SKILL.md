@@ -59,8 +59,8 @@ v_field = load_dataset(
 
 ```python
 transport_timeseries = compute_volume_transport(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     transect_points=transect_points,
     depth_range=depth_range,
     n_samples=n_samples,
@@ -72,9 +72,9 @@ transport_timeseries = compute_volume_transport(
 
 ```text
 heat_transport_timeseries = compute_heat_transport(
-    u=u_field.data,
-    v=v_field.data,
-    temp=temp_field.data,
+    u=u_field,
+    v=v_field,
+    temp=temp_field,
     transect_points=transect_points,
     depth_range=depth_range,
     rho0=rho0,
@@ -88,9 +88,9 @@ heat_transport_timeseries = compute_heat_transport(
 
 ```text
 salt_transport_timeseries = compute_salt_transport(
-    u=u_field.data,
-    v=v_field.data,
-    salt=salt_field.data,
+    u=u_field,
+    v=v_field,
+    salt=salt_field,
     transect_points=transect_points,
     depth_range=depth_range,
     n_samples=n_samples,
@@ -102,9 +102,9 @@ salt_transport_timeseries = compute_salt_transport(
 
 ```text
 freshwater_transport_timeseries = compute_freshwater_transport(
-    u=u_field.data,
-    v=v_field.data,
-    salt=salt_field.data,
+    u=u_field,
+    v=v_field,
+    salt=salt_field,
     transect_points=transect_points,
     depth_range=depth_range,
     s_ref=s_ref,
@@ -117,8 +117,8 @@ freshwater_transport_timeseries = compute_freshwater_transport(
 
 ```python
 transport_streamfunction_map = compute_transport_streamfunction_map(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     depth_range=depth_range,
     time_aggregation=time_aggregation,
     regional_gauge=regional_gauge,
@@ -129,8 +129,8 @@ transport_streamfunction_map = compute_transport_streamfunction_map(
 
 ```python
 transport_flux_hovmoller = compute_transect_normal_flux_hovmoller(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     transect_points=transect_points,
     depth_range=depth_range,
     n_samples=n_samples,
@@ -142,13 +142,13 @@ transport_flux_hovmoller = compute_transect_normal_flux_hovmoller(
 
 ```text
 layer_transport = compute_transport_by_layer(
-    u=u_field.data,
-    v=v_field.data,
+    u=u_field,
+    v=v_field,
     transect_points=transect_points,
     layer_bounds=layer_bounds,
     transport_type=transport_type,
-    temp=temp_field.data,
-    salt=salt_field.data,
+    temp=temp_field,
+    salt=salt_field,
     rho0=rho0,
     cp=cp,
     s_ref=s_ref,

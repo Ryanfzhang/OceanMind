@@ -67,22 +67,22 @@ For current-speed diagnostics (`field_type='speed'`), always compute the speed m
 
 ```python
 derived_field = compute_speed_from_uv(
-    u=primary_field.data,
-    v=secondary_field.data,
+    u=primary_field,
+    v=secondary_field,
 )
 ```
 
-For relative vorticity, assemble `{'u': primary_field.data, 'v': secondary_field.data}` and call `compute_derived_field(dataset=source_dataset.data, field_type='vorticity')`. Use `compute_derived_field` only for supported non-speed diagnostics.
+For relative vorticity, assemble `{'u': primary_field, 'v': secondary_field}` and call `compute_derived_field(dataset=source_dataset, field_type='vorticity')`. Use `compute_derived_field` only for supported non-speed diagnostics.
 
 For one-variable gradients such as `horizontal_gradient` or `vertical_gradient`:
 
 ```python
 source_dataset = assemble_dataset(
-    variables={variables[0]: primary_field.data},
+    variables={variables[0]: primary_field},
 )
 
 derived_field = compute_derived_field(
-    dataset=source_dataset.data,
+    dataset=source_dataset,
     field_type='horizontal_gradient',
     variable=variables[0],
 )
@@ -92,15 +92,15 @@ For `buoyancy_frequency`, compute density before deriving the field:
 
 ```python
 thermo_dataset = assemble_dataset(
-    variables={'temp': primary_field.data, 'salt': secondary_field.data},
+    variables={'temp': primary_field, 'salt': secondary_field},
 )
 
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 
 derived_field = compute_derived_field(
-    density=density_field.data,
+    density=density_field,
     field_type='buoyancy_frequency',
 )
 ```
@@ -109,7 +109,7 @@ derived_field = compute_derived_field(
 
 ```python
 derived_timeseries = extract_regional_mean(
-    data=derived_field.data,
+    data=derived_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -126,5 +126,5 @@ derived_timeseries = extract_regional_mean(
 - Current speed contract: whenever the requested diagnostic is current speed or surface current speed, the derivation step must be `compute_speed_from_uv(u=..., v=...)`.
 - Emit only one Stage 3 derivation branch. Do not output all alternative snippets in the same workflow.
 - For single-variable gradients, pass `variable=variables[0]` to `compute_derived_field`; otherwise the gradient tool cannot identify the source variable.
-- For `buoyancy_frequency`, call `compute_density` first and then call `compute_derived_field(density=density_field.data, field_type='buoyancy_frequency')`.
+- For `buoyancy_frequency`, call `compute_density` first and then call `compute_derived_field(density=density_field, field_type='buoyancy_frequency')`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

@@ -53,21 +53,21 @@ salt_field = load_dataset(
 )
 
 thermo_dataset = assemble_dataset(
-    variables={'temp': temp_field.data, 'salt': salt_field.data},
+    variables={'temp': temp_field, 'salt': salt_field},
 )
 
 density_field = compute_density(
-    data=thermo_dataset.data,
+    data=thermo_dataset,
 )
 
 stratification_field = compute_stratification_index(
-    density=density_field.data,
+    density=density_field,
     depth_range=strat_depth_range,
     method='density_gradient',
 )
 
 stratification_timeseries = compute_area_weighted_mean(
-    data=stratification_field.data,
+    data=stratification_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=strat_depth_range,
@@ -119,11 +119,11 @@ v_field = load_dataset(
 )
 
 local_tendency_field = compute_local_tendency(
-    data=tracer_field.data,
+    data=tracer_field,
 )
 
 local_tendency_timeseries = compute_area_weighted_mean(
-    data=local_tendency_field.data,
+    data=local_tendency_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=tracer_depth_range,
@@ -131,9 +131,9 @@ local_tendency_timeseries = compute_area_weighted_mean(
 )
 
 horizontal_advection_timeseries = compute_tracer_horizontal_advection_timeseries(
-    data=tracer_field.data,
-    u_data=u_field.data,
-    v_data=v_field.data,
+    data=tracer_field,
+    u_data=u_field,
+    v_data=v_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=tracer_depth_range,
@@ -178,14 +178,14 @@ chlorophyll_field = load_dataset(
 )
 
 oxygen_timeseries = extract_regional_mean(
-    data=oxygen_field.data,
+    data=oxygen_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_aggregation=depth_aggregation,
 )
 
 chlorophyll_timeseries = extract_regional_mean(
-    data=chlorophyll_field.data,
+    data=chlorophyll_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=[0, 0],
@@ -236,25 +236,25 @@ v_surface = load_dataset(
 )
 
 front_proximity = compute_front_proximity_index(
-    data=mesoscale_field.data,
+    data=mesoscale_field,
     percentile=90.0,
 )
 
 eddy_influence = compute_eddy_influence_mask(
-    u_data=u_surface.data,
-    v_data=v_surface.data,
+    u_data=u_surface,
+    v_data=v_surface,
     percentile=90.0,
 )
 
 gradient_alignment = compute_tracer_gradient_alignment(
-    data=mesoscale_field.data,
-    u_data=u_surface.data,
-    v_data=v_surface.data,
+    data=mesoscale_field,
+    u_data=u_surface,
+    v_data=v_surface,
 )
 
 flow_context = compute_flow_structure_context(
-    u_data=u_surface.data,
-    v_data=v_surface.data,
+    u_data=u_surface,
+    v_data=v_surface,
 )
 
 mesoscale_score = grade_evidence_strength(

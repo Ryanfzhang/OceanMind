@@ -50,18 +50,18 @@ baseline_field = load_dataset(
 
 ```python
 counterfactual_field = remove_field_anomaly_component(
-    data=baseline_field.data,
+    data=baseline_field,
     period=period,
 )
 ```
 
-Use `replace_field_with_climatology(data=baseline_field.data, period=period)` when the request explicitly says to replace the field with climatology.
+Use `replace_field_with_climatology(data=baseline_field, period=period)` when the request explicitly says to replace the field with climatology.
 
 Use `filter_mesoscale_component` instead when the request asks to keep/remove a mesoscale component or gives a numeric cutoff period:
 
 ```python
 counterfactual_field = filter_mesoscale_component(
-    data=baseline_field.data,
+    data=baseline_field,
     cutoff_period=cutoff_period,
     component=component,
 )
@@ -71,7 +71,7 @@ counterfactual_field = filter_mesoscale_component(
 
 ```python
 baseline_timeseries = extract_regional_mean(
-    data=baseline_field.data,
+    data=baseline_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -79,7 +79,7 @@ baseline_timeseries = extract_regional_mean(
 )
 
 counterfactual_timeseries = extract_regional_mean(
-    data=counterfactual_field.data,
+    data=counterfactual_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
@@ -87,8 +87,8 @@ counterfactual_timeseries = extract_regional_mean(
 )
 
 counterfactual_outcome = run_proxy_counterfactual_experiment(
-    baseline=baseline_field.data,
-    counterfactual=counterfactual_field.data,
+    baseline=baseline_field,
+    counterfactual=counterfactual_field,
     lon_range=lon_range,
     lat_range=lat_range,
     depth_range=depth_range,
