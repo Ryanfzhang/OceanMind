@@ -359,9 +359,6 @@ function AssistantBlock({
   const displaySourceCards = sourceCards.filter((source) => !isNoUsableExternalSourcesCard(source) && hasUsableSourceUrl(source));
   const webSearchHeader = buildWebSearchHeader(displaySourceCards, chinese);
   const summaryContent = buildCompletedSummaryContent(message);
-  const attachments = (payload?.attachments ?? []).filter(
-    (item) => item.kind === "code" || item.kind === "image_png"
-  );
   const progressCounts = getProgressCounts(visiblePlanSteps, visibleSteps);
   const { completedSteps, totalSteps } = terminal
     ? { completedSteps: visibleSteps.length, totalSteps: visibleSteps.length }
@@ -449,21 +446,6 @@ function AssistantBlock({
         <div className="findings-section ui-card">
           <h4 className="findings-title ui-card-title">{chinese ? "回复" : "Response"}</h4>
           <MarkdownSummary text={payload.summary} />
-
-          {conversationId && attachments.length > 0 ? (
-            <div className="result-attachments">
-              <strong>Saved code and figures</strong>
-              {attachments.map((item) => {
-                const mode = item.kind === "code" ? "code" : item.kind === "image_png" ? "image" : "artifact";
-                const params = new URLSearchParams({ conversation: conversationId, mode, artifact: item.ref });
-                const href = `/api/results?${params.toString()}`;
-                return <a key={item.ref} href={href} target="_blank" rel="noreferrer">
-                  {item.kind === "code" ? "Python code" : "Analysis figure"}
-                  {` · ${item.ref.slice(-12)}`}
-                </a>;
-              })}
-            </div>
-          ) : null}
 
           {summaryContent.evidence.length > 0 ? (
             <div className="findings-evidence-list">

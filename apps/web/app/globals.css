@@ -3772,11 +3772,3 @@ h4 {
 .result-index-list button {
   text-align: left;
 }
-
-.result-attachments {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.8rem;
-}
