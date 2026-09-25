@@ -147,6 +147,27 @@ def test_saved_tool_maps_and_timeseries_use_interactive_renderers(tmp_path):
     assert series_card["workspaceData"]["resultSeries"][1]["value"] == 2.0
 
 
+def test_event_mask_is_projected_as_footprint_instead_of_bounding_rectangle(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Detect heatwaves")
+    artifact = session.artifacts.publish("detect_heatwaves", {
+        "event_type": "heatwave",
+        "events": [{"center": {"lon": 120.0, "lat": 20.0},
+                    "bbox": {"lon_min": 120.0, "lon_max": 121.0,
+                             "lat_min": 20.0, "lat_max": 21.0}}],
+        "coordinates": {"lon": [120.0, 121.0], "lat": [20.0, 21.0]},
+        "event_mask": np.array([[[True, False], [False, False]],
+                                [[False, False], [False, True]]]),
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    card = adapter.finalize()["result_cards"][0]
+    assert card["workspaceData"]["mapField"]["values"] == [[1.0, None], [None, 1.0]]
+    assert card["workspaceData"]["eventOverlays"][0]["shape"] == "point"
+
+
 def test_eof_modes_keep_interactive_map_and_pc_series(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()

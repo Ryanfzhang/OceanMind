@@ -153,6 +153,43 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
                        [float(y.max()), float(x.max())]]}
 
 
+def _event_mask_payload(value: dict, root: Any, name: str) -> dict | None:
+    """Show the occupied cells across the saved event mask, not its bounding box."""
+    import numpy as np
+
+    coordinates = value.get("coordinates")
+    if not isinstance(coordinates, dict) or value.get("event_mask") is None:
+        return None
+    lon, lat = coordinates.get("lon"), coordinates.get("lat")
+    if not isinstance(lon, list) or not isinstance(lat, list) or len(lon) < 2 or len(lat) < 2:
+        return None
+    x, y = np.asarray(lon, dtype=float), np.asarray(lat, dtype=float)
+    if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y))):
+        return None
+    mask = np.asarray(_preview_values(value["event_mask"], root))
+    if mask.ndim < 2 or mask.shape[-2:] != (len(lat), len(lon)):
+        return None
+    row_step = max(1, math.ceil(len(lat) / PREVIEW_GRID_SIDE))
+    col_step = max(1, math.ceil(len(lon) / PREVIEW_GRID_SIDE))
+    rows = np.arange(0, len(lat), row_step)
+    cols = np.arange(0, len(lon), col_step)
+    occupied = np.zeros((len(rows), len(cols)), dtype=bool)
+    for field in mask.reshape((-1, len(lat), len(lon))):
+        hits = field if field.dtype == np.bool_ else np.isfinite(field) & (field != 0)
+        occupied |= np.logical_or.reduceat(
+            np.logical_or.reduceat(hits, rows, axis=0), cols, axis=1)
+    if not np.any(occupied):
+        return None
+    return {
+        "lon": x[cols].tolist(), "lat": y[rows].tolist(),
+        "values": [[1.0 if hit else None for hit in row] for row in occupied],
+        "label": f"{name.replace('_', ' ').title()} footprint (any detected day)",
+        "variable": "event_mask", "units": "detected cells",
+        "bounds": [[float(y.min()), float(x.min())], [float(y.max()), float(x.max())]],
+        "discreteLegend": [{"value": 1, "label": "Detected event footprint", "color": "#dc2626"}],
+    }
+
+
 def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
     import numpy as np
 
@@ -353,7 +390,7 @@ def _current_unit(value: Any) -> str | None:
 
 
 def _overlay(event: dict, artifact_id: str, number: int, kind: str,
-             when: Any, depth: Any) -> dict | None:
+             when: Any, depth: Any, *, has_event_mask: bool = False) -> dict | None:
     center = event.get("center") or event.get("centroid")
     if not isinstance(center, dict):
         center = event
@@ -392,7 +429,7 @@ def _overlay(event: dict, artifact_id: str, number: int, kind: str,
                   and math.isfinite(point[key]) for key in ("lon", "lat"))]
         if len(points) >= 2:
             overlay.update(shape="polyline", path=points)
-    if "shape" not in overlay and isinstance(bbox, dict):
+    if "shape" not in overlay and not has_event_mask and isinstance(bbox, dict):
         edges = [bbox.get(key) for key in ("lon_min", "lon_max", "lat_min", "lat_max")]
         if all(isinstance(v, (int, float)) and math.isfinite(v) for v in edges):
             overlay.update(shape="rectangle", bounds={
@@ -605,13 +642,17 @@ class ProgressAdapter:
                         event_type = str(value.get("event_type") or
                                          ("eddy" if name == "detect_eddies" else
                                           name.removeprefix("detect_").rstrip("s")) or "event")
+                        mask_field = _event_mask_payload(value, self.session.root, event_type)
                         overlays = [overlay for i, item in enumerate(events, 1)
                                     if isinstance(item, dict)
                                     if (overlay := _overlay(item, artifact_id, i, event_type,
-                                                            when, depth))]
+                                                            when, depth,
+                                                            has_event_mask=mask_field is not None))]
                         workspace = {"eventOverlays": overlays}
+                        if mask_field:
+                            workspace["mapField"] = mask_field
                         coordinates = value.get("coordinates")
-                        if isinstance(coordinates, dict):
+                        if isinstance(coordinates, dict) and "mapField" not in workspace:
                             for field_name in ("ow_field", "gradient_field", "vorticity_field"):
                                 if field_name not in value:
                                     continue

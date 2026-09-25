@@ -19,7 +19,7 @@ import { renderDockPanel, renderInlineChart } from "@/components/renderers";
 import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
-import { formatStepProgressText, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
+import { displayLooseResults, displayStepTimeline, formatStepProgressText, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
 import { normalizeWorkspaceData } from "@/lib/workspace-results";
 
 type QuerySubmitOptions = {
@@ -56,10 +56,9 @@ function statusIcon(status: StepCard["status"]) {
   switch (status) {
     case "completed":
       return "✓";
-    case "failed":
-      return "!";
     case "pending":
       return "○";
+    case "failed":
     case "running":
     default:
       return "⠿";
@@ -264,21 +263,22 @@ function StepCardBlock({
   preferredLanguage?: "en";
 }) {
   const chinese = false;
-  const canExpand = step.status !== "running" && step.status !== "pending" && (step.results.length > 0 || Boolean(step.error));
+  const canExpand = step.status !== "running" && step.status !== "pending" && step.results.length > 0;
   const showFallbackInterpretation = shouldShowStepFallbackInterpretation(step);
   const progressPercent = stepProgressPercent(step);
   const progressText = stepProgressText(step, chinese);
   const showProgress = shouldShowStepProgress(step, progressPercent);
+  const displayStatus = step.status === "failed" && step.results.length > 0 ? "completed" : step.status === "failed" ? "running" : step.status;
 
   return (
-    <div className={`step-card status-${step.status} ${step.is_expanded ? "is-expanded" : ""}`}>
+    <div className={`step-card status-${displayStatus} ${step.is_expanded ? "is-expanded" : ""}`}>
       <button
         className="step-card-header"
         onClick={() => canExpand && onToggleStepCard?.(messageId, step.step_id)}
         type="button"
       >
         <div className="step-card-heading">
-          <span className="step-card-icon">{statusIcon(step.status)}</span>
+          <span className="step-card-icon">{statusIcon(displayStatus)}</span>
           <div>
             <strong>{step.human_label}</strong>
             <p>{step.technical_label}</p>
@@ -301,13 +301,6 @@ function StepCardBlock({
 
       {step.is_expanded ? (
         <div className="step-card-body">
-          {step.error ? (
-            <div className="error-card">
-              <strong>{chinese ? "步骤失败" : "Step failed"}</strong>
-              <p>{step.error}</p>
-            </div>
-          ) : null}
-
           {step.results.map((card) => (
             <StepResultContent
               key={card.id}
@@ -356,53 +349,12 @@ function AssistantBlock({
   const chinese = false;
   const stepCards = payload?.stepCards ?? [];
   const resultCards = payload?.resultCards ?? [];
-  const attempts = new Map<string, number>();
-  for (const step of stepCards) {
-    attempts.set(step.attempt_id ?? "run", step.attempt_index ?? attempts.size);
-  }
-  for (const card of resultCards) {
-    attempts.set(card.attemptId ?? "run", card.attemptIndex ?? attempts.size);
-  }
-  const attemptIds = [...attempts].sort((left, right) => left[1] - right[1]).map(([id]) => id);
-  const currentAttempt = attemptIds.at(-1);
-  const currentSteps = stepCards.filter((step) => (step.attempt_id ?? "run") === currentAttempt);
-  const renderAttempt = (attemptId: string) => {
-    const steps = stepCards.filter((step) => (step.attempt_id ?? "run") === attemptId);
-    const stepIds = new Set(steps.map((step) => step.step_id));
-    const looseResults = resultCards.filter((card) =>
-      (card.attemptId ?? "run") === attemptId && (!card.ownerStepId || !stepIds.has(card.ownerStepId)));
-    return (
-      <>
-        {steps.map((step) => (
-          <StepCardBlock
-            key={step.step_id}
-            conversationId={conversationId}
-            messageId={message.id}
-            onOpenDetail={onOpenDetail}
-            onPromoteMapField={onPromoteMapField}
-            onResultAction={onResultAction}
-            onToggleStepCard={onToggleStepCard}
-            preferredLanguage={payload?.preferredLanguage}
-            step={step}
-          />
-        ))}
-        {looseResults.map((card) => (
-          <StepResultContent
-            key={card.id}
-            card={card}
-            conversationId={conversationId}
-            onOpenDetail={onOpenDetail}
-            onPromoteMapField={onPromoteMapField}
-            onResultAction={onResultAction}
-            preferredLanguage={payload?.preferredLanguage}
-          />
-        ))}
-      </>
-    );
-  };
+  const terminal = payload?.state === "completed" || payload?.state === "failed";
+  const visibleSteps = displayStepTimeline(stepCards, terminal);
+  const looseResults = displayLooseResults(resultCards, stepCards, terminal);
   const planSteps = payload?.planSteps ?? [];
-  const currentStepIds = new Set(currentSteps.map((step) => step.step_id));
-  const currentPlanSteps = planSteps.filter((step) => currentStepIds.has(step.id));
+  const visibleStepIds = new Set(visibleSteps.map((step) => step.step_id));
+  const visiblePlanSteps = planSteps.filter((step) => visibleStepIds.has(step.id));
   const sourceCards = payload?.sourceCards ?? [];
   const displaySourceCards = sourceCards.filter((source) => !isNoUsableExternalSourcesCard(source) && hasUsableSourceUrl(source));
   const webSearchHeader = buildWebSearchHeader(displaySourceCards, chinese);
@@ -410,17 +362,12 @@ function AssistantBlock({
   const attachments = (payload?.attachments ?? []).filter(
     (item) => item.kind === "code" || item.kind === "image_png"
   );
-  const { completedSteps, totalSteps } = getProgressCounts(currentPlanSteps, currentSteps);
+  const { completedSteps, totalSteps } = getProgressCounts(visiblePlanSteps, visibleSteps);
   const progressLabel = totalSteps > 0 ? `[${completedSteps}/${totalSteps}]` : "";
   const showExecutionProgress = shouldShowExecutionProgress(payload);
-  const failedNote =
-    payload?.state === "failed" && payload.note?.trim() && payload.note.trim() !== payload.summary?.trim()
-      ? payload.note
-      : null;
-
   return (
     <div className="analysis-block">
-      {showExecutionProgress || attemptIds.length > 0 ? (
+      {showExecutionProgress || visibleSteps.length > 0 || looseResults.length > 0 ? (
         <section className="workflow-card ui-card">
           <div className="workflow-card-header">
             <div>
@@ -433,7 +380,7 @@ function AssistantBlock({
                 : payload?.state === "running" || payload?.state === "planning"
                   ? "Running"
                   : payload?.state === "failed"
-                    ? "Stopped"
+                    ? "Finished"
                     : "Pending"}
             </span>
           </div>
@@ -444,17 +391,17 @@ function AssistantBlock({
                 <span className="progress-spinner">{assistantProgressIconState(payload)}</span>
                 <span>{payload?.summary ?? message.text}</span>
                 <span>{progressLabel}</span>
-                {currentPlanSteps.length > 0 ? (
+                {visiblePlanSteps.length > 0 ? (
                   <button className="progress-expand" onClick={() => setPlanExpanded((current) => !current)} type="button">
                     {planExpanded ? (chinese ? "收起 ▴" : "Collapse ▴") : (chinese ? "展开 ▾" : "Expand ▾")}
                   </button>
                 ) : null}
               </div>
 
-              {planExpanded && currentPlanSteps.length > 0 ? (
+              {planExpanded && visiblePlanSteps.length > 0 ? (
                 <div className="plan-steps-list">
-                  {currentPlanSteps.map((step, index) => (
-                    <div key={step.id} className={`plan-step-item status-${step.status}`}>
+                  {visiblePlanSteps.map((step, index) => (
+                    <div key={step.id} className="plan-step-item">
                       <span className="step-icon">{index + 1}.</span>
                       <span>{step.humanLabel ?? step.tool}</span>
                     </div>
@@ -464,20 +411,31 @@ function AssistantBlock({
             </div>
           ) : null}
 
-          {attemptIds.length > 0 ? (
+          {visibleSteps.length > 0 || looseResults.length > 0 ? (
             <div className="step-card-timeline">
-              {attemptIds.map((attemptId, index) => (
-                attemptId === currentAttempt ? (
-                  <section className="analysis-attempt" key={attemptId}>
-                    {attemptIds.length > 1 ? <h5>Attempt {index + 1} · current</h5> : null}
-                    {renderAttempt(attemptId)}
-                  </section>
-                ) : (
-                  <details className="analysis-attempt is-previous" key={attemptId}>
-                    <summary>Attempt {index + 1} · previous results</summary>
-                    {renderAttempt(attemptId)}
-                  </details>
-                )
+              {visibleSteps.map((step) => (
+                <StepCardBlock
+                  key={step.step_id}
+                  conversationId={conversationId}
+                  messageId={message.id}
+                  onOpenDetail={onOpenDetail}
+                  onPromoteMapField={onPromoteMapField}
+                  onResultAction={onResultAction}
+                  onToggleStepCard={onToggleStepCard}
+                  preferredLanguage={payload?.preferredLanguage}
+                  step={step}
+                />
+              ))}
+              {looseResults.map((card) => (
+                <StepResultContent
+                  key={card.id}
+                  card={card}
+                  conversationId={conversationId}
+                  onOpenDetail={onOpenDetail}
+                  onPromoteMapField={onPromoteMapField}
+                  onResultAction={onResultAction}
+                  preferredLanguage={payload?.preferredLanguage}
+                />
               ))}
             </div>
           ) : null}
@@ -577,7 +535,6 @@ function AssistantBlock({
         <div className="failure-response-card ui-card">
           <strong className="ui-card-title">{chinese ? "回复" : "Response"}</strong>
           <p className="ui-card-body">{payload.summary}</p>
-          {failedNote ? <p className="ui-card-body">{failedNote}</p> : null}
         </div>
       ) : null}
     </div>
