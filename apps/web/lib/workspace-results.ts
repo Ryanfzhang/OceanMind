@@ -109,7 +109,7 @@ export function hydrateResultCard(
 ): ResultCardSummary {
   const snakeCard = card as ResultCardSummary & SnakeCardFields;
   const normalizedWorkspace =
-    card.workspaceData ??
+    (card.workspaceData ? normalizeWorkspaceData(card.workspaceData) : undefined) ??
     (snakeCard.workspace_data ? normalizeWorkspaceData(snakeCard.workspace_data) : undefined) ??
     workspaceDataByResult[card.id];
 

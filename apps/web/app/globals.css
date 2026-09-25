@@ -2884,6 +2884,13 @@ h4 {
   max-width: 480px;
 }
 
+.result-inline-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
 .result-inline-chart.is-wide {
   max-width: none;
 }

@@ -86,7 +86,7 @@ export function mergeStepCardLists(existingCards: StepCard[], incomingCards: Ste
 }
 
 export function resolveMapResult(stepCard: StepCard): ResultCardSummary | null {
-  return stepCard.results.find((result) => result.surface === "map") ?? null;
+  return [...stepCard.results].reverse().find((result) => result.surface === "map") ?? null;
 }
 
 export function getProgressCounts(planSteps: PlanStep[], stepCards: StepCard[]) {

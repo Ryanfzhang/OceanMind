@@ -18,7 +18,7 @@ import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
 import { formatStepProgressText, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
-import { ResultIndexBrowser } from "@/components/result-index-browser";
+import { normalizeWorkspaceData } from "@/lib/workspace-results";
 
 type QuerySubmitOptions = {
   continuePending?: boolean;
@@ -307,6 +307,7 @@ function shouldShowStepProgress(step: StepCard, progressPercent: number | null) 
 
 function StepResultContent({
   card,
+  conversationId,
   onOpenDetail,
   onPromoteMapField,
   onResultAction,
@@ -314,6 +315,7 @@ function StepResultContent({
   preferredLanguage,
 }: {
   card: ResultCardSummary;
+  conversationId?: string | null;
   onOpenDetail?: (card: ResultCardSummary, data: WorkspaceData) => void;
   onPromoteMapField?: (card: ResultCardSummary, data: WorkspaceData, field: MapFieldData) => void;
   onResultAction?: (card: ResultCardSummary, data: WorkspaceData, actionId: string) => void;
@@ -321,14 +323,17 @@ function StepResultContent({
   preferredLanguage?: "en";
 }) {
   const chinese = false;
-  const workspaceData = card.workspaceData as WorkspaceData | undefined;
+  const imageUrl = conversationId && card.type === "image_png"
+    ? `/api/results?${new URLSearchParams({ conversation: conversationId, mode: "image", artifact: card.id })}`
+    : null;
+  const workspaceData = card.workspaceData ? normalizeWorkspaceData(card.workspaceData) : undefined;
   const inlineChart =
     workspaceData && !showFullVisualization
       ? renderInlineChart(card, workspaceData, {
           onPromoteMapField: (field) => onPromoteMapField?.(card, workspaceData, field),
         })
       : null;
-  const usesInlineMapPreview = card.surface === "map" && Boolean(workspaceData?.mapField);
+  const usesInlineMapPreview = card.surface === "map" && card.renderer === "summary" && Boolean(workspaceData?.mapField);
   const hasLoadedMapPayload = Boolean(workspaceData?.mapField || workspaceData?.eventOverlays?.length);
   const usesWideInlineChart = card.renderer === "hovmoller" || card.renderer === "eof";
   const fullVisualization =
@@ -352,6 +357,7 @@ function StepResultContent({
         <h4>{card.title}</h4>
         {card.surface === "map" && hasLoadedMapPayload ? <span className="result-map-badge">{chinese ? "📍 已加载到地图" : "📍 Loaded on map"}</span> : null}
       </div>
+      {imageUrl ? <img className="result-inline-image" src={imageUrl} alt={card.title} /> : null}
       {inlineChart ? <div className={`result-inline-chart ${usesWideInlineChart ? "is-wide" : ""}`}>{inlineChart}</div> : null}
       <p className="result-inline-headline">{card.headline}</p>
       {card.description ? <p className="result-inline-description">{card.description}</p> : null}
@@ -407,6 +413,7 @@ function StepResultContent({
 }
 
 function StepCardBlock({
+  conversationId,
   messageId,
   step,
   onOpenDetail,
@@ -415,6 +422,7 @@ function StepCardBlock({
   onToggleStepCard,
   preferredLanguage,
 }: {
+  conversationId?: string | null;
   messageId: string;
   step: StepCard;
   onOpenDetail?: (card: ResultCardSummary, data: WorkspaceData) => void;
@@ -472,6 +480,7 @@ function StepCardBlock({
             <StepResultContent
               key={card.id}
               card={card}
+              conversationId={conversationId}
               onOpenDetail={onOpenDetail}
               onPromoteMapField={onPromoteMapField}
               onResultAction={onResultAction}
@@ -581,6 +590,7 @@ function AssistantBlock({
               {stepCards.map((step) => (
                 <StepCardBlock
                   key={step.step_id}
+                  conversationId={conversationId}
                   messageId={message.id}
                   onOpenDetail={onOpenDetail}
                   onPromoteMapField={onPromoteMapField}
@@ -1166,8 +1176,6 @@ export function AnalysisFeed({
   return (
     <div className="analysis-feed">
       <div className="feed-toolbar">
-        {conversationId && messages.some((message) => Boolean(message.payload?.stepCards?.length))
-          ? <ResultIndexBrowser conversationId={conversationId} /> : null}
         <button
           className="result-expand-btn"
           disabled={!canExportReport || isLocked}

@@ -1087,10 +1087,15 @@ export function OceanWorkspaceApp() {
                 return;
               }
               setMessages((previous) =>
-                updateAssistantMessage(previous, pendingAssistantId, (current) => ({
-                  ...current,
-                  stepCards: mergeOrAppendStepCard(current.stepCards ?? [], stepCard),
-                }))
+                updateAssistantMessage(previous, pendingAssistantId, (current) => {
+                  const existing = current.stepCards?.find((item) => item.step_id === stepCard.step_id);
+                  const known = new Set(existing?.results.map((item) => item.id) ?? []);
+                  const results = [...(existing?.results ?? []),
+                    ...stepCard.results.filter((item) => !known.has(item.id))];
+                  return { ...current, stepCards: mergeOrAppendStepCard(
+                    current.stepCards ?? [], { ...stepCard, results },
+                  ) };
+                })
               );
               const nextMapCard = resolveMapResult(stepCard);
               if (nextMapCard?.workspaceData) {

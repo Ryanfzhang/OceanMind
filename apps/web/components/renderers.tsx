@@ -2906,7 +2906,7 @@ export function renderInlineChart(
   if (card.renderer === "summary" && data.mapField) {
     return <SpatialFieldPreview field={data.mapField} compact onShowOnMap={options?.onPromoteMapField} />;
   }
-  if (card.surface === "map" && data.mapField) {
+  if (card.surface === "map" && data.mapField && card.renderer !== "eof" && card.renderer !== "composite") {
     return <SpatialFieldPreview field={data.mapField} compact onShowOnMap={options?.onPromoteMapField} />;
   }
   if (card.renderer === "timeseries" && data.resultSeries.length > 0) {
@@ -2918,6 +2918,13 @@ export function renderInlineChart(
         title={card.title}
       />
     );
+  }
+  if (card.renderer === "profile" && data.profileSeries.length > 0) {
+    return <ProfileChart series={data.profileSeries} markers={data.profileMarkers} />;
+  }
+  if (card.renderer === "section" && data.sectionRows.length > 0) {
+    return <SectionChart rows={data.sectionRows} distanceKm={data.sectionDistanceKm}
+      axisTitle={data.sectionAxisTitle} sliceLabel={data.sectionSliceLabel} />;
   }
   if (hasNoFiniteTimeseriesValues(card, data)) {
     return <EmptyState message={NO_FINITE_TIMESERIES_MESSAGE} />;
