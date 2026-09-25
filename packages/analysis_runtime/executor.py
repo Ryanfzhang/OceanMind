@@ -96,7 +96,7 @@ def _child_env(root: Path) -> dict[str, str]:
     for name in ("tmp", ".mplconfig"):
         (root / name).mkdir(parents=True, exist_ok=True)
     repo = Path(__file__).resolve().parents[2]
-    return {
+    env = {
         "PATH": "/usr/bin:/bin",
         "LANG": "C.UTF-8",
         "HOME": str(root),
@@ -106,6 +106,11 @@ def _child_env(root: Path) -> dict[str, str]:
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONUNBUFFERED": "1",
     }
+    if sys.platform == "linux":
+        env.update(OPENBLAS_NUM_THREADS="4", OMP_NUM_THREADS="4",
+                   MKL_NUM_THREADS="4", NUMEXPR_NUM_THREADS="4",
+                   DASK_NUM_WORKERS="8")
+    return env
 
 
 def _kill_process_group(pid: int) -> None:

@@ -43,8 +43,8 @@ print('worker started')
 
 
 def test_broad_data_or_workspace_root_is_rejected(tmp_path: Path) -> None:
-    if sys.platform != "darwin":
-        pytest.skip("macOS Seatbelt test")
+    if sys.platform not in {"darwin", "linux"}:
+        pytest.skip("Supported sandbox host required")
     with pytest.raises(ValueError, match="Data read roots"):
         sandbox.build_sandbox_command(sys.executable, ["-c", "pass"], tmp_path, [Path.home()])
     with pytest.raises(ValueError, match="Writable root"):
@@ -54,6 +54,11 @@ def test_broad_data_or_workspace_root_is_rejected(tmp_path: Path) -> None:
 
 
 def test_missing_sandbox_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(sandbox, "_SANDBOX_EXEC", tmp_path / "missing")
+    if sys.platform == "linux":
+        monkeypatch.setattr(sandbox, "_BWRAP_EXEC", tmp_path / "missing")
+    elif sys.platform == "darwin":
+        monkeypatch.setattr(sandbox, "_SANDBOX_EXEC", tmp_path / "missing")
+    else:
+        pytest.skip("Supported sandbox host required")
     with pytest.raises(sandbox.SandboxUnavailableError, match="unavailable"):
         sandbox.build_sandbox_command(sys.executable, ["-c", "pass"], tmp_path, [])

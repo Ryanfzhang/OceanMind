@@ -1,4 +1,4 @@
-"""macOS Seatbelt launcher for untrusted analysis scripts.
+"""Verified macOS Seatbelt and Linux Bubblewrap launchers for analysis scripts.
 
 The child may read its task directory, explicitly supplied data paths, the
 OceanMind Python source, and the Python/system runtime. It may write only its
@@ -29,6 +29,9 @@ class SandboxUnavailableError(RuntimeError):
 
 
 _SANDBOX_EXEC = Path("/usr/bin/sandbox-exec")
+_BWRAP_EXEC = Path("/usr/bin/bwrap")
+_PRLIMIT_EXEC = Path("/usr/bin/prlimit")
+_LINUX_PROCESS_LIMIT = 64
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SYSTEM_READ_ROOTS = (Path("/System"), Path("/usr/lib"), Path("/private/var/db/dyld"))
 
@@ -72,8 +75,9 @@ def _rule(path: Path) -> str:
 def _validate_data_roots(roots: tuple[Path, ...]) -> None:
     # A broad user/home/temp root would also expose unrelated files. Callers
     # should pass the specific dataset file or a narrowly scoped data folder.
-    broad = {Path("/"), Path.home().resolve(), Path("/Users"),
-             Path("/private"), Path("/private/tmp"), Path("/var"), Path("/tmp")}
+    broad = {Path("/"), Path.home().resolve(), Path("/Users"), Path("/home"),
+             Path("/private"), Path("/private/tmp"), Path("/var"), Path("/tmp"),
+             Path("/import"), Path("/etc"), Path("/usr")}
     if any(root in broad for root in roots):
         raise ValueError("Data read roots must be specific files or narrow directories")
 
@@ -136,8 +140,66 @@ def _configuration(
     return executable, root, data, _policy(executable, root, data)
 
 
+def _linux_configuration(
+    python: str | os.PathLike[str], writable_root: str | os.PathLike[str],
+    allowed_read_roots: tuple[str | os.PathLike[str], ...] | list[str | os.PathLike[str]],
+) -> tuple[Path, Path, tuple[Path, ...]]:
+    if (platform.system() != "Linux" or not _BWRAP_EXEC.is_file()
+            or not _PRLIMIT_EXEC.is_file()):
+        raise SandboxUnavailableError("Linux Bubblewrap and prlimit are unavailable")
+    executable = Path(python).expanduser().absolute()
+    if not executable.is_file():
+        raise ValueError(f"Expected a Python executable: {executable}")
+    root = _path(writable_root, directory=True)
+    _validate_writable_root(root)
+    data = tuple(_path(path) for path in allowed_read_roots)
+    _validate_data_roots(data)
+    if any(root.is_relative_to(path) for path in data):
+        raise ValueError("Data read root cannot contain the writable task directory")
+    return executable, root, data
+
+
+def _linux_command(
+    executable: Path, root: Path, data: tuple[Path, ...], worker_args: list[str],
+) -> list[str]:
+    command = [str(_BWRAP_EXEC), "--unshare-user", "--unshare-pid", "--unshare-net",
+               "--unshare-ipc", "--unshare-uts", "--die-with-parent", "--new-session"]
+    mounts = {Path("/usr"), _path(sys.prefix, directory=True),
+              _path(sys.base_prefix, directory=True),
+              _path(_PROJECT_ROOT / "packages", directory=True),
+              _path(_PROJECT_ROOT / "domain", directory=True),
+              _path(_PROJECT_ROOT / "configs" / "dataset_config.yaml", directory=False),
+              *data}
+    resolved_executable = executable.resolve(strict=True)
+    if not any(resolved_executable.is_relative_to(path) for path in mounts if path.is_dir()):
+        mounts.add(resolved_executable)
+    for path in sorted(mounts, key=lambda item: (len(item.parts), str(item))):
+        command.extend(("--ro-bind", str(path), str(path)))
+    for path in (Path("/bin"), Path("/lib"), Path("/lib64"), Path("/sbin")):
+        if path.is_symlink():
+            command.extend(("--symlink", os.readlink(path), str(path)))
+        elif path.exists():
+            command.extend(("--ro-bind", str(path), str(path)))
+    for path in (Path("/etc/ld.so.cache"), Path("/etc/localtime")):
+        if path.exists():
+            command.extend(("--ro-bind", str(path), str(path)))
+    aliases = {parent for path in (executable, Path(sys.prefix), Path(sys.base_prefix))
+               for parent in path.parents if parent.is_symlink()}
+    for path in sorted(aliases, key=lambda item: (len(item.parts), str(item))):
+        command.extend(("--symlink", os.readlink(path), str(path)))
+    command.extend(("--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+                    "--bind", str(root), str(root)))
+    for name in ("code", "logs"):
+        protected = _path(root / name, directory=True)
+        command.extend(("--ro-bind", str(protected), str(protected)))
+    command.extend(("--chdir", str(root), str(_PRLIMIT_EXEC),
+                    f"--nproc={_LINUX_PROCESS_LIMIT}:{_LINUX_PROCESS_LIMIT}",
+                    "--", str(executable), *worker_args))
+    return command
+
+
 _PROBE = r'''
-import errno, json, os, socket, subprocess, sys
+import errno, json, os, resource, socket, subprocess, sys
 from pathlib import Path
 import numpy, xarray
 import packages.analysis_runtime.records
@@ -191,6 +253,7 @@ print(json.dumps({"data_read": data_read, "secret_errno": secret_errno,
                   "log_write_errno": log_write_errno,
                   "symlink_write_errno": symlink_write_errno,
                   "network_errno": network_errno, "spawn_errno": spawn_errno,
+                  "nproc_limit": resource.getrlimit(resource.RLIMIT_NPROC)[1],
                   "tool_count": tool_count}))
 '''
 
@@ -204,7 +267,11 @@ def verify_sandbox_enforcement(
     Raises SandboxUnavailableError on any unexpected outcome, including an
     outer container forbidding sandbox_apply. No analysis code is then run.
     """
-    executable, root, data, profile = _configuration(python, writable_root, allowed_read_roots)
+    linux = platform.system() == "Linux"
+    if linux:
+        executable, root, data = _linux_configuration(python, writable_root, allowed_read_roots)
+    else:
+        executable, root, data, profile = _configuration(python, writable_root, allowed_read_roots)
     with tempfile.TemporaryDirectory(prefix="oceanmind_sandbox_probe_") as temp:
         secret = Path(temp) / "unrelated_secret"
         secret.write_text("must not be readable", encoding="utf-8")
@@ -226,10 +293,15 @@ def verify_sandbox_enforcement(
         # If no dataset is supplied, test read access to the task directory.
         readable = data[0] if data else root
         env = {"PATH": "/usr/bin:/bin", "PYTHONPATH": str(_PROJECT_ROOT),
-               "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": str(root)}
-        command = [str(_SANDBOX_EXEC), "-p", profile, str(executable), "-c", _PROBE,
-                   str(readable), str(secret), str(output), str(code_target),
-                   str(log_target), str(escape_link)]
+               "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": str(root), "HOME": str(root)}
+        if linux:
+            env.update(OPENBLAS_NUM_THREADS="4", OMP_NUM_THREADS="4",
+                       MKL_NUM_THREADS="4", NUMEXPR_NUM_THREADS="4",
+                       DASK_NUM_WORKERS="8")
+        probe_args = ["-c", _PROBE, str(readable), str(secret), str(output),
+                      str(code_target), str(log_target), str(escape_link)]
+        command = (_linux_command(executable, root, data, probe_args) if linux else
+                   [str(_SANDBOX_EXEC), "-p", profile, str(executable), *probe_args])
         try:
             result = subprocess.run(command, cwd=root, env=env, capture_output=True,
                                     text=True, timeout=15, check=False)
@@ -239,13 +311,18 @@ def verify_sandbox_enforcement(
                     f"stdout={result.stdout[-800:]} stderr={result.stderr[-800:]}")
             payload = json.loads(result.stdout.strip().splitlines()[-1])
             denied = {errno.EPERM, errno.EACCES}
+            hidden = denied | ({errno.ENOENT} if linux else set())
+            read_only = denied | ({errno.EROFS} if linux else set())
+            no_network = denied | ({errno.ENETUNREACH, errno.EHOSTUNREACH} if linux else set())
             if (payload.get("data_read") is not True or
-                    payload.get("secret_errno") not in denied or
-                    payload.get("code_write_errno") not in denied or
-                    payload.get("log_write_errno") not in denied or
-                    payload.get("symlink_write_errno") not in denied or
-                    payload.get("network_errno") not in denied or
-                    payload.get("spawn_errno") not in denied or
+                    payload.get("secret_errno") not in hidden or
+                    payload.get("code_write_errno") not in read_only or
+                    payload.get("log_write_errno") not in read_only or
+                    payload.get("symlink_write_errno") not in hidden or
+                    payload.get("network_errno") not in no_network or
+                    (payload.get("spawn_errno") is not None if linux else
+                     payload.get("spawn_errno") not in denied) or
+                    (linux and payload.get("nproc_limit") != _LINUX_PROCESS_LIMIT) or
                     not isinstance(payload.get("tool_count"), int) or
                     payload["tool_count"] < 1 or
                     not output.is_file()):
@@ -264,9 +341,13 @@ def build_sandbox_command(
     writable_root: str | os.PathLike[str],
     allowed_read_roots: tuple[str | os.PathLike[str], ...] | list[str | os.PathLike[str]],
 ) -> list[str]:
-    """Return a verified sandbox-exec worker argv; never a bare Python argv."""
+    """Return a verified host sandbox worker argv; never a bare Python argv."""
     if not isinstance(worker_args, list) or not all(isinstance(arg, str) for arg in worker_args):
         raise TypeError("worker_args must be a list of strings")
+    if platform.system() == "Linux":
+        executable, root, data = _linux_configuration(python, writable_root, allowed_read_roots)
+        verify_sandbox_enforcement(executable, root, data)
+        return _linux_command(executable, root, data, worker_args)
     executable, root, data, profile = _configuration(python, writable_root, allowed_read_roots)
     verify_sandbox_enforcement(executable, root, data)
     return [str(_SANDBOX_EXEC), "-p", profile, str(executable), *worker_args]
