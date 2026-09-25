@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from packages.agent_loop.conversations import ConversationRecord, ConversationStore
 from packages.agent_loop.graph import build_graph
+from packages.agent_loop.language import preferred_language
 from packages.agent_loop.model import OpenAIChatModel
 from packages.agent_loop.state import AgentState, initial_state
 from packages.runtime.dataset_config import (
@@ -197,7 +198,7 @@ def _response(
     return {
         "status": "completed" if success else "clarification_needed" if needs_input else "failed",
         "query": query,
-        "language": "en",
+        "language": state["language"],
         "conversation_id": record.conversation_id,
         "routing_mode": "dataset_analysis" if analysis else "general_answer",
         "router_confidence": None,
@@ -290,6 +291,7 @@ class QueryService:
                 deadline=time.monotonic() + self.timeout_seconds if self.timeout_seconds else None,
                 run_id=session.run_id,
                 run_root=str(session.root),
+                language=preferred_language(request.query),
             )
             turn_start = len(record.messages)
             state["messages"] = [*record.messages, *state["messages"]]

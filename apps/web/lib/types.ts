@@ -564,7 +564,7 @@ export type ApiSynthesis = {
 export type QueryApiResponse = {
   status: ApiQueryStatus;
   query: string;
-  language?: "en" | null;
+  language?: "en" | "zh" | null;
   conversation_id?: string | null;
   routing_mode?: "dataset_analysis" | "general_answer" | null;
   router_confidence?: number | null;

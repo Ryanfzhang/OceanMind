@@ -25,6 +25,7 @@ from packages.agent_loop.finalize import (
     finalize_delivery,
     finalize_state,
 )
+from packages.agent_loop.language import language_instruction, preferred_language
 from packages.agent_loop.limits import budget_violation
 from packages.agent_loop.ocean_tools import (
     FIND_TOOLS_SCHEMA,
@@ -194,7 +195,8 @@ def build_graph(
         )
         model_messages = hydrate_vision_messages(
             [{"role": "system", "content": SYSTEM_PROMPT + skill_prompt + analysis_prompt
-              + delivery_hint}, *state["messages"]], analysis_session,
+              + language_instruction(state["language"]) + delivery_hint},
+             *state["messages"]], analysis_session,
         )
         answer = model.complete(
             model_messages,
@@ -269,8 +271,33 @@ def build_graph(
     graph.add_node("agent", agent, retry_policy=RetryPolicy(max_attempts=3),
                    error_handler=model_error)
     graph.add_node("tools", run_tools)
-    graph.add_node("finalize", (lambda state: finalize_delivery(state, analysis_session))
-                   if analysis_session is not None else finalize_state)
+    def finalize(state: AgentState) -> AgentState:
+        classified = finalize_state(state)
+        if classified["status"] == "completed":
+            messages = classified["messages"]
+            content = messages[-1].get("content") if messages else None
+            if isinstance(content, str) and content.strip() and (
+                preferred_language(content) != classified["language"]
+            ):
+                name = "Chinese" if classified["language"] == "zh" else "English"
+                corrected = model.complete([
+                    {"role": "system", "content": (
+                        f"Translate the following answer into {name}. Return only the "
+                        "translated answer. Preserve every number, unit, URL, artifact "
+                        "ID, citation, and Markdown structure exactly; do not add facts."
+                    )},
+                    {"role": "user", "content": content},
+                ], tools=[], timeout=None)
+                translation = corrected.get("content")
+                if (isinstance(translation, str) and translation.strip()
+                        and preferred_language(translation) == classified["language"]):
+                    messages = [*messages]
+                    messages[-1] = {**messages[-1], "content": translation.strip()}
+                    classified = {**classified, "messages": messages}
+        return (finalize_delivery(classified, analysis_session)
+                if analysis_session is not None else classified)
+
+    graph.add_node("finalize", finalize)
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", after_agent, {"tools": "tools", "finalize": "finalize"})
     graph.add_conditional_edges(

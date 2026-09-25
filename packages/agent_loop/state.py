@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
+from packages.agent_loop.language import Language, preferred_language
+
 
 Message = dict[str, Any]
 RunStatus = Literal["running", "completed", "needs_input", "incomplete", "failed"]
@@ -21,11 +23,13 @@ class AgentState(TypedDict):
     run_root: str | None
     attachments: list[dict[str, str]]
     draft: str
+    language: Language
 
 
 def initial_state(
     user_query: str, *, deadline: float | None = None,
     run_id: str | None = None, run_root: str | None = None,
+    language: Language | None = None,
 ) -> AgentState:
     """Start a task with its original user message."""
 
@@ -39,6 +43,7 @@ def initial_state(
         "run_root": run_root,
         "attachments": [],
         "draft": "",
+        "language": language or preferred_language(user_query),
     }
 
 
