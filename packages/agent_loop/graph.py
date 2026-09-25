@@ -39,6 +39,7 @@ from packages.agent_loop.vision import (
     hydrate_vision_messages,
     make_view_image,
 )
+from packages.runtime.dataset_config import get_active_dataset_config
 
 
 SYSTEM_PROMPT = (
@@ -56,6 +57,23 @@ SYSTEM_PROMPT = (
     "treating only its bounding box as the selected area. "
     "If essential information is missing, call request_clarification with one question."
 )
+
+
+def _configured_data_prompt(data_roots: tuple[Path, ...]) -> str:
+    config = get_active_dataset_config()
+    if Path(config.data_path).resolve() not in data_roots:
+        return ""
+    return (
+        f"\nConfigured dataset: {config.name} ({config.backend}); "
+        f"variables: {', '.join(config.variables)}; "
+        f"time: {config.temporal_extent}; region: {config.spatial_extent}; "
+        f"depth levels: {len(config.depth_levels)} from "
+        f"{config.depth_levels[0] if config.depth_levels else 'unknown'} to "
+        f"{config.depth_levels[-1] if config.depth_levels else 'unknown'} m. "
+        "tools.load_dataset uses this configured source by default. "
+        "Use these known facts directly; inspect_data is for an unfamiliar source or "
+        "variable, not repeated discovery of this configured dataset."
+    )
 
 
 def build_graph(
@@ -107,7 +125,10 @@ def build_graph(
             registry["inspect_data"] = make_inspect_data(analysis_session.data_roots)
             schemas.append(INSPECT_DATA_SCHEMA)
         analysis_prompt = (
-            "\nFor data work, inspect the source and actual tool signatures as needed. "
+            "\nFor data work, use the configured dataset directly when it covers the query. "
+            "Use find_tools for an unfamiliar function signature; do not write and run "
+            "probe scripts to inspect runtime internals, artifact storage, or installed "
+            "plotting libraries. Write the requested analysis first. "
             "Save complete ordinary Python with write_analysis, then run its code_id. "
             "Inside the script, use `from oceanmind_runtime import tools, stage, publish, "
             "load_result`; wrap related work in stage blocks and keep stages outside loops. "
@@ -117,6 +138,11 @@ def build_graph(
             "After execution, check saved results "
             "and quality metrics; a zero exit code alone does not validate a calculation. "
             "Use list_results for earlier results and read_artifact for bounded details."
+            " Saved tool results automatically become interactive frontend views when "
+            "their data shape is supported; do not build standalone HTML for them. "
+            "For a T-S plot, pass the loaded xarray temperature and salinity fields "
+            "directly to tools.compute_ts_diagram; its saved result renders as an "
+            "interactive T-S chart. "
             " To draw an interpretable eddy figure, import render_eddy_figure from "
             "packages.analysis_runtime.figures and publish its PngFigure. "
             "Call view_image with the published image artifact ID when visual patterns matter. "
@@ -125,6 +151,7 @@ def build_graph(
             "\nAuthorized data roots: "
             + (", ".join(str(path) for path in analysis_session.data_roots)
                if analysis_session.data_roots else "none")
+            + _configured_data_prompt(analysis_session.data_roots)
         )
 
     def agent(state: AgentState) -> AgentState:

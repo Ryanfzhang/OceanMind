@@ -7,10 +7,11 @@ import pytest
 import xarray as xr
 
 from packages.agent_loop.analysis import AnalysisSession
-from packages.agent_loop.graph import build_graph
+from packages.agent_loop.graph import _configured_data_prompt, build_graph
 from packages.agent_loop.run import run_query
 from packages.agent_loop.state import initial_state
 from packages.analysis_runtime.artifacts import ArtifactStore
+from packages.runtime.dataset_config import DatasetConfig
 
 
 def call(name, arguments, call_id):
@@ -57,6 +58,26 @@ def local_worker(monkeypatch):
 def run_loop(model, session, query):
     return build_graph(model, analysis_session=session, max_rounds=10).invoke(
         initial_state(query, run_id=session.run_id, run_root=str(session.root)))
+
+
+def test_configured_dataset_guidance_only_applies_to_its_source(tmp_path, monkeypatch):
+    configured = tmp_path / "cmoms"
+    configured.mkdir()
+    monkeypatch.setattr("packages.agent_loop.graph.get_active_dataset_config", lambda: DatasetConfig(
+        name="CMOMS", data_path=str(configured), backend="zarr",
+        variables=["temp", "salt"], depth_levels=[0, -100],
+    ))
+    known = _configured_data_prompt((configured,))
+    assert "tools.load_dataset uses this configured source" in known
+    assert "temp, salt" in known
+    assert _configured_data_prompt((tmp_path / "other",)) == ""
+    model = ScriptedModel([{"role": "assistant", "content": "done"}])
+    run_loop(model, AnalysisSession(tmp_path / "runs", data_roots=[configured]),
+             "Plot a T-S diagram")
+    prompt = model.seen[0][0]["content"]
+    assert known in prompt
+    assert "do not write and run probe scripts" in prompt
+    assert "interactive T-S chart" in prompt
 
 
 def test_direct_entry_point_creates_run_scoped_analysis_session(tmp_path):
