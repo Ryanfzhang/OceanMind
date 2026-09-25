@@ -29,6 +29,7 @@ from domain.ocean.dask_utils import (
     dataarray_to_numpy,
     report_phase,
 )
+from domain.ocean.visualization.landmask import build_land_mask as _build_land_mask
 
 
 DEFAULT_TRANSPORT_TRANSECT_SAMPLES = 120
@@ -1271,52 +1272,6 @@ def _require_same_horizontal_grid(reference: xr.DataArray, candidate: xr.DataArr
         raise ValueError(f"Partitioned {field_name} transport grids do not match")
     if not np.allclose(ref_lat, cand_lat, equal_nan=True) or not np.allclose(ref_lon, cand_lon, equal_nan=True):
         raise ValueError(f"Partitioned {field_name} transport coordinates do not match")
-
-
-def _build_land_mask(*, lat: np.ndarray, lon: np.ndarray) -> Optional[np.ndarray]:
-    """Return True over land using cached Natural Earth polygons when available."""
-    try:
-        lat_key = tuple(float(value) for value in np.round(np.asarray(lat, dtype=float), 6))
-        lon_key = tuple(float(value) for value in np.round(np.asarray(lon, dtype=float), 6))
-        return _cached_land_mask(lat_key, lon_key)
-    except Exception:
-        return None
-
-
-@lru_cache(maxsize=16)
-def _cached_land_mask(lat_key: Tuple[float, ...], lon_key: Tuple[float, ...]) -> np.ndarray:
-    from cartopy.io import shapereader
-    import shapely
-
-    lat = np.asarray(lat_key, dtype=float)
-    lon = np.asarray(lon_key, dtype=float)
-    lon_grid, lat_grid = np.meshgrid(lon, lat)
-    mask = np.zeros(lon_grid.shape, dtype=bool)
-    domain_bounds = (float(np.nanmin(lon)), float(np.nanmin(lat)), float(np.nanmax(lon)), float(np.nanmax(lat)))
-
-    land_path = shapereader.natural_earth(resolution="10m", category="physical", name="land")
-    for geometry in shapereader.Reader(land_path).geometries():
-        if not _bounds_overlap(geometry.bounds, domain_bounds):
-            continue
-        contains_xy = getattr(shapely, "contains_xy", None)
-        if contains_xy is not None:
-            mask |= contains_xy(geometry, lon_grid, lat_grid)
-        else:
-            from shapely import vectorized
-
-            mask |= vectorized.contains(geometry, lon_grid, lat_grid)
-    return mask
-
-
-def _bounds_overlap(a: Tuple[float, float, float, float], b: Tuple[float, float, float, float]) -> bool:
-    a_min_lon, a_min_lat, a_max_lon, a_max_lat = a
-    b_min_lon, b_min_lat, b_max_lon, b_max_lat = b
-    return not (
-        a_max_lon < b_min_lon
-        or a_min_lon > b_max_lon
-        or a_max_lat < b_min_lat
-        or a_min_lat > b_max_lat
-    )
 
 
 def _apply_transport_streamfunction_regional_gauge(

@@ -93,6 +93,62 @@ def test_loaded_field_shows_stats_and_computed_field_shows_map(tmp_path):
     assert adapter.finalize()["active_result_id"] == map_id
 
 
+def test_map_preview_clips_land_for_unrelated_ocean_fields(tmp_path, monkeypatch):
+    from domain.ocean.visualization import landmask
+
+    monkeypatch.setattr(landmask, "build_land_mask", lambda **_: np.array([[True, False], [False, False]]))
+    monkeypatch.setattr(landmask, "render_land_mask_image", lambda *_: "land-png")
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Spatial preview")
+    adapter = ProgressAdapter(session)
+    artifact = session.artifacts.publish("chlorophyll_map", {
+        "lon": [120.0, 121.0], "lat": [20.0, 21.0],
+        "values": [[1.0, 2.0], [3.0, 4.0]],
+        "metadata": {"variable": "chlorophyll", "units": "mg m-3"},
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    field = adapter.finalize()["result_cards"][0]["workspaceData"]["mapField"]
+    assert field["values"] == [[None, 2.0], [3.0, 4.0]]
+    assert field["landMaskImage"] == "land-png"
+
+
+def test_transport_map_preserves_two_regional_colorbars(tmp_path, monkeypatch):
+    from domain.ocean.visualization import landmask
+
+    monkeypatch.setattr(landmask, "build_land_mask", lambda **_: None)
+    monkeypatch.setattr(landmask, "render_land_mask_image", lambda *_: None)
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Transport map")
+    adapter = ProgressAdapter(session)
+    artifact = session.artifacts.publish("compute_transport_streamfunction_map", {
+        "lon": [120.0, 121.0], "lat": [20.0, 21.0],
+        "values": np.array([[-2.0, 1.0], [2.0, 3.0]]),
+        "metadata": {
+            "variable": "transport_streamfunction", "units": "Sv",
+            "regional_color_scales": [
+                {"label": "Area 1", "min": -3.0, "max": 3.0, "renderMode": "filled"},
+                {"label": "Area 2", "min": -1.0, "max": 1.0, "renderMode": "filled"},
+            ],
+            "transport_rendering": {
+                "mode": "gan_fig10_china_seas", "filled_region": "area1",
+                "filled_regions": [
+                    {"id": "area1", "mask": np.array([[True, False], [False, False]])},
+                    {"id": "area2", "mask": np.array([[False, True], [True, True]])},
+                ],
+            },
+        },
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    field = adapter.finalize()["result_cards"][0]["workspaceData"]["mapField"]
+    assert [scale["label"] for scale in field["regionalColorScales"]] == ["Area 1", "Area 2"]
+    assert field["transportRendering"]["mode"] == "gan_fig10_china_seas"
+    assert field["transportRendering"]["filledRegions"][0]["mask"] == [[True, False], [False, False]]
+
+
 def test_publish_outside_stage_keeps_result_without_visible_step(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()

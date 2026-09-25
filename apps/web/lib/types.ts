@@ -326,6 +326,7 @@ export type MapFieldData = {
   depthLabel?: string;
   timeLabel?: string;
   contourImage?: string;
+  landMaskImage?: string;
   colorScale?: MapColorScale;
   regionalColorScales?: MapColorScale[];
   transportRendering?: TransportRenderingData;

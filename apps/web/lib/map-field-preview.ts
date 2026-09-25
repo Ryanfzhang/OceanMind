@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gridCellStrokeColor, sortSubregionCells } from "./subregion-grid";
 import type { MapColorScale, MapFieldData, TransportFilledRegionData } from "./types";
 
@@ -1149,10 +1149,50 @@ function renderTransportStreamfunctionImage(field: MapFieldData, width: number, 
   return canvas.toDataURL();
 }
 
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+async function clipLandFromMapImage(url: string, mask: string, width: number, height: number) {
+  const [fieldImage, landImage] = await Promise.all([
+    loadImage(url), loadImage(`data:image/png;base64,${mask}`),
+  ]);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) return url;
+  context.drawImage(fieldImage, 0, 0, width, height);
+  context.globalCompositeOperation = "destination-out";
+  context.drawImage(landImage, 0, 0, width, height);
+  return canvas.toDataURL();
+}
+
 export function useMapFieldImageUrl(field: MapFieldData | null | undefined, width: number, height: number) {
   const [heatmapUrl, setHeatmapUrl] = useState<string>("");
+  const renderGeneration = useRef(0);
 
   useEffect(() => {
+    const generation = ++renderGeneration.current;
+    const publishImage = (url: string) => {
+      if (!url || !field?.landMaskImage) {
+        setHeatmapUrl(url);
+        return;
+      }
+      setHeatmapUrl("");
+      void clipLandFromMapImage(url, field.landMaskImage, width, height)
+        .then((masked) => {
+          if (renderGeneration.current === generation) setHeatmapUrl(masked);
+        })
+        .catch(() => {
+          if (renderGeneration.current === generation) setHeatmapUrl(url);
+        });
+    };
     if (!field) {
       setHeatmapUrl("");
       return;
@@ -1178,15 +1218,15 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
 
     const tileMapKind = mapFieldTileKind(field);
     if (field.subregionGrid && tileMapKind !== "event_hotspot") {
-      setHeatmapUrl(renderSubregionGridImage(field, width, height));
+      publishImage(renderSubregionGridImage(field, width, height));
       return;
     }
     if (isTransportStreamfunctionRendering(field) && field.contourImage) {
-      setHeatmapUrl(`data:image/png;base64,${field.contourImage}`);
+      publishImage(`data:image/png;base64,${field.contourImage}`);
       return;
     }
     if (isTransportStreamfunctionRendering(field)) {
-      setHeatmapUrl(renderTransportStreamfunctionImage(field, width, height));
+      publishImage(renderTransportStreamfunctionImage(field, width, height));
       return;
     }
 
@@ -1210,7 +1250,7 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
     });
 
     if (field.contourImage && discreteColorMap.size === 0) {
-      setHeatmapUrl(`data:image/png;base64,${field.contourImage}`);
+      publishImage(`data:image/png;base64,${field.contourImage}`);
       return;
     }
 
@@ -1280,7 +1320,7 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
     }
 
     ctx.putImageData(imageData, 0, 0);
-    setHeatmapUrl(canvas.toDataURL());
+    publishImage(canvas.toDataURL());
   }, [field, height, width]);
 
   return heatmapUrl;

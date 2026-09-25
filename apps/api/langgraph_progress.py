@@ -18,6 +18,27 @@ PREVIEW_JSON_BYTES = 4 * 1024 * 1024
 PREVIEW_GRID_SIDE = 64
 
 
+def _map_land_mask(x: Any, y: Any, values: Any) -> tuple[Any, str | None]:
+    """Keep sampled land cells empty and supply a pixel-level coastline clip."""
+    import numpy as np
+    from domain.ocean.visualization.landmask import build_land_mask, render_land_mask_image
+
+    land = build_land_mask(lat=y, lon=x)
+    if land is not None and land.shape == values.shape:
+        values = np.where(land, np.nan, values)
+    try:
+        image = render_land_mask_image(float(x.min()), float(x.max()),
+                                       float(y.min()), float(y.max()))
+    except (ImportError, OSError, ValueError):
+        image = None
+    return values, image
+
+
+def _map_values(values: Any) -> list[list[float | None]]:
+    return [[float(value) if math.isfinite(value) else None for value in row]
+            for row in values]
+
+
 def _loaded_field_metrics(path: Any, summary: dict) -> list[dict[str, str]]:
     """Describe a loaded array without turning it into an analysis map."""
     import numpy as np
@@ -87,15 +108,18 @@ def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
                     or not np.all(np.isfinite(lon)) or not np.all(np.isfinite(lat))
                     or not np.any(np.isfinite(values))):
                 return None
-            return "summary", {"mapField": {
+            values, land_image = _map_land_mask(lon, lat, values)
+            map_field = {
                 "lon": lon.tolist(), "lat": lat.tolist(),
-                "values": [[float(v) if math.isfinite(v) else None for v in row]
-                           for row in values],
+                "values": _map_values(values),
                 "label": name.replace("_", " ").title(), "variable": str(source.name or name),
                 "units": str(source.attrs.get("units") or ""),
                 "bounds": [[float(lat.min()), float(lon.min())],
                            [float(lat.max()), float(lon.max())]],
-            }}
+            }
+            if land_image:
+                map_field["landMaskImage"] = land_image
+            return "summary", {"mapField": map_field}
         if field.ndim == 1 and field.dims[0] == "time":
             stride = max(1, math.ceil(field.sizes["time"] / 100))
             field = field.isel(time=slice(None, None, stride))
@@ -132,6 +156,68 @@ def _preview_values(value: Any, root: Any) -> Any:
     return value
 
 
+def _transport_map_style(value: Any, metadata: dict, root: Any,
+                         lat: Any, lon: Any, rows: Any, cols: Any) -> dict:
+    """Carry tool rendering metadata, or derive regional display scales for a broad China Seas map."""
+    import numpy as np
+
+    if str(metadata.get("variable") or "").lower() != "transport_streamfunction":
+        return {}
+    scales = metadata.get("regional_color_scales")
+    rendering = metadata.get("transport_rendering")
+    if not scales or not rendering:
+        from domain.ocean.analysis.transports import (
+            _domain_spans_gan_fig10_wpo_and_china_seas,
+            _gan_fig10_display_area_masks,
+            _gan_fig10_regional_color_scales,
+            _gan_fig10_transport_rendering_metadata,
+        )
+    if (not scales or not rendering) and _domain_spans_gan_fig10_wpo_and_china_seas(
+            lat=lat, lon=lon):
+        regions = _gan_fig10_display_area_masks(
+            lat=lat, lon=lon, wet_mask=np.isfinite(value))
+        if len(regions) >= 2:
+            # The original Fig. 10 masks stop at 42.5 N; keep the rest of a
+            # broader requested domain visible in the open-ocean color scale.
+            covered = np.logical_or.reduce([region["mask"] for region in regions])
+            regions[1] = {**regions[1], "mask": regions[1]["mask"] | (np.isfinite(value) & ~covered)}
+        scales = _gan_fig10_regional_color_scales(display_values=value, regions=regions)
+        rendering = _gan_fig10_transport_rendering_metadata(regions=regions)
+    if not isinstance(scales, list) or not isinstance(rendering, dict):
+        return {}
+
+    def sample_mask(mask: Any) -> list[list[bool]] | None:
+        decoded = np.asarray(_preview_values(mask, root), dtype=bool)
+        if decoded.shape != value.shape:
+            return None
+        return decoded[np.ix_(rows, cols)].tolist()
+
+    regions = []
+    for region in rendering.get("filled_regions") or []:
+        if not isinstance(region, dict):
+            continue
+        mask = sample_mask(region.get("mask"))
+        if mask is not None:
+            regions.append({
+                "id": region.get("id"), "region": region.get("region"),
+                "label": region.get("label"),
+                "scaleStrategy": region.get("scaleStrategy") or region.get("scale_strategy"),
+                "mask": mask,
+            })
+    if not regions:
+        return {}
+    return {
+        "regionalColorScales": scales,
+        "transportRendering": {
+            "mode": rendering.get("mode"),
+            "filledRegion": rendering.get("filled_region"),
+            "filledMask": sample_mask(rendering.get("filled_mask")),
+            "filledRegions": regions,
+            "filledColormap": rendering.get("filled_colormap"),
+        },
+    }
+
+
 def _map_payload(value: dict, root: Any, name: str) -> dict | None:
     import numpy as np
 
@@ -147,20 +233,28 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
         return None
     row_step = max(1, math.ceil(len(lat) / PREVIEW_GRID_SIDE))
     col_step = max(1, math.ceil(len(lon) / PREVIEW_GRID_SIDE))
-    x = np.asarray(lon[::col_step], dtype=float)
-    y = np.asarray(lat[::row_step], dtype=float)
-    sample = np.asarray(values[::row_step, ::col_step], dtype=float)
+    rows = np.arange(0, len(lat), row_step)
+    cols = np.arange(0, len(lon), col_step)
+    x = np.asarray(lon, dtype=float)[cols]
+    y = np.asarray(lat, dtype=float)[rows]
+    sample = np.asarray(values[np.ix_(rows, cols)], dtype=float)
     if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y)) and np.any(np.isfinite(sample))):
         return None
     metadata = value.get("metadata") or {}
-    return {"lon": x.tolist(), "lat": y.tolist(),
-            "values": [[float(v) if math.isfinite(v) else None for v in row]
-                       for row in sample],
+    sample, land_image = _map_land_mask(x, y, sample)
+    result = {"lon": x.tolist(), "lat": y.tolist(),
+            "values": _map_values(sample),
             "label": name.replace("_", " ").title(),
             "variable": str(metadata.get("variable") or name),
             "units": str(metadata.get("units") or metadata.get("unit") or ""),
             "bounds": [[float(y.min()), float(x.min())],
                        [float(y.max()), float(x.max())]]}
+    if land_image:
+        result["landMaskImage"] = land_image
+    result.update(_transport_map_style(np.asarray(values, dtype=float), metadata, root,
+                                       np.asarray(lat, dtype=float), np.asarray(lon, dtype=float),
+                                       rows, cols))
+    return result
 
 
 def _mask_map_payload(mask_value: Any, lon: Any, lat: Any, root: Any,
