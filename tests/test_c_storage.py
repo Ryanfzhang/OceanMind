@@ -109,6 +109,17 @@ def test_large_nested_array_uses_sidecar_not_json(tmp_path):
                                   values)
 
 
+def test_nested_dataarray_roundtrips_for_structured_analysis_result(tmp_path):
+    records, attempt, stage, store = context(tmp_path)
+    pattern = xr.DataArray([[1.0, 2.0], [3.0, 4.0]], dims=("lat", "lon"),
+                           coords={"lat": [20, 21], "lon": [120, 121]})
+    artifact_id = store.publish("eof", {"modes": [{"spatial_pattern": pattern}]},
+                                run_id=records.run_id, attempt_id=attempt,
+                                stage_id=stage, inputs=[])
+    restored = ArtifactStore(tmp_path).load_result(artifact_id)
+    xr.testing.assert_identical(restored["modes"][0]["spatial_pattern"], pattern)
+
+
 def test_source_reference_checks_content_before_reopen(tmp_path):
     records, attempt, stage, store = context(tmp_path)
     path = tmp_path / "ocean.nc"

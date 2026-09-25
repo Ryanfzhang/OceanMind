@@ -55,7 +55,22 @@ def _stored_payload(root: Path, relative: str) -> Path:
 def _encoded(value: Any, *, root: Path | None = None,
              artifact_id: str | None = None, sidecars: list[Path] | None = None) -> Any:
     import numpy as np
+    import xarray as xr
 
+    if isinstance(value, xr.DataArray):
+        if root is None or artifact_id is None or sidecars is None:
+            raise ValueError("Nested DataArray requires artifact storage")
+        path = root / "artifacts" / "data" / f"{artifact_id}_field_{len(sidecars)}.nc"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".nc", delete=False) as file:
+            temporary = Path(file.name)
+        try:
+            value.to_netcdf(temporary)
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        sidecars.append(path)
+        return {"__dataarray_file__": str(path.relative_to(root))}
     if isinstance(value, np.ndarray):
         if value.dtype.hasobject:
             raise TypeError("Object arrays cannot be persisted")
@@ -99,6 +114,13 @@ def _encoded(value: Any, *, root: Path | None = None,
 
 
 def _decoded(value: Any, *, root: Path | None = None) -> Any:
+    if isinstance(value, dict) and set(value) == {"__dataarray_file__"}:
+        import xarray as xr
+
+        if root is None:
+            raise ValueError("DataArray sidecar requires artifact storage")
+        with xr.open_dataarray(_stored_payload(root, value["__dataarray_file__"])) as array:
+            return array.load()
     if isinstance(value, dict) and set(value) == {"__ndarray_file__"}:
         import numpy as np
 
