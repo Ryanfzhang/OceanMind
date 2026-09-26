@@ -128,6 +128,40 @@ function resultImageUrl(conversationId: string, artifactId: string) {
   return `/api/results?${new URLSearchParams({ conversation: conversationId, mode: "image", artifact: artifactId })}`;
 }
 
+function ResultImage({ url, title, mapSupplement = false }: {
+  url: string;
+  title: string;
+  mapSupplement?: boolean;
+}) {
+  const [imageExpanded, setImageExpanded] = useState(false);
+  useEffect(() => {
+    if (!imageExpanded) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImageExpanded(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imageExpanded]);
+  return <>
+    <button className="result-inline-image-button" type="button"
+      aria-label={`Enlarge ${title}`} onClick={() => setImageExpanded(true)}>
+      <img className={`result-inline-image${mapSupplement ? " is-map-supplement" : ""}`}
+        src={url} alt={title} />
+      <span className="result-image-expand-hint">Click to enlarge</span>
+    </button>
+    {imageExpanded ? createPortal(
+      <div className="result-image-dialog" role="dialog" aria-modal="true"
+        aria-label={title} onClick={(event) => {
+          if (event.target === event.currentTarget) setImageExpanded(false);
+        }}>
+        <button className="result-image-dialog-close" type="button"
+          aria-label="Close enlarged image" onClick={() => setImageExpanded(false)} autoFocus>×</button>
+        <img className="result-image-dialog-image" src={url} alt={title} />
+      </div>, document.body,
+    ) : null}
+  </>;
+}
+
 function StepResultContent({
   card,
   conversationId,
@@ -146,15 +180,6 @@ function StepResultContent({
   preferredLanguage?: "en";
 }) {
   const chinese = false;
-  const [imageExpanded, setImageExpanded] = useState(false);
-  useEffect(() => {
-    if (!imageExpanded) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setImageExpanded(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [imageExpanded]);
   const imageUrl = conversationId && card.type === "image_png"
     ? resultImageUrl(conversationId, card.id)
     : null;
@@ -189,24 +214,8 @@ function StepResultContent({
         <h4>{card.title}</h4>
         {card.surface === "map" && hasLoadedMapPayload ? <span className="result-map-badge">{chinese ? "📍 已加载到地图" : "📍 Loaded on map"}</span> : null}
       </div>
-      {imageUrl ? (
-        <button className="result-inline-image-button" type="button"
-          aria-label={`Enlarge ${card.title}`} onClick={() => setImageExpanded(true)}>
-          <img className={`result-inline-image${card.surface === "map" ? " is-map-supplement" : ""}`}
-            src={imageUrl} alt={card.title} />
-          <span className="result-image-expand-hint">Click to enlarge</span>
-        </button>
-      ) : null}
-      {imageUrl && imageExpanded ? createPortal(
-        <div className="result-image-dialog" role="dialog" aria-modal="true"
-          aria-label={card.title} onClick={(event) => {
-            if (event.target === event.currentTarget) setImageExpanded(false);
-          }}>
-          <button className="result-image-dialog-close" type="button"
-            aria-label="Close enlarged image" onClick={() => setImageExpanded(false)} autoFocus>×</button>
-          <img className="result-image-dialog-image" src={imageUrl} alt={card.title} />
-        </div>, document.body,
-      ) : null}
+      {imageUrl ? <ResultImage url={imageUrl} title={card.title}
+        mapSupplement={card.surface === "map"} /> : null}
       {inlineChart ? <div className={`result-inline-chart ${usesWideInlineChart ? "is-wide" : ""}`}>{inlineChart}</div> : null}
       <p className="result-inline-headline">{card.headline}</p>
       {card.description ? <p className="result-inline-description">{card.description}</p> : null}
@@ -479,13 +488,12 @@ function AssistantBlock({
         <div className="findings-section ui-card">
           <h4 className="findings-title ui-card-title">{chinese ? "回复" : "Response"}</h4>
           {conversationId && figureAttachments.length > 0 ? (
-            <div className="response-attachments">
-              <strong>Figure attachments</strong>
+            <div className="response-figures">
               {figureAttachments.map((card) => (
-                <a key={card.id} href={resultImageUrl(conversationId, card.id)}
-                  target="_blank" rel="noreferrer">
-                  {card.title} ↗
-                </a>
+                <figure key={card.id} className="response-figure">
+                  <ResultImage url={resultImageUrl(conversationId, card.id)} title={card.title} />
+                  <figcaption>{card.title}</figcaption>
+                </figure>
               ))}
             </div>
           ) : null}

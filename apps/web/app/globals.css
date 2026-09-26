@@ -3289,21 +3289,22 @@ h4 {
   color: var(--text);
 }
 
-.response-attachments {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+.response-figures {
+  display: grid;
+  gap: 14px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  overflow-wrap: anywhere;
 }
 
-.response-attachments a {
-  color: var(--accent);
+.response-figure {
+  min-width: 0;
+  margin: 0;
+}
+
+.response-figure figcaption {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: var(--type-sm);
+  overflow-wrap: anywhere;
 }
 
 .markdown-summary {
