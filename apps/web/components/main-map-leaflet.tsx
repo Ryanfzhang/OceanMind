@@ -9,7 +9,7 @@ import {
   hasValidPolygon,
   hasValidTransect,
 } from "@/lib/geometry-tools";
-import { isTransportStreamfunctionRendering, mapFieldTileKind, useMapFieldImageUrl } from "@/lib/map-field-preview";
+import { isTransportStreamfunctionRendering, mapFieldRasterSize, mapFieldTileKind, useMapFieldImageUrl } from "@/lib/map-field-preview";
 import { sampleNearestMapFieldValue, type HoverSample } from "@/lib/map-hover";
 import { MapColorbar } from "@/components/map-colorbar";
 import {
@@ -267,11 +267,8 @@ export default function MainMapLeaflet({
 }: MainMapLeafletProps) {
   const regionBounds = manualState.regionBounds;
   const mapField = workspaceData.mapField;
-  const mapFieldImageUrl = useMapFieldImageUrl(
-    mapField,
-    Math.max(720, mapField?.lon.length ?? 0),
-    Math.max(520, mapField?.lat.length ?? 0),
-  );
+  const rasterSize = mapFieldRasterSize(mapField);
+  const mapFieldImageUrl = useMapFieldImageUrl(mapField, rasterSize.width, rasterSize.height);
   const eventOverlays = workspaceData.eventOverlays;
   const mapEventOverlays = useMemo(() => groupEventOverlaysForMap(eventOverlays), [eventOverlays]);
   const simplifyEventOverlays = useMemo(() => shouldSimplifyEventOverlays(eventOverlays), [eventOverlays]);

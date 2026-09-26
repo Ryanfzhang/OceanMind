@@ -41,6 +41,29 @@ function fieldExtent(field: MapFieldData) {
   };
 }
 
+function axisRasterPixels(coordinates: number[], span: number, minimum: number) {
+  let smallestGap = Infinity;
+  for (let index = 1; index < coordinates.length; index += 1) {
+    const gap = Math.abs(coordinates[index] - coordinates[index - 1]);
+    if (gap > 0 && Number.isFinite(gap)) smallestGap = Math.min(smallestGap, gap);
+  }
+  if (!Number.isFinite(smallestGap) || !Number.isFinite(span)) return minimum;
+  return Math.max(minimum, Math.ceil(Math.abs(span) / smallestGap) + 1);
+}
+
+export function mapFieldRasterSize(field: MapFieldData | null | undefined, width = 720, height = 520) {
+  if (!field || field.lon.length < 2 || field.lat.length < 2) return { width, height };
+  const extent = fieldExtent(field);
+  return {
+    width: axisRasterPixels(field.lon, extent.lonMax - extent.lonMin, width),
+    height: axisRasterPixels(
+      field.lat.map(latToWebMercatorY),
+      latToWebMercatorY(extent.latMax) - latToWebMercatorY(extent.latMin),
+      height,
+    ),
+  };
+}
+
 const OCEAN_DIVERGING_COLORMAP_STOPS: [number, [number, number, number]][] = [
   [0.0, [112, 0, 168]],
   [0.125, [88, 42, 214]],
