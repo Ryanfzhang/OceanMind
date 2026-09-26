@@ -17,7 +17,7 @@ REQUEST_CLARIFICATION_SCHEMA: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "request_clarification",
-        "description": "Ask the user one specific question needed to continue.",
+        "description": "Pause for required user input, explain why, and ask one actionable question so the task can resume.",
         "parameters": {
             "type": "object",
             "properties": {"question": {"type": "string"}},
@@ -58,7 +58,7 @@ def clarification_request(assistant_message: Mapping[str, Any]) -> tuple[str, st
 
 
 def finalize_state(state: AgentState) -> AgentState:
-    """Always return a readable delivery unless the agent requested user input."""
+    """Preserve model answers and keep technical interruptions out of Response."""
     if state["status"] in {"completed", "needs_input", "failed"}:
         return state.copy()
     final = state["messages"][-1] if state["messages"] else {}
@@ -75,15 +75,8 @@ def finalize_state(state: AgentState) -> AgentState:
                 and isinstance(content, str) and content.strip()):
             return {**state, "status": "completed", "termination_reason": None}
 
-    draft = state.get("draft", "").strip()
-    reason = state.get("termination_reason") or "the answer was not finished"
-    if draft:
-        content = f"{draft}\n\nFurther analysis was interrupted ({reason})."
-    else:
-        content = f"I could not complete the analysis ({reason}). Any saved results remain available."
-    return {**state, "messages": [*state["messages"],
-                                 {"role": "assistant", "content": content}],
-            "status": "completed"}
+    return {**state, "status": "failed",
+            "termination_reason": state.get("termination_reason") or "answer_not_finished"}
 
 
 def finalize_delivery(state: AgentState, session: Any) -> AgentState:

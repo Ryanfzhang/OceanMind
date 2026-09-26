@@ -304,16 +304,9 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
   } as const;
   const findings = buildScientificFindings(response.synthesis);
   const failureSummary = response.error ?? "The query failed.";
-  const missingFields = Array.isArray(response.missing_fields)
-    ? response.missing_fields.filter((item) => typeof item === "string" && item.trim().length > 0)
-    : [];
-  const missingFieldsText =
-    missingFields.length > 0
-      ? `Missing fields: ${missingFields.join(", ")}`
-      : "Missing fields: none reported by planner.";
   const clarificationSummary =
     response.analysis_proposal?.approval_prompt ??
-    [response.clarification_question ?? "More information is needed.", missingFieldsText].filter(Boolean).join(" ");
+    response.clarification_question ?? "More information is needed.";
   const timingText = formatTimings(response.timings);
   const failureResponse =
     response.status === "failed"
@@ -343,7 +336,7 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
       response.status === "completed"
         ? [response.plan_summary ?? response.router_reason ?? "", timingText].filter(Boolean).join(" ")
         : response.status === "clarification_needed"
-          ? [missingFieldsText, timingText].filter(Boolean).join(" ")
+          ? timingText
           : failureResponse?.note ?? timingText,
     routingMode: response.routing_mode ?? undefined,
     routerConfidence: typeof response.router_confidence === "number" ? response.router_confidence : undefined,
@@ -1017,7 +1010,7 @@ export function OceanWorkspaceApp() {
                   ...current,
                   state: "clarification",
                   summary: question,
-                  note: "The planner needs additional context before continuing.",
+                  note: "",
                 }))
               );
             }

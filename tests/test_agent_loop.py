@@ -112,6 +112,29 @@ def test_answer_agent_can_return_a_conflict_for_verification():
     assert "request_verification" in {item["function"]["name"] for item in answer.tools_seen[0]}
 
 
+def test_answer_agent_can_explain_missing_input_and_request_clarification():
+    executor = ScriptedModel([
+        {"role": "assistant", "content": "The selected section is unavailable."},
+    ])
+    question = (
+        "A section is needed to integrate transport across the strait. "
+        "Would you draw one, provide endpoints, or confirm a suggested section?"
+    )
+    answer = ScriptedModel([
+        {"role": "assistant", "content": None, "tool_calls": [
+            call("request_clarification", {"question": question})
+        ]},
+    ])
+    state = build_graph(executor, answer_model=answer).invoke(
+        initial_state("Compute transport across the selected section")
+    )
+    assert state["status"] == "needs_input"
+    assert json.loads(state["messages"][-1]["content"])["question"] == question
+    assert "request_clarification" in {
+        item["function"]["name"] for item in answer.tools_seen[0]
+    }
+
+
 def test_clarification_and_limits_have_distinct_statuses():
     clarification = {"role": "assistant", "content": None, "tool_calls": [
         call("request_clarification", {"question": "Which dataset?"})
@@ -125,9 +148,10 @@ def test_clarification_and_limits_have_distinct_statuses():
         initial_state("Analyze it", deadline=time.monotonic() - 1)
     )
     assert (expired["status"], expired["termination_reason"]) == (
-        "completed", "deadline_exceeded"
+        "failed", "deadline_exceeded"
     )
-    assert "could not complete" in expired["messages"][-1]["content"]
+    assert not any("could not complete" in str(message.get("content"))
+                   for message in expired["messages"])
 
     one_round = build_graph(ScriptedModel([clarification]), max_rounds=1).invoke(
         initial_state("Analyze it")
@@ -139,7 +163,7 @@ def test_clarification_and_limits_have_distinct_statuses():
     ]}
     capped = build_graph(ScriptedModel([tool_call]), max_rounds=1).invoke(initial_state("Add"))
     assert (capped["status"], capped["termination_reason"]) == (
-        "completed", "max_rounds_exceeded"
+        "failed", "max_rounds_exceeded"
     )
 
 

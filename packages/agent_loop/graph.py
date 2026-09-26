@@ -67,8 +67,14 @@ SYSTEM_PROMPT = (
     "lon_range and lat_range. Preserve every transect vertex, "
     "and apply a polygon mask when analyzing the drawn polygon rather than "
     "treating only its bounding box as the selected area. "
-    "If essential information is missing, call request_clarification with one question; "
-    "weather requests need a city or location. Do not infer live conditions from "
+    "If continuing requires user input, call request_clarification rather than "
+    "ending with a question in plain text, so the user's reply resumes the task. "
+    "In its question, briefly explain why the input matters and ask one actionable "
+    "question. You may suggest a "
+    "reasonable option, clearly labeled as unconfirmed; do not claim the user "
+    "selected it. If the request cannot be completed, explain the actual limitation "
+    "and a useful next step in your answer instead of reporting a generic failure. "
+    "Weather requests need a city or location. Do not infer live conditions from "
     "historical workspace data."
 )
 
@@ -258,7 +264,8 @@ def build_graph(
         return "tools" if calls else "answer_agent" if answer_model is not None else "finalize"
 
     answer_registry = {"web_search": search}
-    answer_schemas = [WEB_SEARCH_SCHEMA, REQUEST_VERIFICATION_SCHEMA]
+    answer_schemas = [WEB_SEARCH_SCHEMA, REQUEST_VERIFICATION_SCHEMA,
+                      REQUEST_CLARIFICATION_SCHEMA]
     if analysis_session is not None:
         answer_registry.update({
             "list_results": analysis_session.list_results,
@@ -305,6 +312,22 @@ def build_graph(
 
     def run_answer_tools(state: AgentState) -> Command:
         calls = state["messages"][-1]["tool_calls"]
+        try:
+            clarification = clarification_request(state["messages"][-1])
+        except ValueError:
+            return Command(update={"status": "failed",
+                                   "termination_reason": "invalid_clarification_request"},
+                           goto="finalize")
+        if clarification:
+            call_id, question = clarification
+            observation = {
+                "role": "tool", "tool_call_id": call_id,
+                "content": json.dumps({"status": "needs_input", "question": question}),
+            }
+            return Command(update={**append_message(state, observation),
+                                   "status": "needs_input",
+                                   "termination_reason": "clarification_requested"},
+                           goto="finalize")
         if len(calls) == 1 and calls[0]["function"]["name"] == "request_verification":
             observation = execute_tool_calls({"tool_calls": calls}, {
                 "request_verification": lambda issue: {"verification_needed": issue},
