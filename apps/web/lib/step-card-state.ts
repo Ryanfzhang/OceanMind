@@ -86,9 +86,19 @@ export function mergeStepCardLists(existingCards: StepCard[], incomingCards: Ste
 }
 
 export function displayStepTimeline(stepCards: StepCard[], _terminal: boolean): StepCard[] {
-  // A card is a saved outcome. Running and failed stages remain in internal
-  // history for reconciliation and retries but never appear as result cards.
-  return stepCards.filter((step) => step.status === "completed");
+  const completed = stepCards.filter((step) => step.status === "completed");
+  const visualResults = completed.filter((step) => step.results.some((result) =>
+    result.surface === "map" || result.type === "image_png" || result.renderer !== "summary"));
+  if (visualResults.length > 0) return visualResults;
+  // A calculation without a visual still has one useful result card. Keep its
+  // latest saved outcome in view; the other stages remain in analysis details.
+  const latestResult = [...completed].reverse().find((step) => step.results.length > 0);
+  return latestResult ? [latestResult] : [];
+}
+
+export function displayStepDetails(stepCards: StepCard[], primarySteps: StepCard[]): StepCard[] {
+  const primaryIds = new Set(primarySteps.map((step) => step.step_id));
+  return stepCards.filter((step) => step.status === "completed" && !primaryIds.has(step.step_id));
 }
 
 export function displayLooseResults(

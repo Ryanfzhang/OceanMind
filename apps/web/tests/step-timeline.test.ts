@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { displayLooseResults, displayStepTimeline, formatStepProgressText } from "../lib/step-card-state";
+import { displayLooseResults, displayStepDetails, displayStepTimeline, formatStepProgressText } from "../lib/step-card-state";
 import type { ResultCardSummary, StepCard } from "../lib/types";
 
 function step(id: string, label: string, status: StepCard["status"], attempt_id: string): StepCard {
@@ -18,55 +18,70 @@ function step(id: string, label: string, status: StepCard["status"], attempt_id:
   };
 }
 
-test("workflow keeps successful attempts but hides failed stages", () => {
-  const visible = displayStepTimeline([
+function withVisual(card: StepCard): StepCard {
+  return { ...card, results: [{
+    id: `${card.step_id}_map`, title: card.human_label, type: "image_png",
+    headline: card.human_label, description: "", renderer: "summary", metrics: [],
+  }] };
+}
+
+function withSummary(card: StepCard): StepCard {
+  return { ...card, results: [{
+    id: `${card.step_id}_stats`, title: card.human_label, type: "json",
+    headline: card.human_label, description: "", renderer: "summary", metrics: [],
+  }] };
+}
+
+test("workflow shows deliverables and collapses successful internal stages", () => {
+  const cards = [
     step("load_1", "Load SST", "completed", "attempt_1"),
     step("detect_1", "Detect heatwaves", "completed", "attempt_1"),
     step("summary_failed", "Summarize events", "failed", "attempt_1"),
-    step("detect_2", "Detect heatwaves", "completed", "attempt_2"),
+    withVisual(step("detect_2", "Detect heatwaves", "completed", "attempt_2")),
     step("summary_2", "Summarize events", "completed", "attempt_2"),
     step("verify_2", "Verify statistics", "completed", "attempt_2"),
-  ], true);
-  assert.deepEqual(visible.map((item) => item.step_id),
-    ["load_1", "detect_1", "detect_2", "summary_2", "verify_2"]);
+  ];
+  const visible = displayStepTimeline(cards, true);
+  assert.deepEqual(visible.map((item) => item.step_id), ["detect_2"]);
+  assert.deepEqual(displayStepDetails(cards, visible).map((item) => item.step_id),
+    ["load_1", "detect_1", "summary_2", "verify_2"]);
 });
 
-test("repeated execution keeps the same history while running and after completion", () => {
+test("repeated execution keeps details but does not fill the main view", () => {
   const cards = Array.from({ length: 20 }, (_, index) =>
     step(`stage_${index}`, `Step ${index % 5}`, "completed",
       `attempt_${Math.floor(index / 5)}`));
-  assert.equal(displayStepTimeline(cards, false).length, 20);
-  assert.equal(displayStepTimeline(cards, true).length, 20);
-  assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
-    cards.map((item) => item.step_id));
+  assert.equal(displayStepTimeline(cards, false).length, 0);
+  assert.equal(displayStepTimeline(cards, true).length, 0);
+  assert.equal(displayStepDetails(cards, []).length, 20);
 });
 
 test("a retry stays in workflow progress until it completes", () => {
   const cards = [
     step("load_1", "Load data", "completed", "attempt_1"),
-    step("detect_1", "Detect events", "completed", "attempt_1"),
+    withVisual(step("detect_1", "Detect events", "completed", "attempt_1")),
     step("load_2", "Load data", "running", "attempt_2"),
   ];
   assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
-    ["load_1", "detect_1"]);
+    ["detect_1"]);
   assert.deepEqual(displayStepTimeline(cards, true).map((item) => item.step_id),
-    ["load_1", "detect_1"]);
+    ["detect_1"]);
   cards[2] = { ...cards[2], status: "completed" };
   assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
-    ["load_1", "detect_1", "load_2"]);
+    ["detect_1"]);
 });
 
 test("two genuine same-name stages in one attempt remain visible", () => {
   const visible = displayStepTimeline([
-    step("map_day_1", "Compute map", "completed", "attempt_1"),
-    step("map_day_2", "Compute map", "completed", "attempt_1"),
+    withVisual(step("map_day_1", "Compute map", "completed", "attempt_1")),
+    withVisual(step("map_day_2", "Compute map", "completed", "attempt_1")),
   ], true);
   assert.deepEqual(visible.map((item) => item.step_id), ["map_day_1", "map_day_2"]);
 });
 
 test("failed and unfinished stages never appear as cards", () => {
   const cards = [
-    step("load", "Load data", "completed", "attempt_1"),
+    withSummary(step("load", "Load data", "completed", "attempt_1")),
     step("analysis", "Compute field", "running", "attempt_1"),
     step("retry", "Compute field", "failed", "attempt_2"),
   ];
@@ -84,6 +99,17 @@ test("a failed step with a partial result is still hidden", () => {
   }];
   assert.deepEqual(displayStepTimeline([delivered], false), []);
   assert.deepEqual(displayStepTimeline([delivered], true), []);
+});
+
+test("a nonvisual analysis keeps only its latest saved outcome in the main view", () => {
+  const cards = [
+    withSummary(step("inspect", "Inspect store", "completed", "attempt_1")),
+    withSummary(step("calculate", "Calculate sea depth", "completed", "attempt_1")),
+    step("probe", "Probe serializer", "completed", "attempt_1"),
+  ];
+  assert.deepEqual(displayStepTimeline(cards, true).map((item) => item.step_id), ["calculate"]);
+  assert.deepEqual(displayStepDetails(cards, displayStepTimeline(cards, true)).map((item) => item.step_id),
+    ["inspect", "probe"]);
 });
 
 test("loose results reuse the latest version of each saved product", () => {

@@ -2981,6 +2981,25 @@ h4 {
   gap: 10px;
 }
 
+.workflow-details {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.workflow-details > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: var(--card-body-size);
+  list-style-position: inside;
+}
+
+.workflow-details-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .workflow-card {
   display: flex;
   flex-direction: column;

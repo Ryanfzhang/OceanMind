@@ -19,7 +19,7 @@ import { renderDockPanel, renderInlineChart } from "@/components/renderers";
 import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
-import { displayLooseResults, displayStepTimeline, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
+import { displayLooseResults, displayStepDetails, displayStepTimeline, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
 import { normalizeWorkspaceData } from "@/lib/workspace-results";
 
 type QuerySubmitOptions = {
@@ -334,6 +334,7 @@ function AssistantBlock({
   const resultCards = payload?.resultCards ?? [];
   const terminal = payload?.state === "completed" || payload?.state === "failed";
   const visibleSteps = displayStepTimeline(stepCards, terminal);
+  const detailSteps = displayStepDetails(stepCards, visibleSteps);
   const looseResults = displayLooseResults(resultCards, stepCards);
   const planSteps = payload?.planSteps ?? [];
   const visibleStepIds = new Set(visibleSteps.map((step) => step.step_id));
@@ -342,7 +343,7 @@ function AssistantBlock({
   const displaySourceCards = sourceCards.filter((source) => !isNoUsableExternalSourcesCard(source) && hasUsableSourceUrl(source));
   const webSearchHeader = buildWebSearchHeader(displaySourceCards, chinese);
   const summaryContent = buildCompletedSummaryContent(message);
-  const completedSteps = visibleSteps.length;
+  const completedSteps = visibleSteps.length + detailSteps.length;
   const progressLabel = completedSteps > 0 ? `${completedSteps} completed` : "";
   return (
     <div className="analysis-block">
@@ -391,7 +392,7 @@ function AssistantBlock({
             </div>
           ) : null}
 
-          {visibleSteps.length > 0 || looseResults.length > 0 ? (
+          {visibleSteps.length > 0 || looseResults.length > 0 || detailSteps.length > 0 ? (
             <div className="step-card-timeline">
               {visibleSteps.map((step) => (
                 <StepCardBlock
@@ -417,6 +418,26 @@ function AssistantBlock({
                   preferredLanguage={payload?.preferredLanguage}
                 />
               ))}
+              {detailSteps.length > 0 ? (
+                <details className="workflow-details">
+                  <summary>{`Show ${detailSteps.length} analysis ${detailSteps.length === 1 ? "step" : "steps"}`}</summary>
+                  <div className="workflow-details-list">
+                    {detailSteps.map((step) => (
+                      <StepCardBlock
+                        key={step.step_id}
+                        conversationId={conversationId}
+                        messageId={message.id}
+                        onOpenDetail={onOpenDetail}
+                        onPromoteMapField={onPromoteMapField}
+                        onResultAction={onResultAction}
+                        onToggleStepCard={onToggleStepCard}
+                        preferredLanguage={payload?.preferredLanguage}
+                        step={step}
+                      />
+                    ))}
+                  </div>
+                </details>
+              ) : null}
             </div>
           ) : null}
         </section>
