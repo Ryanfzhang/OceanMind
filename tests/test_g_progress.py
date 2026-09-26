@@ -177,6 +177,130 @@ def test_figure_linked_to_saved_2d_field_opens_interactive_map(tmp_path):
     assert payload["active_result_id"] == figure_id
 
 
+def test_figure_resolves_structured_map_through_other_saved_results(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Publish spatial results")
+    map_id = session.artifacts.publish(
+        "salinity_field", {
+            "lon": [120.0, 121.0], "lat": [20.0, 21.0],
+            "values": [[32.0, 33.0], [34.0, 35.0]],
+            "metadata": {"variable": "salinity", "units": "psu"},
+        }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[],
+    )
+    derived_id = session.artifacts.publish(
+        "salinity_statistics", {"mean": 33.5}, run_id=session.run_id,
+        attempt_id=attempt, stage_id=stage, inputs=[map_id],
+    )
+    unrelated_id = session.artifacts.publish(
+        "sample_count", {"count": 4}, run_id=session.run_id,
+        attempt_id=attempt, stage_id=stage, inputs=[],
+    )
+    point_id = session.artifacts.publish(
+        "salinity_station", {"event_type": "station",
+                             "events": [{"lon": 120.0, "lat": 20.0}]},
+        run_id=session.run_id, attempt_id=attempt, stage_id=stage,
+        inputs=[map_id],
+    )
+    image = BytesIO()
+    Image.new("RGB", (2, 2), "blue").save(image, format="PNG")
+    figure_id = session.artifacts.publish(
+        "salinity_figure", PngFigure(image.getvalue(), {}),
+        run_id=session.run_id, attempt_id=attempt, stage_id=stage,
+        inputs=[derived_id, point_id, unrelated_id],
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": figure_id}})
+    figure_card = adapter.finalize()["result_cards"][0]
+    assert figure_card["surface"] == "map"
+    assert figure_card["workspaceData"]["mapField"]["variable"] == "salinity"
+    assert figure_card["workspaceData"]["eventOverlays"][0]["center"] == {
+        "lat": 20.0, "lon": 120.0,
+    }
+
+
+def test_figure_with_multiple_distinct_spatial_inputs_keeps_map_choice_open(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Publish comparison")
+    spatial_ids = []
+    for name in ("temperature", "salinity"):
+        spatial_ids.append(session.artifacts.publish(
+            name, {"lon": [120.0, 121.0], "lat": [20.0, 21.0],
+                   "values": [[1.0, 2.0], [3.0, 4.0]],
+                   "metadata": {"variable": name}},
+            run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[],
+        ))
+    image = BytesIO()
+    Image.new("RGB", (2, 2), "blue").save(image, format="PNG")
+    figure_id = session.artifacts.publish(
+        "comparison_figure", PngFigure(image.getvalue(), {}),
+        run_id=session.run_id, attempt_id=attempt, stage_id=stage,
+        inputs=spatial_ids,
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": figure_id}})
+    figure_card = adapter.finalize()["result_cards"][0]
+    assert figure_card["surface"] == "inline"
+    assert "workspaceData" not in figure_card
+
+
+def test_spatial_field_and_point_events_share_one_interactive_map(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Locate deepest points")
+    artifact = session.artifacts.publish(
+        "seafloor_depth", {
+            "lon": [119.0, 120.0], "lat": [13.0, 14.0],
+            "values": [[-4200.0, -4600.0], [-3900.0, -4100.0]],
+            "metadata": {"variable": "seafloor_depth", "units": "m"},
+            "event_type": "deepest_point",
+            "events": [{"lon": 120.0, "lat": 13.0}],
+        }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[],
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    card = adapter.finalize()["result_cards"][0]
+    assert card["surface"] == "map"
+    assert card["workspaceData"]["mapField"]["variable"] == "seafloor_depth"
+    assert card["workspaceData"]["eventOverlays"][0]["center"] == {
+        "lat": 13.0, "lon": 120.0,
+    }
+
+
+def test_point_result_uses_its_saved_spatial_input_as_map_background(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Find extreme point")
+    field = xr.DataArray(
+        np.array([[-4200.0, -4600.0], [-3900.0, -4100.0]]),
+        dims=("lat", "lon"),
+        coords={"lat": [13.0, 14.0], "lon": [119.0, 120.0]},
+        name="seafloor_depth",
+    )
+    field_id = session.artifacts.publish(
+        "seafloor_depth", field, run_id=session.run_id, attempt_id=attempt,
+        stage_id=stage, inputs=[],
+    )
+    point_id = session.artifacts.publish(
+        "deepest_point", {"event_type": "deepest_point",
+                          "events": [{"lon": 120.0, "lat": 13.0}]},
+        run_id=session.run_id, attempt_id=attempt, stage_id=stage,
+        inputs=[field_id],
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": point_id}})
+    card = adapter.finalize()["result_cards"][0]
+    assert card["workspaceData"]["mapField"]["variable"] == "seafloor_depth"
+    assert card["workspaceData"]["eventOverlays"][0]["center"] == {
+        "lat": 13.0, "lon": 120.0,
+    }
+
+
 def test_map_preview_clips_land_for_unrelated_ocean_fields(tmp_path, monkeypatch):
     from domain.ocean.visualization import landmask
 

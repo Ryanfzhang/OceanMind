@@ -681,6 +681,63 @@ class ProgressAdapter:
                     workspace["eventOverlays"] = [*workspace.get("eventOverlays", []), overlay]
             pending.extend(source.get("inputs", []))
 
+    def _linked_map_workspace(self, metadata: dict) -> dict | None:
+        """Combine one map field and its point overlays from saved inputs."""
+        pending = [ref for ref in metadata.get("inputs", []) if isinstance(ref, str)]
+        seen: set[str] = set()
+        overlays: dict[str, dict] = {}
+        while pending and len(seen) < 128:
+            fields = []
+            next_level = []
+            for ref in pending:
+                if ref in seen:
+                    continue
+                seen.add(ref)
+                try:
+                    source = self.session.artifacts.read_artifact(ref)
+                    if (source.get("status") != "completed"
+                            or source.get("run_id") != self.session.run_id):
+                        continue
+                    workspace = self.workspace_by_result.get(ref)
+                    if workspace is None:
+                        path = _stored_payload(self.session.root, source["payload"])
+                        name = str(source.get("name") or "Spatial field").removeprefix("publish:")
+                        if source.get("kind") == "dataarray_netcdf":
+                            preview = _array_preview(path, name, spatial_slice_only=True)
+                        elif source.get("kind") == "json":
+                            preview = _json_preview(self.session.root, path, name)
+                        else:
+                            preview = None
+                        workspace = preview[1] if preview else {}
+                        if (source.get("kind") == "json"
+                                and path.stat().st_size <= PREVIEW_JSON_BYTES):
+                            with path.open(encoding="utf-8") as file:
+                                value = json.load(file).get("value")
+                            events = value.get("events") if isinstance(value, dict) else None
+                            if isinstance(events, list):
+                                kind = str(value.get("event_type") or "event")
+                                workspace = {**workspace, "eventOverlays": [
+                                    overlay for index, event in enumerate(events, 1)
+                                    if isinstance(event, dict)
+                                    if (overlay := _overlay(event, ref, index, kind, None, None))
+                                ]}
+                    if workspace.get("mapField"):
+                        fields.append(workspace["mapField"])
+                    for overlay in workspace.get("eventOverlays", []):
+                        overlays[overlay["id"]] = overlay
+                    next_level.extend(source.get("inputs", []))
+                except (OSError, KeyError, TypeError, ValueError):
+                    continue
+            distinct_fields = []
+            for field in fields:
+                if field not in distinct_fields:
+                    distinct_fields.append(field)
+            if distinct_fields:
+                return ({"mapField": distinct_fields[0], "eventOverlays": list(overlays.values())}
+                        if len(distinct_fields) == 1 else None)
+            pending = [ref for ref in next_level if isinstance(ref, str) and ref not in seen]
+        return {"eventOverlays": list(overlays.values())} if overlays else None
+
     def _card(self, stage_id: str, title: str | None = None,
               attempt_id: str | None = None) -> dict:
         if stage_id not in self.cards:
@@ -749,19 +806,11 @@ class ProgressAdapter:
                         result["renderer"], workspace = preview
                         result["workspaceData"] = workspace
                         self.workspace_by_result[artifact_id] = workspace
-            elif is_figure and len(metadata.get("inputs") or []) == 1:
-                source_id = metadata["inputs"][0]
-                source = self.session.artifacts.read_artifact(source_id)
-                if (source.get("status") == "completed" and source.get("run_id") == self.session.run_id
-                        and source.get("kind") == "dataarray_netcdf"):
-                    preview = _array_preview(
-                        _stored_payload(self.session.root, source["payload"]),
-                        str(source.get("name") or display_name).removeprefix("publish:"),
-                        spatial_slice_only=True,
-                    )
-                    if preview and preview[1].get("mapField"):
-                        result["workspaceData"] = preview[1]
-                        self.workspace_by_result[artifact_id] = preview[1]
+            elif is_figure:
+                workspace = self._linked_map_workspace(metadata)
+                if workspace:
+                    result["workspaceData"] = workspace
+                    self.workspace_by_result[artifact_id] = workspace
             elif metadata.get("kind") == "json":
                 path = _stored_payload(self.session.root, metadata["payload"])
                 result["metrics"] = _numeric_metrics(path)
@@ -787,16 +836,16 @@ class ProgressAdapter:
                                          ("eddy" if name == "detect_eddies" else
                                           name.removeprefix("detect_").rstrip("s")) or "event")
                         existing_field = (result.get("workspaceData") or {}).get("mapField")
-                        mask_field = (existing_field if existing_field and
-                                      str(existing_field.get("variable", "")).endswith("mask")
-                                      else _structured_mask_payload(value, self.session.root, event_type))
+                        map_field = existing_field or _structured_mask_payload(
+                            value, self.session.root, event_type,
+                        )
                         overlays = [overlay for i, item in enumerate(events, 1)
                                     if isinstance(item, dict)
                                     if (overlay := _overlay(item, artifact_id, i, event_type,
                                                             when, depth))]
                         workspace = {"eventOverlays": overlays}
-                        if mask_field:
-                            workspace["mapField"] = mask_field
+                        if map_field:
+                            workspace["mapField"] = map_field
                         coordinates = value.get("coordinates")
                         if isinstance(coordinates, dict) and "mapField" not in workspace:
                             for field_name in ("ow_field", "gradient_field", "vorticity_field"):
@@ -807,11 +856,10 @@ class ProgressAdapter:
                                 if map_field:
                                     workspace["mapField"] = map_field
                                     break
-                        for input_id in metadata.get("inputs", []):
-                            source = self.workspace_by_result.get(input_id, {})
-                            if source.get("mapField") and "mapField" not in workspace:
-                                workspace["mapField"] = source["mapField"]
-                                break
+                        if "mapField" not in workspace:
+                            linked = self._linked_map_workspace(metadata)
+                            if linked and linked.get("mapField"):
+                                workspace["mapField"] = linked["mapField"]
                         result.update(type="eddy_detection" if event_type == "eddy" else "event_detection",
                                       renderer="event", surface="map",
                                       metrics=[{"label": "Detected events", "value": str(len(overlays))}],
