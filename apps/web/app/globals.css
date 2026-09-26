@@ -3318,6 +3318,14 @@ h4 {
   margin: 0;
 }
 
+.response-figure .result-inline-headline,
+.response-figure .result-inline-description,
+.response-figure .result-inline-metrics,
+.response-figure .result-detail-section-list,
+.response-figure .result-interpretation-card {
+  display: none;
+}
+
 .response-figure figcaption {
   margin-top: 4px;
   color: var(--muted);

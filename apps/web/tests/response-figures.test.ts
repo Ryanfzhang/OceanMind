@@ -13,13 +13,15 @@ test("response embeds an LLM-selected interactive card and keeps its citation", 
       label: "2020 hypoxic days", variable: "hypoxic_days",
     } },
   };
-  const text = "The hotspot expanded [Figure 1](#figure-artifact_123).\n\n" +
-    "![Figure 1. Days with bottom hypoxia in 2020; the map locates the highest burden.](#figure-artifact_123)";
-  const selected = selectResponseFigures(text, [card]);
+  const unusedCard = { ...card, id: "artifact_456", title: "Other result" };
+  const text = "The hotspot expanded [(Fig. 1)](#figure-artifact_123).\n\n" +
+    "![Fig. 1. Bottom hypoxia in 2020](#figure-artifact_123)";
+  const selected = selectResponseFigures(text, [card, unusedCard]);
+  assert.equal(selected.figures.length, 1);
   assert.equal(selected.figures[0]?.card.id, card.id);
-  assert.match(selected.figures[0]?.caption ?? "", /bottom hypoxia/);
-  assert.match(selected.prose, /\[Figure 1\]\(#figure-artifact_123\)/);
-  assert.doesNotMatch(selected.prose, /!\[Figure 1/);
+  assert.match(selected.figures[0]?.caption ?? "", /bottom hypoxia/i);
+  assert.match(selected.prose, /\[\(Fig\. 1\)\]\(#figure-artifact_123\)/);
+  assert.doesNotMatch(selected.prose, /!\[Fig\. 1/);
 });
 
 test("response does not embed an unknown or nonvisual artifact", () => {
