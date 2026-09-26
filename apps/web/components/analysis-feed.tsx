@@ -579,7 +579,7 @@ function AssistantBlock({
 
       {payload?.state === "failed" ? (
         <div className="failure-response-card ui-card">
-          <strong className="ui-card-title">{chinese ? "回复" : "Response"}</strong>
+          <strong className="ui-card-title">{chinese ? "系统错误" : "System error"}</strong>
           <p className="ui-card-body">{payload.summary}</p>
         </div>
       ) : null}

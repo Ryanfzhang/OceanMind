@@ -3,6 +3,7 @@
 import pytest
 
 from packages.agent_loop.skills import (
+    DEFAULT_SKILLS_ROOT,
     MAX_SKILL_BYTES,
     READ_SKILL_SCHEMA,
     list_skills,
@@ -24,6 +25,18 @@ def test_read_one_skill_preserves_plain_markdown():
     assert body.startswith("---\nskill_id: ocean_event_statistics")
     assert "## Workflow" in body
     assert "compute_event_statistics(" in body
+
+
+def test_windows_crlf_skill_frontmatter_is_indexed(tmp_path):
+    original_index = list_skills()
+    for item in original_index:
+        skill_id = item["skill_id"]
+        folder = tmp_path / skill_id
+        folder.mkdir()
+        body = (DEFAULT_SKILLS_ROOT / skill_id / "SKILL.md").read_bytes()
+        (folder / "SKILL.md").write_bytes(body.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    assert list_skills(tmp_path) == original_index
+    assert "include_climatology" in read_skill("ocean_transport_analysis", tmp_path)
 
 
 def test_index_does_not_decode_skill_body(tmp_path):

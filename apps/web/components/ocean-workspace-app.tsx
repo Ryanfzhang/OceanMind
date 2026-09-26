@@ -409,7 +409,7 @@ function buildClientFailureMessage(message: string) {
   if (lowered.includes("network") || lowered.includes("fetch") || lowered.includes("terminated") || lowered.includes("econnreset")) {
     return "The live connection did not return a complete result. Please try again.";
   }
-  return message.trim() || "The request could not be completed. Please try again.";
+  return "An internal error interrupted the request. Please try again.";
 }
 
 type FailureResponseStage = "planning" | "execution" | "synthesis" | "transport" | "visualization";
@@ -429,14 +429,14 @@ function buildFailureResponseCopy({
   detail?: string | null;
 }) {
   const summaryByStage: Record<FailureResponseStage, string> = {
-    planning: "I could not prepare the analysis plan.",
-    execution: "I could not complete the analysis.",
-    synthesis: "I could not prepare the final answer.",
-    transport: "I could not complete the request.",
-    visualization: "I could not create the visualization.",
+    planning: "The analysis plan could not be prepared.",
+    execution: "The analysis could not be completed.",
+    synthesis: "The final answer could not be prepared.",
+    transport: "The request could not be completed.",
+    visualization: "The visualization could not be created.",
   };
   return {
-    summary: `${summaryByStage[stage]} Reason: ${normalizeFailureDetail(detail)}`,
+    summary: `${summaryByStage[stage]} ${normalizeFailureDetail(detail)}`,
     note: "",
   };
 }

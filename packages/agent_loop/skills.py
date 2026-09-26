@@ -41,10 +41,12 @@ def _skill_file(skill_id: str, root: Path | str | None) -> Path:
 def _metadata(path: Path) -> dict[str, str]:
     with path.open("rb") as source:
         front = source.read(MAX_FRONTMATTER_BYTES + 1)
-    end = front.find(b"\n---\n", 4)
-    if end < 0 or end + 5 > MAX_FRONTMATTER_BYTES:
+    prefix_length = 6 if front.startswith(b"\xef\xbb\xbf---") else 3
+    closing = re.search(rb"\r?\n---\r?\n", front[prefix_length:])
+    end = prefix_length + closing.end() if closing else -1
+    if end < 0 or end > MAX_FRONTMATTER_BYTES:
         raise ValueError(f"Skill frontmatter is missing or too long: {path.parent.name}")
-    lines = front[:end + 5].decode("utf-8").splitlines()
+    lines = front[:end].decode("utf-8-sig").splitlines()
     if not lines or lines[0] != "---" or "---" not in lines[1:]:
         raise ValueError(f"Missing skill frontmatter: {path.parent.name}")
     fields = dict(
