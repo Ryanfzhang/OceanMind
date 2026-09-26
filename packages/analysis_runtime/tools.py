@@ -10,6 +10,7 @@ from typing import Any
 
 import xarray as xr
 
+from domain.ocean.result_payload import ResultWithCompanions
 from packages.analysis_runtime.artifacts import ArtifactStore
 from packages.analysis_runtime.records import RunRecords
 from packages.analysis_runtime.stages import StageManager
@@ -144,23 +145,38 @@ class AnalysisTools:
         token = set_tool_progress_callback(progress)
         try:
             result = func()
+            companions = result.companions if isinstance(result, ResultWithCompanions) else {}
             if (presentation == "auto" and isinstance(result, xr.DataArray)
                     and not refs and source_result
                     and not any(isinstance(value, xr.DataArray) for value in kwargs.values())):
                 presentation = "summary"
             artifact_id = self.artifacts.publish(
-                name, result, run_id=self.records.run_id, attempt_id=self.stages.attempt_id,
+                name, dict(result) if companions else result,
+                run_id=self.records.run_id, attempt_id=self.stages.attempt_id,
                 stage_id=stage.id, inputs=refs, call_id=call_id,
                 presentation=presentation,
             )
-            summary = json.dumps(
-                self.artifacts.read_artifact(artifact_id)["summary"], ensure_ascii=False
-            )[:500]
-            self.records.update("call", call_id, status="completed", artifact_ids=[artifact_id])
-            self.stages.register_call_result(
-                call_id, status="completed", artifact_id=artifact_id,
-                summary=summary, inputs=refs,
-            )
+            saved = [(artifact_id, refs)]
+            for suffix, companion in companions.items():
+                companion_refs = [*refs, artifact_id]
+                companion_id = self.artifacts.publish(
+                    f"{name}_{suffix}", companion,
+                    run_id=self.records.run_id, attempt_id=self.stages.attempt_id,
+                    stage_id=stage.id, inputs=companion_refs, call_id=call_id,
+                    presentation=presentation,
+                )
+                saved.append((companion_id, companion_refs))
+                self._result_refs[id(companion)] = companion_id
+            self.records.update("call", call_id, status="completed",
+                                artifact_ids=[item[0] for item in saved])
+            for saved_id, saved_refs in saved:
+                summary = json.dumps(
+                    self.artifacts.read_artifact(saved_id)["summary"], ensure_ascii=False
+                )[:500]
+                self.stages.register_call_result(
+                    call_id, status="completed", artifact_id=saved_id,
+                    summary=summary, inputs=saved_refs,
+                )
             self._result_refs[id(result)] = artifact_id
             self.stages._event({"type": "call_completed", "stage_id": stage.id,
                                 "call_id": call_id, "artifact_id": artifact_id})

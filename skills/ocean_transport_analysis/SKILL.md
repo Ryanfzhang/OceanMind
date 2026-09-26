@@ -31,6 +31,7 @@ regional_gauge = None  # <-- MODIFY: use 'gan_fig10_china_seas' for China Seas +
 transect_points = [[113.0, 18.0], [114.0, 19.0]]  # <-- MODIFY: ordered lon/lat transect points.
 n_samples = 100  # <-- MODIFY: number of samples along the transect.
 method = 'linear'  # <-- MODIFY: interpolation method.
+include_climatology = False  # <-- MODIFY: True for a multi-year time-depth view with a seasonal climatology.
 
 u_field = load_dataset(
     variable=variables[0],
@@ -135,6 +136,7 @@ transport_flux_hovmoller = compute_transect_normal_flux_hovmoller(
     depth_range=depth_range,
     n_samples=n_samples,
     method=method,
+    include_climatology=include_climatology,
 )
 ```
 
@@ -164,6 +166,7 @@ layer_transport = compute_transport_by_layer(
 - Supported mask builders include: threshold, condition, combined.
 - For volume transport streamfunction map requests, use the exact tool call `compute_transport_streamfunction_map(...)`. Do not rename it to `compute_streamfunction`.
 - For time-depth normal volume flux / transport-flux Hovmoller requests, use the exact tool call `compute_transect_normal_flux_hovmoller(...)`. Do not use `generated_python_analysis` for this workflow branch.
+- For a time range longer than one year, set `include_climatology=True` unless the user asks for only the original timeline. One call then saves the original time-depth view and a separate calendar-aligned climatology; for shorter ranges leave it `False`.
 - Reuse the already loaded `u_field` and `v_field`; do not load duplicate zonal/meridional current fields for the same scope.
 - For seasonal streamfunction requests such as "summer mean", set `season_filter='summer'` or `season_filter='JJA'` on the `load_dataset` calls and keep `time_aggregation='mean'` on `compute_transport_streamfunction_map`.
 - Skill files describe retrieval, defaults, composition, and workflow intent; concrete type and shape checks live in the harness contracts.

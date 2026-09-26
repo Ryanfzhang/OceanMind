@@ -13,6 +13,14 @@ DEFAULT_RESULT_FULL_LIST_LIMIT = 100_000
 DEFAULT_WORKSPACE_MAX_MATRIX_POINTS = 120_000
 
 
+class ResultWithCompanions(dict):
+    """A primary tool result with separately publishable companion results."""
+
+    def __init__(self, primary: dict[str, Any], companions: dict[str, Any]):
+        super().__init__(primary)
+        self.companions = companions
+
+
 def result_full_list_limit() -> int:
     return _positive_int_env("OCEAN_RESULT_FULL_LIST_LIMIT", DEFAULT_RESULT_FULL_LIST_LIMIT)
 

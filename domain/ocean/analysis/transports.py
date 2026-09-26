@@ -5,6 +5,7 @@ Transect-based transport diagnostics.
 from __future__ import annotations
 
 import math
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Literal, Optional, Tuple
@@ -30,6 +31,7 @@ from domain.ocean.dask_utils import (
     report_phase,
 )
 from domain.ocean.visualization.landmask import build_land_mask as _build_land_mask
+from domain.ocean.result_payload import ResultWithCompanions, as_numeric_array
 
 
 DEFAULT_TRANSPORT_TRANSECT_SAMPLES = 120
@@ -798,17 +800,25 @@ def compute_transect_normal_flux_hovmoller(
     depth_range: Optional[Tuple[float, float]] = None,
     n_samples: int = DEFAULT_TRANSPORT_TRANSECT_SAMPLES,
     method: Literal["linear", "nearest"] = "linear",
+    include_climatology: bool = False,
 ) -> Dict:
     """
     Build a time-depth Hovmoller of along-transect integrated normal volume flux.
 
     The retained vertical coordinate is depth; values are the normal flux
     integrated across the sampled transect length, with units m^2 s^-1.
+
+    Args:
+        include_climatology: Also save a separate calendar-aligned climatology
+            when the selected time range exceeds one year. The original view
+            is always retained.
     """
+    if not isinstance(include_climatology, bool):
+        raise TypeError("include_climatology must be a boolean")
     if find_partitioned_values((u, v)):
         from packages.tool_loader.partitioned_execution import execute_partition_aware
 
-        return execute_partition_aware(
+        result = execute_partition_aware(
             tool_name="compute_transect_normal_flux_hovmoller",
             tool_func=compute_transect_normal_flux_hovmoller,
             params={
@@ -818,8 +828,10 @@ def compute_transect_normal_flux_hovmoller(
                 "depth_range": depth_range,
                 "n_samples": n_samples,
                 "method": method,
+                "include_climatology": False,
             },
         )
+        return _with_hovmoller_climatology(result) if include_climatology else result
     u = materialize_partitioned_xarray(u)
     v = materialize_partitioned_xarray(v)
 
@@ -856,7 +868,7 @@ def compute_transect_normal_flux_hovmoller(
         end=0.9,
     )
 
-    return {
+    result = {
         "time": [str(value) for value in flux_field.time.values],
         "spatial_coord": flux_field[depth_dim].values.tolist(),
         "values": flux_per_depth,
@@ -874,6 +886,70 @@ def compute_transect_normal_flux_hovmoller(
             "sign_convention": "positive values indicate flux to the left of the transect orientation",
         },
     }
+    return _with_hovmoller_climatology(result) if include_climatology else result
+
+
+def _with_hovmoller_climatology(result: Dict) -> ResultWithCompanions:
+    """Keep the original matrix and derive one annual cycle from its full values."""
+    times = result["time"]
+    dates = [date.fromisoformat(str(value)[:10]) for value in times]
+    if len(dates) < 2 or (max(dates) - min(dates)).days <= 365:
+        raise ValueError("include_climatology requires a time range longer than one year")
+
+    values = as_numeric_array(result["values"])
+    if (values.ndim != 2 or values.shape !=
+            (len(dates), len(result["spatial_coord"]))):
+        raise ValueError("Hovmoller values must match its time and depth axes")
+    intervals = np.diff(sorted({day.toordinal() for day in dates}))
+    daily = bool(intervals.size and np.median(intervals) <= 2)
+    phases = ([(day.month, day.day) if (day.month, day.day) != (2, 29) else None
+               for day in dates] if daily
+              else [(day.month,) for day in dates])
+    unique_phases = sorted(phase for phase in set(phases) if phase is not None)
+    climatology_values = np.full((len(unique_phases), values.shape[1]), np.nan)
+    for index, phase in enumerate(unique_phases):
+        selected = values[[item == phase for item in phases]]
+        finite = np.isfinite(selected)
+        counts = finite.sum(axis=0)
+        climatology_values[index] = np.divide(
+            np.where(finite, selected, 0.0).sum(axis=0), counts,
+            out=np.full(values.shape[1], np.nan), where=counts > 0,
+        )
+
+    if daily:
+        totals = np.zeros_like(climatology_values)
+        counts = np.zeros_like(climatology_values)
+        for offset in range(-15, 15):
+            shifted = np.roll(climatology_values, offset, axis=0)
+            finite = np.isfinite(shifted)
+            totals += np.where(finite, shifted, 0.0)
+            counts += finite
+        climatology_values = np.divide(
+            totals, counts, out=np.full_like(totals, np.nan), where=counts > 0,
+        )
+
+    labels = ([date(2000, month, day).strftime("%b %d")
+               for month, day in unique_phases] if daily
+              else [date(2000, month, 1).strftime("%b") for (month,) in unique_phases])
+    metadata = dict(result.get("metadata") or {})
+    metadata.update({
+        "aggregation": "daily_climatology" if daily else "monthly_climatology",
+        "aggregation_label": ("30-day smoothed daily climatology" if daily
+                              else "Monthly climatology"),
+        "source_time_steps": len(times),
+        "source_time_range": [times[0], times[-1]],
+        "source_years": len({day.year for day in dates}),
+        "statistics": _compute_field_statistics(climatology_values),
+    })
+    if daily:
+        metadata["leap_day_handling"] = "omitted"
+    climatology = {
+        "time": labels,
+        "spatial_coord": list(result["spatial_coord"]),
+        "values": climatology_values,
+        "metadata": metadata,
+    }
+    return ResultWithCompanions(result, {"climatology": climatology})
 
 
 def _select_depth_range(data: xr.DataArray, depth_range: Optional[Tuple[float, float]]) -> xr.DataArray:

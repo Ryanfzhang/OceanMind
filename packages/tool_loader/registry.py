@@ -695,6 +695,7 @@ TOOL_CONTRACTS: Dict[str, Dict[str, Any]] = {
             "depth_range": {"kind": "literal_or_ref", "type": "array"},
             "n_samples": {"kind": "literal", "type": "integer"},
             "method": {"kind": "literal", "type": "string"},
+            "include_climatology": {"kind": "literal", "type": "boolean"},
         },
         "reference_examples": ["$ref:u_field.data", "$ref:v_field.data"],
     },
