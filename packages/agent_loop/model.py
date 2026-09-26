@@ -32,6 +32,7 @@ class OpenAIChatModel:
         *,
         tools: list[dict[str, Any]] | None = None,
         timeout: float | None = None,
+        max_tokens: int | None = None,
     ) -> dict[str, Any]:
         """Return an assistant message ready to append to graph state."""
         kwargs: dict[str, Any] = {"model": self.model, "messages": messages}
@@ -39,6 +40,8 @@ class OpenAIChatModel:
             kwargs["tools"] = tools
         if timeout is not None:
             kwargs["timeout"] = timeout
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
         response = self.client.chat.completions.create(**kwargs)
         message = _get(_get(response, "choices")[0], "message")
         result: dict[str, Any] = {
@@ -70,3 +73,7 @@ class OpenAIChatModel:
                 for call in calls
             ]
         return result
+
+    def complete_route(self, messages: list[dict[str, Any]], *, timeout: float | None = None):
+        """Bound the routing decision so it cannot turn into a long answer."""
+        return self.complete(messages, tools=[], timeout=timeout, max_tokens=160)

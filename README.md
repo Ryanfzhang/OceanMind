@@ -68,7 +68,10 @@ Set `data_path` in `configs/dataset_config.yaml` to the directory containing
 your ocean dataset and update its metadata for that dataset. Set
 `CARTO_BASEMAP_API_KEY` in `.env` for the interactive map. The agent and
 API-backed web search use `OPENAI_MODEL` by default; `AGENT_MODEL` and
-`WEB_SEARCH_MODEL` are optional overrides.
+`WEB_SEARCH_MODEL` are optional overrides. OceanMind uses a short LLM routing
+decision to choose workspace analysis, external web information, or conversation.
+Set `ROUTER_MODEL` to a fast model on the same API endpoint to reduce routing
+latency. External information goes from web search directly to the answer agent.
 
 ### Step 3: Start
 

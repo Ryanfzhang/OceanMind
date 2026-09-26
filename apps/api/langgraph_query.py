@@ -21,12 +21,13 @@ from packages.agent_loop.conversations import ConversationRecord, ConversationSt
 from packages.agent_loop.graph import build_graph
 from packages.agent_loop.language import preferred_language
 from packages.agent_loop.model import OpenAIChatModel
+from packages.agent_loop.router import route_query
 from packages.agent_loop.state import AgentState, initial_state
 from packages.runtime.dataset_config import (
     get_active_dataset_config,
     get_active_dataset_public_config,
 )
-from packages.runtime.llm_config import load_agent_model_config
+from packages.runtime.llm_config import load_agent_model_config, load_config_value
 
 
 router = APIRouter()
@@ -93,6 +94,14 @@ def _default_model() -> OpenAIChatModel:
     config = load_agent_model_config()
     return OpenAIChatModel(
         api_key=config.api_key, base_url=config.base_url, model=config.model,
+    )
+
+
+def _router_model() -> OpenAIChatModel:
+    config = load_agent_model_config()
+    return OpenAIChatModel(
+        api_key=config.api_key, base_url=config.base_url,
+        model=load_config_value("ROUTER_MODEL") or config.model,
     )
 
 
@@ -238,6 +247,8 @@ class QueryService:
         *,
         model_factory: Callable[[], Any] = _default_model,
         answer_model_factory: Callable[[], Any] | None = None,
+        router_model_factory: Callable[[], Any] | None = None,
+        web_search: Callable[..., Any] | None = None,
         data_roots: Callable[[], tuple[str | Path, ...]] = _default_data_roots,
         progress_factory: ProgressFactory | None = None,
         max_rounds: int = 60,
@@ -246,6 +257,8 @@ class QueryService:
         self.store = ConversationStore(workspace)
         self.model_factory = model_factory
         self.answer_model_factory = answer_model_factory
+        self.router_model_factory = router_model_factory
+        self.web_search = web_search
         self.data_roots = data_roots
         self.progress_factory = progress_factory
         self.max_rounds = max_rounds
@@ -299,10 +312,40 @@ class QueryService:
             state["messages"] = [*record.messages, *state["messages"]]
             emit({"event": "execution_event", "payload": {"type": "planning_started"}})
             try:
+                route = None
+                if self.router_model_factory is not None:
+                    prior_request = next(
+                        (message.get("content") for message in reversed(record.messages)
+                         if message.get("role") == "user"), None,
+                    )
+                    pending_question = (_question({"status": record.status,
+                                                   "messages": record.messages})
+                                        if record.status == "needs_input" else None)
+                    try:
+                        route = route_query(
+                            self.router_model_factory(), request.query,
+                            pending_request=(prior_request if isinstance(prior_request, str)
+                                             else None),
+                            pending_question=pending_question,
+                            timeout=(max(0.001, state["deadline"] - time.monotonic())
+                                     if state["deadline"] else None),
+                        )
+                    except Exception:
+                        # A router outage must not prevent the agent from serving a query.
+                        route = None
                 graph = build_graph(
                     self.model_factory(), max_rounds=self.max_rounds,
                     answer_model=self.answer_model_factory() if self.answer_model_factory else None,
                     analysis_session=session,
+                    web_search=self.web_search,
+                    forced_search_query=(
+                        route["search_query"] if route and route["mode"] == "web_information"
+                        else None
+                    ),
+                    forced_clarification=(
+                        route["question"] if route and route["mode"] == "clarification"
+                        else None
+                    ),
                 )
                 state = graph.invoke(
                     state, config={"recursion_limit": 2 * self.max_rounds + 8},
@@ -310,6 +353,8 @@ class QueryService:
                 record = replace(record, messages=state["messages"], status=state["status"])
                 self.store.save(record)
                 response = _response(state, record, request.query, turn_start)
+                if route is not None:
+                    response["router_reason"] = route["mode"]
                 if adapter is not None:
                     response.update(adapter.finalize(state))
                 return response
@@ -358,6 +403,7 @@ def get_query_service() -> QueryService:
     ).expanduser()
     return QueryService(workspace,
                         answer_model_factory=_default_model,
+                        router_model_factory=_router_model,
                         progress_factory=ProgressAdapter)
 
 

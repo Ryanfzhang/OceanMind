@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -50,9 +51,9 @@ SYSTEM_PROMPT = (
     "You are OceanMind. For factual or scientific questions that do not need "
     "dataset analysis, call web_search before answering, even when the topic "
     "is familiar. Use relevant retrieved URLs as citations when useful, but "
-    "citations are optional; never invent them. If search fails, answer from "
-    "stable knowledge without "
-    "pretending sources were checked. Answer conversational or creative "
+    "citations are optional; never invent them. If search fails, answer stable "
+    "historical facts from knowledge without pretending sources were checked; "
+    "do not infer current conditions. Answer conversational or creative "
     "requests directly. "
     "For ocean analysis, skills are optional method guidance: read one when useful, "
     "and use find_tools to inspect actual Python tool signatures. Treat skill examples "
@@ -66,6 +67,10 @@ SYSTEM_PROMPT = (
     "and apply a polygon mask when analyzing the drawn polygon rather than "
     "treating only its bounding box as the selected area. "
     "If essential information is missing, call request_clarification with one question."
+    " Weather and other current external facts require web_search; the configured "
+    "ocean dataset is not evidence that live information is unavailable. For weather, "
+    "ask for a city or location when none is specified. If a search fails, say the "
+    "live information could not be verified; do not invent current conditions."
 )
 
 
@@ -95,6 +100,8 @@ def build_graph(
     web_search: Callable[..., Any] | None = None,
     skills_root: Path | str | None = None,
     analysis_session: AnalysisSession | None = None,
+    forced_search_query: str | None = None,
+    forced_clarification: str | None = None,
 ):
     """Compile one model/tool loop; injected model and tools support offline tests."""
     if max_rounds < 1:
@@ -202,6 +209,20 @@ def build_graph(
         violation = budget_violation(state, max_rounds)
         if violation:
             return {**state, **violation}
+        if (state["rounds"] == 0 and max_rounds > 1
+                and (forced_search_query or forced_clarification)):
+            action = (("request_clarification", forced_clarification)
+                      if forced_clarification else ("web_search", forced_search_query))
+            if action:
+                tool_name, argument = action
+                arguments = ({"query": argument} if tool_name == "web_search"
+                             else {"question": argument})
+                message = {"role": "assistant", "content": None, "tool_calls": [{
+                    "id": f"call_{uuid.uuid4().hex}", "type": "function",
+                    "function": {"name": tool_name,
+                                 "arguments": json.dumps(arguments, ensure_ascii=False)},
+                }]}
+                return {**append_message(state, message), "rounds": 1}
         deadline = state["deadline"]
         timeout = max(0.001, deadline - time.monotonic()) if deadline else None
         remaining = max_rounds - state["rounds"]
@@ -396,8 +417,13 @@ def build_graph(
     })
     graph.add_conditional_edges(
         "tools",
-        lambda state: "agent" if state["status"] == "running" else "finalize",
-        {"agent": "agent", "finalize": "finalize"},
+        lambda state: (
+            "finalize" if state["status"] != "running" else
+            "answer_agent" if (forced_search_query and answer_model is not None
+                               and state["rounds"] == 1) else "agent"
+        ),
+        {"agent": "agent", "finalize": "finalize",
+         **({"answer_agent": "answer_agent"} if answer_model is not None else {})},
     )
     graph.add_edge("finalize", END)
     return graph.compile()

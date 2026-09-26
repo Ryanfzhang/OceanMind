@@ -30,7 +30,8 @@ ANSWER_PROMPT = (
     "line. For general factual or scientific questions without retrieved web "
     "results, call web_search once before finalizing when possible. Cite useful "
     "retrieved URLs when available, but citations are optional and source links "
-    "must not be invented. "
+    "must not be invented. If live search fails, say current conditions could not "
+    "be verified; do not substitute old workspace data or invent current facts. "
     "Saved code and result files are attached automatically; "
     "do not list artifact IDs in the prose."
 )
