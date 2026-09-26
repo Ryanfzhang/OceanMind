@@ -95,6 +95,7 @@ def test_search_answer_stays_on_latest_question_after_router_fallback(tmp_path):
 
     synthesis = ScriptedModel([
         {"role": "assistant", "content": "CMOMS ends in December 2022."},
+        {"role": "assistant", "content": "CMOMS 数据截止于 2022 年 12 月。"},
         weather_answer,
     ])
     service = QueryService(

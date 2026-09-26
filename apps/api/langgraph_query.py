@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from packages.agent_loop.answer import web_answer_messages
 from packages.agent_loop.conversations import ConversationRecord, ConversationStore
+from packages.agent_loop.finalize import explain_failure
 from packages.agent_loop.graph import build_graph
 from packages.agent_loop.language import preferred_language
 from packages.agent_loop.model import OpenAIChatModel
@@ -121,10 +122,11 @@ def _default_data_roots() -> tuple[Path, ...]:
     return tuple(roots)
 
 
-def _question(state: AgentState) -> str | None:
+def _question(state: AgentState, turn_start: int = 0) -> str | None:
     if state["status"] != "needs_input":
         return None
-    for message in reversed(state["messages"]):
+    turn_messages = state["messages"][turn_start:]
+    for message in reversed(turn_messages):
         if message.get("role") != "tool":
             continue
         try:
@@ -133,7 +135,7 @@ def _question(state: AgentState) -> str | None:
             continue
         if isinstance(payload, dict) and isinstance(payload.get("question"), str):
             return payload["question"]
-    for message in reversed(state["messages"]):
+    for message in reversed(turn_messages):
         if message.get("role") == "assistant" and isinstance(message.get("content"), str):
             return message["content"].strip() or None
     return None
@@ -150,14 +152,12 @@ def _model_error_detail(exc: Exception) -> str:
     return type(exc).__name__
 
 
-def _summary(state: AgentState) -> str:
-    for message in reversed(state["messages"]):
+def _summary(state: AgentState, turn_start: int = 0) -> str:
+    for message in reversed(state["messages"][turn_start:]):
         if message.get("role") == "assistant" and isinstance(message.get("content"), str):
             if message["content"].strip():
                 return message["content"].strip()
-    if state["status"] == "needs_input":
-        return _question(state) or "More information is needed."
-    return "The analysis ended without a complete answer."
+    return ""
 
 
 def _skills_used(messages: list[dict[str, Any]]) -> list[str]:
@@ -211,10 +211,12 @@ def _sources(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _response(
     state: AgentState, record: ConversationRecord, query: str, turn_start: int,
 ) -> dict[str, Any]:
-    success = state["status"] == "completed"
-    needs_input = state["status"] == "needs_input"
-    summary = _summary(state)
     turn_messages = state["messages"][turn_start:]
+    summary = _summary(state, turn_start)
+    success = state["status"] == "completed" and bool(summary)
+    question = _question(state, turn_start)
+    needs_input = state["status"] == "needs_input" and bool(question)
+    failure_explained = bool(state.get("failure_explained") and summary)
     analysis = any(
         call.get("function", {}).get("name") in {"write_analysis", "run_analysis"}
         for message in turn_messages for call in message.get("tool_calls") or []
@@ -229,7 +231,7 @@ def _response(
         "router_reason": None,
         "skill_id": None,
         "skills_used": _skills_used(turn_messages),
-        "clarification_question": _question(state),
+        "clarification_question": question,
         "missing_fields": [],
         "analysis_proposal": None,
         "dataset_info": get_active_dataset_public_config(),
@@ -238,7 +240,8 @@ def _response(
         "step_cards": [],
         "result_cards": [],
         "result_summaries": {},
-        "synthesis": {"summary": summary} if success else None,
+        "synthesis": {"summary": summary} if success or failure_explained else None,
+        "failure_explained": failure_explained,
         "summary_status": "completed" if success else "failed",
         "source_cards": _sources(turn_messages),
         "active_result_id": None,
@@ -246,7 +249,7 @@ def _response(
         "workspace_data": {},
         "workspace_data_by_result": {},
         "attachments": state.get("attachments", []),
-        "error": None if success or needs_input else state["termination_reason"] or summary,
+        "error": None if success or needs_input else state["termination_reason"] or "empty_model_answer",
         "failure_kind": None if success or needs_input else "execution",
         "recoverable": state["status"] == "incomplete",
     }
@@ -278,6 +281,14 @@ class QueryService:
         self.progress_factory = progress_factory
         self.max_rounds = max_rounds
         self.timeout_seconds = timeout_seconds
+
+    def _explain_failed_state(self, state: AgentState) -> AgentState:
+        try:
+            model = (self.answer_model_factory() if self.answer_model_factory
+                     else self.model_factory())
+        except Exception:
+            return state
+        return explain_failure(state, model, self.max_rounds)
 
     def _record(self, request: QueryRequest, roots: tuple[str | Path, ...]):
         conversation_id = request.conversation_id
@@ -397,6 +408,8 @@ class QueryService:
                     except Exception as exc:
                         state = {**state, "status": "failed",
                                  "termination_reason": f"answer_model_error: {_model_error_detail(exc)}"}
+                    if state["status"] == "failed":
+                        state = self._explain_failed_state(state)
                     record = replace(record, messages=state["messages"], status=state["status"])
                     self.store.save(record)
                     response = _response(state, record, request.query, turn_start)
@@ -424,6 +437,13 @@ class QueryService:
                 if adapter is not None:
                     response.update(adapter.finalize(state))
                 return response
+            except Exception as exc:
+                state = {**state, "status": "failed",
+                         "termination_reason": f"{type(exc).__name__}: {str(exc)[:240]}"}
+                state = self._explain_failed_state(state)
+                record = replace(record, messages=state["messages"], status=state["status"])
+                self.store.save(record)
+                return _response(state, record, request.query, turn_start)
             finally:
                 session.close()
 
@@ -435,6 +455,23 @@ class QueryService:
                 response = self.execute(request, emit=events.put)
                 events.put({"event": "final", "payload": response})
             except Exception as exc:
+                state = initial_state(request.query.strip())
+                state = {**state, "status": "failed",
+                         "termination_reason": f"{type(exc).__name__}: {str(exc)[:240]}"}
+                state = self._explain_failed_state(state)
+                if state.get("failure_explained"):
+                    events.put({"event": "final", "payload": {
+                        "status": "failed", "query": request.query,
+                        "conversation_id": request.conversation_id,
+                        "skills_used": [], "missing_fields": [],
+                        "plan_steps": [], "step_cards": [], "result_cards": [],
+                        "result_summaries": {}, "source_cards": [],
+                        "synthesis": {"summary": state["messages"][-1]["content"]},
+                        "failure_explained": True,
+                        "error": state["termination_reason"],
+                        "failure_kind": "execution", "recoverable": True,
+                    }})
+                    return
                 events.put({"event": "error", "payload": {
                     "detail": str(exc), "failure_kind": "execution", "recoverable": True,
                 }})

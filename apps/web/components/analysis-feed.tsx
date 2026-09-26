@@ -493,7 +493,7 @@ function AssistantBlock({
         </section>
       ) : null}
 
-      {payload?.state === "completed" && payload.summary ? (
+      {(payload?.state === "completed" || (payload?.state === "failed" && payload.failureExplained)) && payload.summary ? (
         <div className="findings-section ui-card">
           <h4 className="findings-title ui-card-title">{chinese ? "回复" : "Response"}</h4>
           {conversationId && figureAttachments.length > 0 ? (
@@ -577,7 +577,7 @@ function AssistantBlock({
         </div>
       ) : null}
 
-      {payload?.state === "failed" ? (
+      {payload?.state === "failed" && !payload.failureExplained ? (
         <div className="failure-response-card ui-card">
           <strong className="ui-card-title">{chinese ? "系统错误" : "System error"}</strong>
           <p className="ui-card-body">{payload.summary}</p>

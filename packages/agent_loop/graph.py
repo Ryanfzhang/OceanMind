@@ -28,6 +28,7 @@ from packages.agent_loop.answer import (
 from packages.agent_loop.finalize import (
     REQUEST_CLARIFICATION_SCHEMA,
     clarification_request,
+    explain_failure,
     finalize_delivery,
     finalize_state,
 )
@@ -109,7 +110,27 @@ def build_graph(
     """Compile one model/tool loop; injected model and tools support offline tests."""
     if max_rounds < 1:
         raise ValueError("model decision limit must be positive")
+    answer_reserve = min(3, max_rounds - 1) if answer_model is not None else 0
     search = web_search or make_web_search_tool()
+
+    def complete_with_retry(
+        current_model: Any, messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]], timeout: float | None,
+    ) -> tuple[dict[str, Any] | None, Exception | None]:
+        attempts = 0
+        while attempts < 2:
+            attempts += 1
+            try:
+                return current_model.complete(
+                    messages, tools=tools, timeout=timeout,
+                ), None
+            except Exception as exc:
+                transient = isinstance(exc, (ConnectionError, TimeoutError)) or any(
+                    word in type(exc).__name__.lower() for word in ("connection", "timeout")
+                )
+                if not transient or attempts >= 2:
+                    return None, exc
+        return None, RuntimeError("Model connection retry failed")
 
     skill_index = list_skills(skills_root)
     skill_prompt = "\nAvailable skill guidance (ID: summary):\n" + "\n".join(
@@ -219,6 +240,8 @@ def build_graph(
         violation = budget_violation(state, max_rounds)
         if violation:
             return {**state, **violation}
+        if answer_reserve and state["rounds"] >= max_rounds - answer_reserve:
+            return state
         deadline = state["deadline"]
         timeout = max(0.001, deadline - time.monotonic()) if deadline else None
         remaining = max_rounds - state["rounds"]
@@ -232,11 +255,14 @@ def build_graph(
               + language_instruction(state["language"]) + delivery_hint},
              *state["messages"]], analysis_session,
         )
-        answer = model.complete(
-            model_messages,
-            tools=[] if remaining <= (2 if answer_model is not None else 1) else schemas,
-            timeout=timeout,
+        answer, error = complete_with_retry(
+            model, model_messages,
+            [REQUEST_CLARIFICATION_SCHEMA] if remaining == 1 else schemas,
+            timeout,
         )
+        if error is not None or answer is None:
+            return {**state, "status": "failed",
+                    "termination_reason": f"model_error: {type(error).__name__}"}
         updated = append_message(state, answer)
         content = answer.get("content")
         return {**updated, "rounds": state["rounds"] + 1,
@@ -261,6 +287,9 @@ def build_graph(
         if state["status"] != "running":
             return "finalize"
         calls = state["messages"][-1].get("tool_calls") or []
+        if answer_reserve and state["rounds"] >= max_rounds - answer_reserve:
+            if state["messages"][-1].get("role") == "tool" or not calls:
+                return "answer_agent"
         return "tools" if calls else "answer_agent" if answer_model is not None else "finalize"
 
     answer_registry = {"web_search": search}
@@ -283,8 +312,11 @@ def build_graph(
         remaining = max_rounds - state["rounds"]
         deadline = state["deadline"]
         prompt = ANSWER_PROMPT + language_instruction(state["language"])
-        if remaining == 1:
-            prompt += "\nThis is the final model decision. Deliver from verified evidence now."
+        if remaining <= 2:
+            prompt += ("\nThis is the final model decision. Answer from verified evidence "
+                       "or request essential user input; do not start more analysis.")
+        elif remaining <= answer_reserve:
+            prompt += "\nFinish from the available evidence within the remaining model decisions."
         current_turn = state["messages"][state.get("turn_start", 0):]
         web_evidence = web_evidence_from_turn(current_turn)
         messages = (web_answer_messages(state["current_query"], web_evidence,
@@ -294,11 +326,19 @@ def build_graph(
                         [{"role": "system", "content": prompt}, *state["messages"]],
                         analysis_session,
                     ))
-        reply = answer_model.complete(
-            messages,
-            tools=[] if remaining == 1 else answer_schemas,
-            timeout=max(0.001, deadline - time.monotonic()) if deadline else None,
+        available_schemas = (
+            [REQUEST_CLARIFICATION_SCHEMA] if remaining <= 2 else
+            [schema for schema in answer_schemas
+             if schema["function"]["name"] != "request_verification"]
+            if remaining <= answer_reserve else answer_schemas
         )
+        reply, error = complete_with_retry(
+            answer_model, messages, available_schemas,
+            max(0.001, deadline - time.monotonic()) if deadline else None,
+        )
+        if error is not None or reply is None:
+            return {**state, "status": "failed",
+                    "termination_reason": f"answer_model_error: {type(error).__name__}"}
         updated = append_message(state, reply)
         content = reply.get("content")
         return {**updated, "rounds": state["rounds"] + 1, "answer_active": True,
@@ -397,27 +437,33 @@ def build_graph(
     graph.add_node("tools", run_tools)
     def finalize(state: AgentState) -> AgentState:
         classified = finalize_state(state)
+        if classified["status"] == "failed":
+            classified = explain_failure(classified, answer_model or model, max_rounds)
         if classified["status"] == "completed":
             messages = classified["messages"]
             content = messages[-1].get("content") if messages else None
-            if isinstance(content, str) and content.strip() and (
-                preferred_language(content) != classified["language"]
-            ):
+            if (classified["rounds"] < max_rounds
+                    and isinstance(content, str) and content.strip()
+                    and preferred_language(content) != classified["language"]):
                 name = "Chinese" if classified["language"] == "zh" else "English"
-                corrected = (answer_model or model).complete([
-                    {"role": "system", "content": (
-                        f"Translate the following answer into {name}. Return only the "
-                        "translated answer. Preserve every number, unit, URL, artifact "
-                        "ID, citation, and Markdown structure exactly; do not add facts."
-                    )},
-                    {"role": "user", "content": content},
-                ], tools=[], timeout=None)
-                translation = corrected.get("content")
+                try:
+                    corrected = (answer_model or model).complete([
+                        {"role": "system", "content": (
+                            f"Translate the following answer into {name}. Return only the "
+                            "translated answer. Preserve every number, unit, URL, artifact "
+                            "ID, citation, and Markdown structure exactly; do not add facts."
+                        )},
+                        {"role": "user", "content": content},
+                    ], tools=[], timeout=None)
+                    translation = corrected.get("content")
+                except Exception:
+                    translation = None
                 if (isinstance(translation, str) and translation.strip()
                         and preferred_language(translation) == classified["language"]):
                     messages = [*messages]
                     messages[-1] = {**messages[-1], "content": translation.strip()}
-                    classified = {**classified, "messages": messages}
+                    classified = {**classified, "messages": messages,
+                                  "rounds": classified["rounds"] + 1}
         return (finalize_delivery(classified, analysis_session)
                 if analysis_session is not None else classified)
 

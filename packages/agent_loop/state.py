@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     draft: str
     language: Language
     answer_active: bool
+    failure_explained: bool
     current_query: str
     turn_start: int
 
@@ -47,6 +48,7 @@ def initial_state(
         "draft": "",
         "language": language or preferred_language(user_query),
         "answer_active": False,
+        "failure_explained": False,
         "current_query": user_query,
         "turn_start": 0,
     }

@@ -74,6 +74,24 @@ def test_clarification_resumes_same_run_and_keeps_other_session_out(tmp_path):
     assert restored.messages[-1]["content"] == "Use 2022."
 
 
+def test_backend_exception_uses_model_authored_failure_response(tmp_path, monkeypatch):
+    def broken_graph(*_args, **_kwargs):
+        raise RuntimeError("optional analysis setup failed")
+
+    monkeypatch.setattr("apps.api.langgraph_query.build_graph", broken_graph)
+    explanation = (
+        "I could not start the calculation because analysis setup failed before "
+        "any data was read. Please retry after the service is repaired."
+    )
+    model = ScriptedModel([{"role": "assistant", "content": explanation}])
+    service = QueryService(tmp_path, model_factory=lambda: model, data_roots=lambda: ())
+    result = service.execute(QueryRequest(query="Compute transport across the selected line"))
+    assert result["status"] == "failed"
+    assert result["failure_explained"] is True
+    assert result["synthesis"]["summary"] == explanation
+    assert "optional analysis setup failed" in model.seen[0][-1]["content"]
+
+
 def test_ndjson_starts_before_model_completes(tmp_path):
     release = threading.Event()
 

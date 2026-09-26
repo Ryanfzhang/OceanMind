@@ -582,6 +582,7 @@ export type QueryApiResponse = {
   result_cards: ResultCardSummary[];
   result_summaries: Record<string, Record<string, unknown>>;
   synthesis?: ApiSynthesis | null;
+  failure_explained?: boolean;
   summary_status?: "pending" | "completed" | "failed";
   source_cards: SourceCard[];
   active_result_id?: string | null;
@@ -632,6 +633,7 @@ export type AssistantMessagePayload = {
   attachments?: Array<{ kind: string; ref: string }>;
   activeResultId?: string;
   failureKind?: QueryApiResponse["failure_kind"];
+  failureExplained?: boolean;
   recoverable?: boolean;
   timings?: Record<string, number>;
 };

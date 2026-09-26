@@ -6,6 +6,7 @@ import json
 import re
 from typing import Any, Mapping
 
+from packages.agent_loop.language import language_instruction
 from packages.agent_loop.state import AgentState
 from packages.analysis_runtime.artifacts import _stored_payload
 
@@ -77,6 +78,55 @@ def finalize_state(state: AgentState) -> AgentState:
 
     return {**state, "status": "failed",
             "termination_reason": state.get("termination_reason") or "answer_not_finished"}
+
+
+def explain_failure(state: AgentState, model: Any, max_rounds: int) -> AgentState:
+    """Ask the model to explain an interrupted run from bounded observations."""
+    if (state["status"] != "failed" or state.get("failure_explained")
+            or state["rounds"] >= max_rounds):
+        return state
+    events = []
+    for message in state["messages"][state.get("turn_start", 0):][-12:]:
+        entry = {"role": message.get("role")}
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            entry["content"] = content[:1200]
+        calls = message.get("tool_calls") or []
+        if calls:
+            entry["tools_called"] = [
+                call.get("function", {}).get("name") for call in calls[:8]
+            ]
+        events.append(entry)
+    prompt = (
+        "You are OceanMind. The requested work stopped before completion. "
+        "Write the user-facing explanation yourself from the supplied facts: "
+        "what was actually attempted or verified, why work stopped, and the most "
+        "useful next step. Distinguish saved results from unfinished work. "
+        "If user input is required, explain why and offer a clearly unconfirmed "
+        "option when useful. Do not invent results, blame the user, or expose "
+        "internal exception names unless they clarify a concrete action. "
+        "Be concise."
+        + language_instruction(state["language"])
+    )
+    facts = json.dumps({
+        "request": state["current_query"],
+        "stop_reason": state.get("termination_reason"),
+        "recent_events": events,
+    }, ensure_ascii=False, default=str)
+    try:
+        reply = model.complete([
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": facts},
+        ], tools=[], timeout=20)
+    except Exception:
+        return state
+    content = reply.get("content")
+    if not isinstance(content, str) or not content.strip() or reply.get("tool_calls"):
+        return state
+    return {**state,
+            "messages": [*state["messages"], {"role": "assistant", "content": content.strip()}],
+            "rounds": state["rounds"] + 1,
+            "failure_explained": True}
 
 
 def finalize_delivery(state: AgentState, session: Any) -> AgentState:

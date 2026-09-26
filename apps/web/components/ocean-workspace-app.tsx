@@ -304,12 +304,14 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
   } as const;
   const findings = buildScientificFindings(response.synthesis);
   const failureSummary = response.error ?? "The query failed.";
+  const failureExplained = response.status === "failed" && response.failure_explained === true
+    && Boolean(response.synthesis?.summary?.trim());
   const clarificationSummary =
     response.analysis_proposal?.approval_prompt ??
-    response.clarification_question ?? "More information is needed.";
+    response.clarification_question ?? "";
   const timingText = formatTimings(response.timings);
   const failureResponse =
-    response.status === "failed"
+    response.status === "failed" && !failureExplained
       ? buildFailureResponseCopy({
           stage:
             response.failure_kind === "execution"
@@ -328,10 +330,10 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
     preferredLanguage: "en" as const,
     summary:
       response.status === "completed"
-        ? response.synthesis?.summary ?? response.plan_summary ?? "Analysis completed."
+        ? response.synthesis?.summary ?? ""
         : response.status === "clarification_needed"
           ? clarificationSummary
-          : failureResponse?.summary ?? failureSummary,
+          : failureExplained ? response.synthesis?.summary ?? "" : failureResponse?.summary ?? failureSummary,
     note:
       response.status === "completed"
         ? [response.plan_summary ?? response.router_reason ?? "", timingText].filter(Boolean).join(" ")
@@ -358,6 +360,7 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
     attachments: response.attachments,
     activeResultId: response.active_result_id ?? undefined,
     failureKind: response.failure_kind ?? undefined,
+    failureExplained,
     recoverable: response.recoverable ?? undefined,
     timings: response.timings,
   };
@@ -1003,8 +1006,8 @@ export function OceanWorkspaceApp() {
             }
 
             if (eventType === "clarification_needed") {
-              const question =
-                typeof payload.question === "string" ? payload.question : "More information is needed to continue.";
+              const question = typeof payload.question === "string" ? payload.question : "";
+              if (!question.trim()) return;
               setMessages((previous) =>
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
@@ -1094,8 +1097,7 @@ export function OceanWorkspaceApp() {
                 updateAssistantMessage(previous, pendingAssistantId, (current) => {
                   const summary =
                     (typeof synthesis?.summary === "string" ? synthesis.summary : null)
-                    ?? current.planSummary
-                    ?? "Analysis completed.";
+                    ?? "";
 
                   // Merge interpretations from synthesis into existing step cards
                   let updatedStepCards = current.stepCards ?? [];

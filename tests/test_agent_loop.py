@@ -150,6 +150,47 @@ def test_missing_input_reaches_model_when_optional_skill_is_invalid(tmp_path):
     assert json.loads(state["messages"][-1]["content"])["question"] == question
 
 
+def test_last_three_model_decisions_are_reserved_for_answer():
+    executor = ScriptedModel([
+        {"role": "assistant", "content": None, "tool_calls": [
+            call("calculator", {"operation": "add", "a": number, "b": 1}, f"call_{number}")
+        ]}
+        for number in range(3)
+    ])
+    answer = ScriptedModel([{"role": "assistant", "content": "I verified three calculations."}])
+    state = build_graph(
+        executor, answer_model=answer, max_rounds=6,
+        tool_registry={"calculator": lambda a, b, **_: a + b},
+    ).invoke(initial_state("Check the calculations and summarize"))
+    assert state["status"] == "completed"
+    assert state["messages"][-1]["content"] == "I verified three calculations."
+    assert len(executor.seen) == 3
+    assert len(answer.seen) == 1
+    assert state["rounds"] == 4
+
+
+def test_program_failure_is_explained_by_model_without_backend_response():
+    class FailingModel:
+        calls = 0
+
+        def complete(self, messages, *, tools, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("storage unavailable")
+            assert "model_error: RuntimeError" in messages[-1]["content"]
+            return {"role": "assistant", "content": (
+                "I could not inspect the dataset because the model request failed "
+                "before any data was read. Please retry."
+            )}
+
+    model = FailingModel()
+    state = build_graph(model, max_rounds=6).invoke(initial_state("Inspect the dataset"))
+    assert state["status"] == "failed"
+    assert state["failure_explained"] is True
+    assert state["messages"][-1]["content"].startswith("I could not inspect")
+    assert model.calls == 2
+
+
 def test_clarification_and_limits_have_distinct_statuses():
     clarification = {"role": "assistant", "content": None, "tool_calls": [
         call("request_clarification", {"question": "Which dataset?"})
@@ -207,14 +248,15 @@ def test_transient_model_error_retries_agent_without_replaying_tool():
                     call("calculator", {"operation": "add", "a": 2, "b": 3})]}
             if self.calls == 2:
                 raise ConnectionError("temporary model connection")
-            assert json.loads(messages[-1]["content"])["result"] == 5
+            assert messages[-1]["content"] == "5"
             return {"role": "assistant", "content": "The sum is 5."}
 
     model = FlakyModel()
     tool_calls = []
-    state = build_graph(model, tool_registry={"calculator": lambda **kwargs: (
+    state = build_graph(model, max_rounds=2, tool_registry={"calculator": lambda **kwargs: (
         tool_calls.append(kwargs) or kwargs["a"] + kwargs["b"]
     )}).invoke(initial_state("Add"))
     assert state["status"] == "completed"
     assert model.calls == 3
+    assert state["rounds"] == 2
     assert len(tool_calls) == 1
