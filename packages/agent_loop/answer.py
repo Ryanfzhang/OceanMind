@@ -35,6 +35,8 @@ ANSWER_PROMPT = (
     "line. Confirm a completed image_png result with list_results/read_artifact "
     "before calling a figure attached; a disk path alone is insufficient. If an "
     "explicitly requested static figure is missing, request_verification. "
+    "For multi-year time-depth results, verify that a separate climatology was "
+    "published when a seasonal cycle is meaningful; request_verification if missing. "
     "For current external "
     "facts or requested citations without retrieved web "
     "results, call web_search when needed. Cite useful "
