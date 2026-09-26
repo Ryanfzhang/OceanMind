@@ -100,6 +100,9 @@ button:disabled {
   align-self: stretch;
   height: 100%;
   width: 100%;
+  /* Left panel + right panel + gaps/padding + a bounded map track. */
+  max-width: calc(320px + 580px + 48px + min(1240px, 135vh));
+  margin-inline: auto;
   min-width: 0;
   min-height: 0;
   padding: 12px 12px 0;
