@@ -10,9 +10,11 @@ class ScriptedModel:
     def __init__(self, replies):
         self.replies = iter(replies)
         self.seen = []
+        self.tools_seen = []
 
     def complete(self, messages, *, tools, timeout):
         self.seen.append(messages)
+        self.tools_seen.append(tools)
         reply = next(self.replies)
         return reply(messages) if callable(reply) else reply
 
@@ -27,8 +29,10 @@ def test_external_information_searches_even_if_executor_would_skip_it(tmp_path):
     router = ScriptedModel([decision("web_information", search_query="今天香港天气")])
 
     def answer(messages):
-        result = json.loads(messages[-1]["content"])
+        assert all(not message.get("tool_calls") for message in messages)
+        result = json.loads(messages[-1]["content"].split("Web search results: ", 1)[1])
         assert result["results"][0]["url"] == "https://weather.example/hong-kong"
+        assert len(result["results"][0]["snippet"]) == 1200
         return {"role": "assistant", "content": "香港天气来源：https://weather.example/hong-kong"}
 
     executor = ScriptedModel([])
@@ -39,7 +43,7 @@ def test_external_information_searches_even_if_executor_would_skip_it(tmp_path):
         searched.append(kwargs["query"])
         return {"query": kwargs["query"], "provider": "test", "results": [{
             "title": "Hong Kong weather", "url": "https://weather.example/hong-kong",
-            "snippet": "Observed conditions",
+            "snippet": "Observed conditions " * 200,
         }]}
 
     service = QueryService(tmp_path, model_factory=lambda: executor,
@@ -56,8 +60,10 @@ def test_external_information_searches_even_if_executor_would_skip_it(tmp_path):
     assert response["router_reason"] == "web_information"
     assert searched == ["今天香港天气"]
     assert response["source_cards"][0]["url"] == "https://weather.example/hong-kong"
+    assert len(response["source_cards"][0]["short_snippet"]) == 600
     assert not executor.seen
     assert len(synthesis.seen) == 1
+    assert synthesis.tools_seen == [[]]
 
 
 def test_missing_location_clarifies_then_searches_on_resume(tmp_path):
@@ -95,6 +101,7 @@ def test_missing_location_clarifies_then_searches_on_resume(tmp_path):
     assert second["status"] == "completed"
     assert searched == ["今天香港天气"]
     assert second["source_cards"][0]["url"] == "https://weather.example/hk"
+    assert not any(message.get("tool_calls") for message in executor.seen[0])
 
 
 def test_workspace_request_does_not_force_web_search(tmp_path):
@@ -108,6 +115,35 @@ def test_workspace_request_does_not_force_web_search(tmp_path):
     assert response["status"] == "completed"
     assert response["router_reason"] == "workspace_analysis"
     assert len(executor.seen) == 1
+
+
+def test_llm_can_answer_stable_knowledge_without_web_search(tmp_path):
+    router = ScriptedModel([decision("conversation")])
+    executor = ScriptedModel([{"role": "assistant", "content": "盐度是海水中溶解盐的含量。"}])
+    service = QueryService(tmp_path, model_factory=lambda: executor,
+                           router_model_factory=lambda: router,
+                           web_search=lambda **_: (_ for _ in ()).throw(AssertionError("searched")),
+                           data_roots=lambda: ())
+    response = service.execute(QueryRequest(query="盐度是什么意思？"))
+    assert response["status"] == "completed"
+    assert response["router_reason"] == "conversation"
+    assert response["source_cards"] == []
+
+
+def test_provider_validation_error_is_reported_without_request_dump(tmp_path):
+    class BadRequestError(Exception):
+        body = {"error": {"message": "Tool call message is invalid"}}
+
+    router = ScriptedModel([decision("web_information", search_query="今天香港天气")])
+    answer = ScriptedModel([lambda _messages: (_ for _ in ()).throw(BadRequestError("secret"))])
+    service = QueryService(tmp_path, model_factory=lambda: answer,
+                           router_model_factory=lambda: router,
+                           web_search=lambda **_: {"provider": "test", "results": []},
+                           data_roots=lambda: ())
+    response = service.execute(QueryRequest(query="今天香港天气"))
+    assert response["status"] == "failed"
+    assert response["error"] == "answer_model_error: BadRequestError: Tool call message is invalid"
+    assert "secret" not in response["error"]
 
 
 def test_invalid_router_output_falls_back_to_agent():

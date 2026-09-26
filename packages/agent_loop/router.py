@@ -20,8 +20,9 @@ ROUTER_PROMPT = (
     '{"mode":"workspace_analysis|web_information|conversation|clarification",'
     '"search_query":null,"question":null}. '
     "workspace_analysis = compute/plot/inspect the ocean workspace. "
-    "web_information = facts requiring outside sources, including live conditions, "
-    "weather, news, scientific facts and literature. conversation = no outside evidence. "
+    "web_information = requests needing fresh or verifiable outside sources, such as "
+    "live conditions, weather, news, requested citations or recent literature. "
+    "conversation = greetings, creative work or stable knowledge answerable without search. "
     "clarification = essential detail missing; ask one question (weather needs a "
     "location; workspace map is not user location). If answering pending_question, "
     "combine pending_request and latest_request. For web_information set search_query "

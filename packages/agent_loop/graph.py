@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import time
-import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -48,9 +47,10 @@ from packages.runtime.dataset_config import get_active_dataset_config
 
 
 SYSTEM_PROMPT = (
-    "You are OceanMind. For factual or scientific questions that do not need "
-    "dataset analysis, call web_search before answering, even when the topic "
-    "is familiar. Use relevant retrieved URLs as citations when useful, but "
+    "You are OceanMind. For questions that do not need dataset analysis, use "
+    "web_search when current information, source verification, or requested citations "
+    "are needed. Stable knowledge can be answered directly. Use relevant retrieved "
+    "URLs as citations when useful, but "
     "citations are optional; never invent them. If search fails, answer stable "
     "historical facts from knowledge without pretending sources were checked; "
     "do not infer current conditions. Answer conversational or creative "
@@ -100,13 +100,12 @@ def build_graph(
     web_search: Callable[..., Any] | None = None,
     skills_root: Path | str | None = None,
     analysis_session: AnalysisSession | None = None,
-    forced_search_query: str | None = None,
-    forced_clarification: str | None = None,
 ):
     """Compile one model/tool loop; injected model and tools support offline tests."""
     if max_rounds < 1:
         raise ValueError("model decision limit must be positive")
     search = web_search or make_web_search_tool()
+
     skill_index = list_skills(skills_root)
     skill_prompt = "\nAvailable skill guidance (ID: summary):\n" + "\n".join(
         f"- {item['skill_id']}: {item['description']}" for item in skill_index
@@ -209,20 +208,6 @@ def build_graph(
         violation = budget_violation(state, max_rounds)
         if violation:
             return {**state, **violation}
-        if (state["rounds"] == 0 and max_rounds > 1
-                and (forced_search_query or forced_clarification)):
-            action = (("request_clarification", forced_clarification)
-                      if forced_clarification else ("web_search", forced_search_query))
-            if action:
-                tool_name, argument = action
-                arguments = ({"query": argument} if tool_name == "web_search"
-                             else {"question": argument})
-                message = {"role": "assistant", "content": None, "tool_calls": [{
-                    "id": f"call_{uuid.uuid4().hex}", "type": "function",
-                    "function": {"name": tool_name,
-                                 "arguments": json.dumps(arguments, ensure_ascii=False)},
-                }]}
-                return {**append_message(state, message), "rounds": 1}
         deadline = state["deadline"]
         timeout = max(0.001, deadline - time.monotonic()) if deadline else None
         remaining = max_rounds - state["rounds"]
@@ -417,13 +402,8 @@ def build_graph(
     })
     graph.add_conditional_edges(
         "tools",
-        lambda state: (
-            "finalize" if state["status"] != "running" else
-            "answer_agent" if (forced_search_query and answer_model is not None
-                               and state["rounds"] == 1) else "agent"
-        ),
-        {"agent": "agent", "finalize": "finalize",
-         **({"answer_agent": "answer_agent"} if answer_model is not None else {})},
+        lambda state: "agent" if state["status"] == "running" else "finalize",
+        {"agent": "agent", "finalize": "finalize"},
     )
     graph.add_edge("finalize", END)
     return graph.compile()

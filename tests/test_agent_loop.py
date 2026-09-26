@@ -90,32 +90,6 @@ def test_search_source_reaches_final_answer():
     assert "https://example.org/source" in state["messages"][-1]["content"]
 
 
-def test_forced_external_search_goes_directly_to_answer_agent():
-    executor = ScriptedModel([])
-
-    def answer(messages):
-        assert json.loads(messages[-1]["content"])["results"][0]["url"] == "https://example.org/weather"
-        return {"role": "assistant", "content": "Today's conditions: https://example.org/weather"}
-
-    synthesis = ScriptedModel([answer])
-    searched = []
-
-    def search(**kwargs):
-        searched.append(kwargs["query"])
-        return {"query": kwargs["query"], "results": [{
-            "title": "Weather", "url": "https://example.org/weather", "snippet": "Conditions",
-        }]}
-
-    state = build_graph(executor, answer_model=synthesis, web_search=search,
-                        forced_search_query="Hong Kong weather today").invoke(
-        initial_state("How is the weather in Hong Kong today?")
-    )
-    assert state["status"] == "completed"
-    assert searched == ["Hong Kong weather today"]
-    assert not executor.seen
-    assert len(synthesis.seen) == 1
-
-
 def test_answer_agent_can_return_a_conflict_for_verification():
     executor = ScriptedModel([
         {"role": "assistant", "content": "Draft says 34 days."},
