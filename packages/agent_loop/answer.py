@@ -48,8 +48,41 @@ ANSWER_PROMPT = (
     "must not be invented. If live search fails, say current conditions could not "
     "be verified; do not substitute old workspace data or invent current facts. "
     "Completed published results appear in the UI; "
-    "do not list artifact IDs in the prose."
+    "do not list artifact IDs in the prose. For claims supported by a saved visual, "
+    "cite a small set of key figures as [Figure 1](#figure-ARTIFACT_ID), etc. "
+    "At the end, embed each cited result card once with "
+    "![Figure 1. A concise explanation of what the result shows and why it matters](#figure-ARTIFACT_ID). "
+    "Choose completed results from the catalog; interactive cards and PNGs both work. "
+    "Do not cite a preview with invalid values or an unsupported interpretation. "
+    "For management or environmental advice, name the evidence-linked risk zone, "
+    "specific monitoring or seasonal action, and important uncertainty. Treat proposed "
+    "thresholds as proposals, not existing rules."
 )
+
+
+def visual_result_catalog(session: Any, limit: int = 80) -> str:
+    """Give the answer agent bounded, verified result references for figure selection."""
+    index = session.root / "artifacts" / "index"
+    if not index.is_dir():
+        return ""
+    entries = []
+    for path in sorted(index.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+        try:
+            item = session.artifacts.read_artifact(path.stem)
+        except (OSError, ValueError):
+            continue
+        if item.get("status") != "completed" or item.get("run_id") != session.run_id:
+            continue
+        kind = item.get("kind")
+        summary = item.get("summary") or {}
+        if kind == "dataarray_netcdf" and not {"lat", "lon"}.issubset(summary.get("dims") or []):
+            continue
+        if kind not in {"image_png", "dataarray_netcdf", "json"}:
+            continue
+        entries.append({key: item[key] for key in ("artifact_id", "name", "kind", "description") if key in item})
+        if len(entries) >= limit:
+            break
+    return json.dumps(entries, ensure_ascii=False)
 
 
 def web_answer_messages(

@@ -31,6 +31,7 @@ export const EMPTY_WORKSPACE_DATA: WorkspaceData = {
   eofModes: [],
   compositeFields: [],
   mapField: null,
+  mapFieldFrames: [],
   eventOverlays: [],
 };
 
@@ -74,6 +75,7 @@ export function normalizeWorkspaceData(workspaceData?: Partial<WorkspaceData>): 
     eofModes: workspaceData?.eofModes ?? [],
     compositeFields: workspaceData?.compositeFields ?? [],
     mapField: workspaceData?.mapField ?? null,
+    mapFieldFrames: workspaceData?.mapFieldFrames ?? [],
     eventOverlays: workspaceData?.eventOverlays ?? [],
   };
 }

@@ -22,8 +22,7 @@ from packages.agent_loop.analysis import (
 from packages.agent_loop.answer import (
     ANSWER_PROMPT,
     REQUEST_VERIFICATION_SCHEMA,
-    web_answer_messages,
-    web_evidence_from_turn,
+    visual_result_catalog,
 )
 from packages.agent_loop.finalize import (
     REQUEST_CLARIFICATION_SCHEMA,
@@ -187,8 +186,11 @@ def build_graph(
             "create a generic Run analysis stage for publishing. "
             "Use short, descriptive English stage titles for the English workspace UI; "
             "name actual analysis actions, not diagnostic probes. "
-            "Use `publish(name, value, inputs=[])` for custom computed results; "
-            "if the value derives from a tool result, pass its saved ID in inputs using "
+            "Use `publish(name, value, inputs=[], description='...')` for custom computed results; "
+            "give each visual result a short description of what it shows, its period and region, "
+            "and the key interpretable pattern. "
+            "For a tool-generated visual, call `tools.describe_result(result, '...')` "
+            "after checking it. If the value derives from a tool result, pass its saved ID in inputs using "
             "`tools.ref(result)`. Tool calls already save their results; do not publish "
             "the same result again. Do not pass a `kind` argument. "
             "For a custom result derived from a selected transect or polygon without "
@@ -314,20 +316,19 @@ def build_graph(
         remaining = max_rounds - state["rounds"]
         deadline = state["deadline"]
         prompt = ANSWER_PROMPT + language_instruction(state["language"])
+        if analysis_session is not None:
+            catalog = visual_result_catalog(analysis_session)
+            if catalog:
+                prompt += "\nCompleted result catalog for optional key figures: " + catalog
         if remaining <= 2:
             prompt += ("\nThis is the final model decision. Answer from verified evidence "
                        "or request essential user input; do not start more analysis.")
         elif remaining <= answer_reserve:
             prompt += "\nFinish from the available evidence within the remaining model decisions."
-        current_turn = state["messages"][state.get("turn_start", 0):]
-        web_evidence = web_evidence_from_turn(current_turn)
-        messages = (web_answer_messages(state["current_query"], web_evidence,
-                                        state["language"])
-                    if web_evidence is not None
-                    else hydrate_vision_messages(
-                        [{"role": "system", "content": prompt}, *state["messages"]],
-                        analysis_session,
-                    ))
+        messages = hydrate_vision_messages(
+            [{"role": "system", "content": prompt}, *state["messages"]],
+            analysis_session,
+        )
         available_schemas = (
             [REQUEST_CLARIFICATION_SCHEMA] if remaining <= 2 else
             [schema for schema in answer_schemas

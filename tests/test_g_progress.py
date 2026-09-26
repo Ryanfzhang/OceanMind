@@ -9,6 +9,7 @@ import xarray as xr
 from PIL import Image
 
 from apps.api.langgraph_progress import ProgressAdapter, _array_preview, _json_preview, _map_payload
+from packages.agent_loop.answer import visual_result_catalog
 from packages.agent_loop.analysis import AnalysisSession
 from packages.analysis_runtime.figures import PngFigure
 from packages.analysis_runtime.stages import StageManager
@@ -668,7 +669,7 @@ def test_later_summary_backfills_polygon_outline_on_earlier_map(tmp_path):
     assert [[point["lon"], point["lat"]] for point in path] == [*vertices, vertices[0]]
 
 
-def test_multidimensional_saved_field_gets_bounded_spatial_preview(tmp_path):
+def test_multidimensional_saved_field_does_not_silently_average_axes(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()
     stage = session.records.new_stage(attempt, "Load 4D field")
@@ -682,8 +683,84 @@ def test_multidimensional_saved_field_gets_bounded_spatial_preview(tmp_path):
     adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
                       "entry": {"status": "completed", "artifact_id": artifact_id}})
     card = adapter.finalize()["result_cards"][0]
-    assert card["workspaceData"]["mapField"]["values"][0][0] == 13.5
-    assert card["surface"] == "map"
+    assert "workspaceData" not in card
+    assert card["surface"] == "inline"
+
+
+def test_by_year_preview_keeps_years_separate_and_masks_integer_missing(tmp_path, monkeypatch):
+    import domain.ocean.visualization.landmask as landmask
+
+    monkeypatch.setattr(landmask, "mask_land_for_map_preview",
+                        lambda lon, lat, values: (values, None))
+    missing = np.iinfo(np.int64).min
+    field = xr.DataArray(
+        np.array([[[1, missing], [3, 4]], [[5, 6], [missing, 8]]], dtype=np.int64),
+        dims=("year", "lat", "lon"),
+        coords={"year": [2020, 2021], "lat": [32, 33], "lon": [120, 121]},
+        name="hypoxic_days",
+    )
+    path = tmp_path / "by_year.nc"
+    field.to_netcdf(path)
+    renderer, workspace = _array_preview(path, "Hypoxic Event Days By Year")
+    assert renderer == "summary"
+    assert [frame["label"] for frame in workspace["mapFieldFrames"]] == ["2020", "2021"]
+    assert workspace["mapFieldFrames"][0]["mapField"]["values"] == [[1.0, None], [3.0, 4.0]]
+    assert workspace["mapFieldFrames"][1]["mapField"]["values"] == [[5.0, 6.0], [None, 8.0]]
+    assert workspace["mapFieldFrames"][0]["mapField"]["colorScale"]["max"] == 8.0
+    assert workspace["mapFieldFrames"][1]["mapField"]["colorScale"]["max"] == 8.0
+
+
+def test_published_figure_description_reaches_card_and_answer_catalog(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Map hypoxic days")
+    description = "Annual bottom hypoxic days off the Yellow Sea coast; compare the yearly slices."
+    field = xr.DataArray(np.ones((2, 2)), dims=("lat", "lon"),
+                         coords={"lat": [34, 35], "lon": [122, 123]})
+    artifact_id = session.artifacts.publish(
+        "hypoxic_days", field, run_id=session.run_id,
+        attempt_id=attempt, stage_id=stage, inputs=[], description=description,
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact_id}})
+    assert adapter.finalize()["result_cards"][0]["description"] == description
+    assert description in visual_result_catalog(session)
+
+
+def test_tool_result_description_updates_existing_result_card(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    manager = StageManager(session.run_id, attempt, records=session.records)
+    tools = AnalysisTools(session.records, session.artifacts, manager,
+                          functions={"example_map": lambda: xr.DataArray(
+                              [[1, 2], [3, 4]], dims=("lat", "lon"),
+                              coords={"lat": [32, 33], "lon": [120, 121]}),
+                          })
+    with manager.activate():
+        result = tools.example_map()
+    ref = tools.ref(result)
+    metadata = session.artifacts.read_artifact(ref)
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": metadata["stage_id"],
+                      "entry": {"status": "completed", "artifact_id": ref}})
+    assert not adapter.finalize()["result_cards"][0]["description"]
+    tools.describe_result(result, "The map locates the strongest bottom-water burden.")
+    assert adapter.finalize()["result_cards"][0]["description"] == (
+        "The map locates the strongest bottom-water burden.")
+
+
+def test_json_map_preview_rejects_cast_integer_missing_value(tmp_path, monkeypatch):
+    import domain.ocean.visualization.landmask as landmask
+
+    monkeypatch.setattr(landmask, "mask_land_for_map_preview",
+                        lambda lon, lat, values: (values, None))
+    missing = float(np.iinfo(np.int64).min)
+    map_field = _map_payload({
+        "lat": [32, 33], "lon": [120, 121],
+        "values": [[1, missing], [2, 3]],
+    }, tmp_path, "hypoxic days")
+    assert map_field["values"] == [[1.0, None], [2.0, 3.0]]
 
 
 def test_eddy_maps_keep_their_intermediate_results(tmp_path):

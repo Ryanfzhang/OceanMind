@@ -2885,6 +2885,24 @@ h4 {
   color: var(--muted);
 }
 
+.result-map-frame-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--type-sm);
+}
+
+.result-map-frame-selector select {
+  min-width: 100px;
+  max-width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+}
+
 .result-inline-chart {
   width: 100%;
   max-width: 480px;
@@ -3292,6 +3310,7 @@ h4 {
   display: grid;
   gap: 14px;
   min-width: 0;
+  margin-top: 16px;
 }
 
 .response-figure {

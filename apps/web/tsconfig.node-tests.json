@@ -33,6 +33,7 @@
     "lib/assistant-display.ts",
     "lib/assistant-summary.ts",
     "lib/report-export.ts",
+    "lib/response-figures.ts",
     "lib/step-card-state.ts",
     "lib/workspace-results.ts",
     "components/renderers.tsx",

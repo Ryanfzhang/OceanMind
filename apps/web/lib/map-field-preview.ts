@@ -13,6 +13,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function validFieldValue(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) &&
+    Math.abs(value) < 9e18;
+}
+
 function latToWebMercatorY(lat: number) {
   const clipped = clamp(lat, -WEB_MERCATOR_MAX_LAT, WEB_MERCATOR_MAX_LAT);
   const radians = (clipped * Math.PI) / 180;
@@ -215,7 +220,7 @@ export function resolveMapColorScale(field: MapFieldData | null | undefined): Ma
     return null;
   }
 
-  const allValues = field.values.flat().filter((value) => Number.isFinite(value));
+  const allValues = field.values.flat().filter(validFieldValue);
   if (allValues.length === 0) {
     return null;
   }
@@ -719,8 +724,28 @@ function nearestGridIndex(position: AxisPosition) {
 }
 
 function gridValue(field: MapFieldData, row: number, col: number) {
-  const value = Number(field.values[row]?.[col]);
-  return Number.isFinite(value) ? value : null;
+  const value = field.values[row]?.[col];
+  return validFieldValue(value) ? value : null;
+}
+
+function sampleContinuousField(field: MapFieldData, row: AxisPosition, col: AxisPosition) {
+  // Require a real value at the nearest native cell; coastlines remain masked.
+  if (gridValue(field, nearestGridIndex(row), nearestGridIndex(col)) === null) return null;
+  const corners = [
+    [row.lower, col.lower, (1 - row.t) * (1 - col.t)],
+    [row.lower, col.upper, (1 - row.t) * col.t],
+    [row.upper, col.lower, row.t * (1 - col.t)],
+    [row.upper, col.upper, row.t * col.t],
+  ];
+  let total = 0;
+  let weight = 0;
+  for (const [r, c, w] of corners) {
+    const value = gridValue(field, r, c);
+    if (value === null || w === 0) continue;
+    total += value * w;
+    weight += w;
+  }
+  return weight > 0 ? total / weight : null;
 }
 
 function interpolateTransportFilledValue(
@@ -828,7 +853,7 @@ function finiteFieldRange(field: MapFieldData): { min: number; max: number } | n
   let max = -Infinity;
   for (const row of field.values) {
     for (const value of row) {
-      if (!Number.isFinite(value)) continue;
+      if (!validFieldValue(value)) continue;
       min = Math.min(min, value);
       max = Math.max(max, value);
     }
@@ -1268,10 +1293,13 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
       for (let px = 0; px < width; px += 1) {
         const colPosition = colPositions[px];
         const nearestCol = colPosition ? nearestGridIndex(colPosition) : 0;
-        // Preserve individual grid cells, including narrow extrema, in the map image.
-        const value = rowPosition && colPosition ? field.values[nearestRow]?.[nearestCol] : null;
+        const value = rowPosition && colPosition
+          ? discreteColorMap.size > 0
+            ? field.values[nearestRow]?.[nearestCol]
+            : sampleContinuousField(field, rowPosition, colPosition)
+          : null;
         const index = (py * width + px) * 4;
-        if (typeof value !== "number" || !Number.isFinite(value)) {
+        if (!validFieldValue(value)) {
           imageData.data[index] = 255;
           imageData.data[index + 1] = 255;
           imageData.data[index + 2] = 255;
@@ -1284,7 +1312,7 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
             ? [...discreteColorMap.entries()].sort((a, b) => Math.abs(a[0] - numericValue) - Math.abs(b[0] - numericValue))[0]?.[1]
             : null;
         const [red, green, blue] = discreteRgb ?? colormapRGB(
-          clamp((numericValue - valueMin) / range, 0, 1),
+          Math.round(clamp((numericValue - valueMin) / range, 0, 1) * 24) / 24,
           colorScale?.colormap,
         );
         imageData.data[index] = red;

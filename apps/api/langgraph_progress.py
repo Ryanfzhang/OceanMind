@@ -17,6 +17,24 @@ from packages.analysis_runtime.artifacts import _stored_payload
 PREVIEW_GRID_SIDE = 64
 
 
+def _valid_numeric_values(values: Any, missing: Any = None) -> Any:
+    """Remove encoded missing values before statistics or map rendering."""
+    import numpy as np
+
+    original = np.asarray(values)
+    cleaned = np.asarray(original, dtype=float).copy()
+    if original.dtype.kind in "iu" and original.dtype.itemsize >= 4:
+        cleaned[original == np.iinfo(original.dtype).min] = np.nan
+    # Casting NaN to int64 in an upstream calculation produces this finite value.
+    cleaned[np.isclose(cleaned, float(np.iinfo(np.int64).min), rtol=1e-12)] = np.nan
+    for marker in np.atleast_1d(missing) if missing is not None else ():
+        try:
+            cleaned[cleaned == float(marker)] = np.nan
+        except (TypeError, ValueError):
+            continue
+    return cleaned
+
+
 def _map_values(values: Any) -> list[list[float | None]]:
     return [[float(value) if math.isfinite(value) else None for value in row]
             for row in values]
@@ -40,7 +58,11 @@ def _loaded_field_metrics(path: Any, summary: dict) -> list[dict[str, str]]:
             dim: slice(None, None, max(1, math.ceil(size / (64 if dim in {"lat", "lon"} else 8))))
             for dim, size in field.sizes.items()
         })
-        values = np.asarray(sampled.values, dtype=float)
+        values = _valid_numeric_values(
+            sampled.values,
+            field.attrs.get("_FillValue", field.attrs.get("missing_value",
+                                                     field.encoding.get("_FillValue"))),
+        )
     finite = values[np.isfinite(values)]
     metrics.append({"label": "Sample valid", "value": f"{finite.size}/{values.size}"})
     if finite.size:
@@ -56,7 +78,6 @@ def _array_preview(path: Any, name: str, *, spatial_slice_only: bool = False) ->
     """Read saved fields for UI charts without dropping spatial grid cells."""
     import numpy as np
     import xarray as xr
-    from domain.ocean.visualization.landmask import mask_land_for_map_preview
 
     with xr.open_dataarray(path) as source:
         field = source.squeeze(drop=True)
@@ -70,42 +91,50 @@ def _array_preview(path: Any, name: str, *, spatial_slice_only: bool = False) ->
                 if is_mask:
                     field = field.any(extras) if field.dtype.kind == "b" else field.max(extras)
                 else:
-                    field = field.isel(**{
-                        dim: slice(None, None, max(1, math.ceil(field.sizes[dim] / 8)))
-                        for dim in extras
-                    }).mean(extras, skipna=True)
-                    name = f"{name} (sampled mean preview)"
+                    # A sampled mean silently changes a by-year or by-depth result.
+                    # Only an explicitly labelled slice is suitable for a map preview.
+                    if len(extras) != 1 or extras[0] not in {"year", "time", "depth"}:
+                        return None
+                    dimension = extras[0]
+                    coordinate = field.coords.get(dimension)
+                    if coordinate is None or field.sizes[dimension] > 12:
+                        return None
+                    frames = []
+                    for index in range(field.sizes[dimension]):
+                        label = str(coordinate.values[index])[:19]
+                        slice_field = field.isel({dimension: index}).transpose("lat", "lon")
+                        preview = _spatial_array_map(slice_field, source, f"{name} — {label}")
+                        if preview:
+                            frames.append({"label": label, "mapField": preview})
+                    if not frames:
+                        return None
+                    finite = [value for frame in frames
+                              for row in frame["mapField"]["values"] for value in row
+                              if value is not None]
+                    low, high = min(finite), max(finite)
+                    for frame in frames:
+                        frame["mapField"]["colorScale"] = {
+                            "min": low, "max": high, "rawMin": low, "rawMax": high,
+                            "units": frame["mapField"]["units"], "renderMode": "filled",
+                        }
+                    return "summary", {"mapField": frames[0]["mapField"], "mapFieldFrames": frames}
             field = field.transpose("lat", "lon")
             if field.sizes["lat"] < 2 or field.sizes["lon"] < 2:
                 return None
-            lon = np.asarray(field["lon"].values, dtype=float)
-            lat = np.asarray(field["lat"].values, dtype=float)
             if is_mask:
+                lon = np.asarray(field["lon"].values, dtype=float)
+                lat = np.asarray(field["lat"].values, dtype=float)
                 mask_field = _mask_map_payload(
                     field.values, lon.tolist(), lat.tolist(), None,
                     f"{name.replace('_', ' ').title()} footprint", str(source.name or name))
                 return ("summary", {"mapField": mask_field}) if mask_field else None
-            values = np.asarray(field.values, dtype=float)
-            if (lon.ndim != 1 or lat.ndim != 1 or values.shape != (len(lat), len(lon))
-                    or not np.all(np.isfinite(lon)) or not np.all(np.isfinite(lat))
-                    or not np.any(np.isfinite(values))):
-                return None
-            values, land_image = mask_land_for_map_preview(lon, lat, values)
-            map_field = {
-                "lon": lon.tolist(), "lat": lat.tolist(),
-                "values": _map_values(values),
-                "label": name.replace("_", " ").title(), "variable": str(source.name or name),
-                "units": str(source.attrs.get("units") or ""),
-                "bounds": [[float(lat.min()), float(lon.min())],
-                           [float(lat.max()), float(lon.max())]],
-            }
-            if land_image:
-                map_field["landMaskImage"] = land_image
-            return "summary", {"mapField": map_field}
+            map_field = _spatial_array_map(field, source, name)
+            return ("summary", {"mapField": map_field}) if map_field else None
         if field.ndim == 1 and field.dims[0] == "time":
             stride = max(1, math.ceil(field.sizes["time"] / 100))
             field = field.isel(time=slice(None, None, stride))
-            values = np.asarray(field.values, dtype=float)
+            values = _valid_numeric_values(field.values, source.attrs.get("_FillValue",
+                                                     source.attrs.get("missing_value")))
             times = field["time"].values
             series = [{"label": str(t)[:19], "value": float(v)}
                       for t, v in zip(times, values) if math.isfinite(v)]
@@ -116,13 +145,40 @@ def _array_preview(path: Any, name: str, *, spatial_slice_only: bool = False) ->
             stride = max(1, math.ceil(field.sizes["depth"] / 100))
             field = field.isel(depth=slice(None, None, stride))
             depths = np.asarray(field["depth"].values, dtype=float)
-            values = np.asarray(field.values, dtype=float)
+            values = _valid_numeric_values(field.values, source.attrs.get("_FillValue",
+                                                     source.attrs.get("missing_value")))
             points = [{"depth": float(depth), "value": float(value)}
                       for depth, value in zip(depths, values)
                       if math.isfinite(depth) and math.isfinite(value)]
             if points:
                 return "profile", {"profileSeries": points}
     return None
+
+
+def _spatial_array_map(field: Any, source: Any, name: str) -> dict | None:
+    import numpy as np
+    from domain.ocean.visualization.landmask import mask_land_for_map_preview
+
+    lon = np.asarray(field["lon"].values, dtype=float)
+    lat = np.asarray(field["lat"].values, dtype=float)
+    missing = source.attrs.get("_FillValue", source.attrs.get("missing_value",
+                                                        source.encoding.get("_FillValue")))
+    values = _valid_numeric_values(field.values, missing)
+    if (lon.ndim != 1 or lat.ndim != 1 or values.shape != (len(lat), len(lon))
+            or len(lat) < 2 or len(lon) < 2
+            or not np.all(np.isfinite(lon)) or not np.all(np.isfinite(lat))
+            or not np.any(np.isfinite(values))):
+        return None
+    values, land_image = mask_land_for_map_preview(lon, lat, values)
+    result = {
+        "lon": lon.tolist(), "lat": lat.tolist(), "values": _map_values(values),
+        "label": name.replace("_", " ").title(), "variable": str(source.name or name),
+        "units": str(source.attrs.get("units") or ""),
+        "bounds": [[float(lat.min()), float(lon.min())], [float(lat.max()), float(lon.max())]],
+    }
+    if land_image:
+        result["landMaskImage"] = land_image
+    return result
 
 
 def _preview_values(value: Any, root: Any) -> Any:
@@ -218,10 +274,10 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
     cols = np.arange(len(lon))
     x = np.asarray(lon, dtype=float)
     y = np.asarray(lat, dtype=float)
-    sample = np.asarray(values, dtype=float)
+    metadata = value.get("metadata") or {}
+    sample = _valid_numeric_values(values, metadata.get("_FillValue", metadata.get("missing_value")))
     if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y)) and np.any(np.isfinite(sample))):
         return None
-    metadata = value.get("metadata") or {}
     sample, land_image = mask_land_for_map_preview(x, y, sample)
     result = {"lon": x.tolist(), "lat": y.tolist(),
             "values": _map_values(sample),
@@ -789,9 +845,7 @@ class ProgressAdapter:
         result = {"id": artifact_id, "title": display_name.replace("_", " ").title(),
                   "type": str(metadata.get("kind", "result")),
                   "headline": scope or display_name,
-                  "description": "Saved analysis figure" if is_figure else
-                                 "Saved field" if metadata.get("kind") == "dataarray_netcdf" else
-                                 "Saved calculation result",
+                  "description": str(metadata.get("description") or "")[:600],
                   "renderer": "summary", "metrics": [], "surface": "inline",
                   "attemptId": metadata.get("attempt_id"),
                   "attemptIndex": self._attempt_index(metadata.get("attempt_id"))}
@@ -969,6 +1023,13 @@ class ProgressAdapter:
                           "error": card.get("error"), "recoverable": False})
 
     def finalize(self, state: Any = None) -> dict[str, Any]:
+        for result in self.result_cards:
+            try:
+                metadata = self.session.artifacts.read_artifact(result["id"])
+            except (OSError, ValueError):
+                continue
+            if metadata.get("run_id") == self.session.run_id and metadata.get("description"):
+                result["description"] = str(metadata["description"])[:600]
         cards = list(self.cards.values())
         active = self.active_result_id
         return {

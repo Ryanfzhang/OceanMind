@@ -95,6 +95,15 @@ class AnalysisTools:
         except KeyError as exc:
             raise ValueError("Result has no artifact ID; pass an explicit input reference") from exc
 
+    def describe_result(self, value_or_ref: Any, description: str) -> str:
+        """Attach an LLM-written interpretation to a completed saved result."""
+        artifact_id = value_or_ref if isinstance(value_or_ref, str) else self.ref(value_or_ref)
+        metadata = self.artifacts.read_artifact(artifact_id)
+        if metadata.get("run_id") != self.records.run_id:
+            raise ValueError("Result belongs to another run")
+        self.artifacts.set_description(artifact_id, description)
+        return artifact_id
+
     def call(
         self, tool_name: str, *args: Any, input_refs: list[str] | None = None,
         **kwargs: Any,
@@ -110,7 +119,7 @@ class AnalysisTools:
         self, name: str, func: Callable[..., Any], input_refs: list[str] | None,
         kwargs: dict[str, Any],
         *, source_result: bool = False, presentation: str = "auto",
-        geometry: dict[str, Any] | None = None,
+        geometry: dict[str, Any] | None = None, description: str | None = None,
     ) -> tuple[Any, str]:
         stage = self.stages.ensure_stage(visible=False)
         refs = input_refs or [
@@ -154,7 +163,7 @@ class AnalysisTools:
                 name, dict(result) if companions else result,
                 run_id=self.records.run_id, attempt_id=self.stages.attempt_id,
                 stage_id=stage.id, inputs=refs, call_id=call_id,
-                presentation=presentation,
+                presentation=presentation, description=description,
             )
             saved = [(artifact_id, refs)]
             for suffix, companion in companions.items():
@@ -193,11 +202,12 @@ class AnalysisTools:
             reset_tool_progress_callback(token)
 
     def publish(self, name: str, value: Any, *, inputs: list[str] | None = None,
-                presentation: str = "auto", geometry: dict[str, Any] | None = None) -> str:
+                presentation: str = "auto", geometry: dict[str, Any] | None = None,
+                description: str | None = None) -> str:
         """Save one custom calculation in the active stage."""
         _, artifact_id = self._execute(
             f"publish:{name}", lambda: value, [] if inputs is None else inputs, {},
-            presentation=presentation, geometry=geometry,
+            presentation=presentation, geometry=geometry, description=description,
         )
         return artifact_id
 

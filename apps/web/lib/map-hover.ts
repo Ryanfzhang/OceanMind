@@ -93,7 +93,7 @@ export function sampleNearestMapFieldValue(
   const row = mapField.values[latIndex];
   const value = row?.[lonIndex] as unknown;
 
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) >= 9e18) {
     return null;
   }
 

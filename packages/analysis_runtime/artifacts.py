@@ -202,6 +202,15 @@ class ArtifactStore:
     def _payload(self, artifact_id: str, suffix: str) -> Path:
         return self.root / "artifacts" / "data" / f"{artifact_id}{suffix}"
 
+    def set_description(self, artifact_id: str, description: str) -> None:
+        if not isinstance(description, str) or not description.strip() or len(description) > 600:
+            raise ValueError("description must contain 1..600 characters")
+        metadata = self.read_artifact(artifact_id)
+        if metadata.get("status") != "completed":
+            raise ValueError("Only completed results can be described")
+        metadata["description"] = description.strip()
+        write_json_atomic(self._index(artifact_id), metadata)
+
     def _start(self, name: str, *, run_id: str, attempt_id: str, stage_id: str,
                inputs: list[str], call_id: str | None, kind: str, summary: dict) -> dict:
         if not isinstance(inputs, list) or not all(isinstance(item, str) for item in inputs):
@@ -229,12 +238,14 @@ class ArtifactStore:
 
     def publish(self, name: str, value: Any, *, run_id: str, attempt_id: str,
                 stage_id: str, inputs: list[str], call_id: str | None = None,
-                presentation: str = "auto") -> str:
+                presentation: str = "auto", description: str | None = None) -> str:
         import xarray as xr
         from .figures import PngFigure
 
         if presentation not in {"auto", "summary", "map"}:
             raise ValueError("presentation must be auto, summary, or map")
+        if description is not None and (not isinstance(description, str) or len(description) > 600):
+            raise ValueError("description must be at most 600 characters")
         is_array = isinstance(value, xr.DataArray)
         is_image = isinstance(value, PngFigure)
         if is_image:
@@ -257,6 +268,8 @@ class ArtifactStore:
                                stage_id=stage_id, inputs=inputs, call_id=call_id,
                                kind=kind, summary=summary)
         metadata["presentation"] = presentation
+        if description:
+            metadata["description"] = description.strip()
         write_json_atomic(self._index(metadata["artifact_id"]), metadata)
         artifact_id = metadata["artifact_id"]
         path = self._payload(artifact_id, ".png" if is_image else ".nc" if is_array else ".json")

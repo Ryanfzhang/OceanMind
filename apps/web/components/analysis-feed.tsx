@@ -22,6 +22,7 @@ import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
 import { displayLooseResults, displayStepDetails, displayStepTimeline, latestFigureResultIds, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
 import { normalizeWorkspaceData } from "@/lib/workspace-results";
+import { selectResponseFigures } from "@/lib/response-figures";
 
 type QuerySubmitOptions = {
   continuePending?: boolean;
@@ -45,12 +46,32 @@ type AnalysisFeedProps = {
   onToggleStepCard?: (messageId: string, stepId: string) => void;
 };
 
-function MarkdownSummary({ text }: { text: string }) {
-  return <div className="markdown-summary"><ReactMarkdown
-    remarkPlugins={[remarkGfm]}
-    skipHtml
-    components={{table: ({ children }) => <div className="markdown-table-wrap"><table>{children}</table></div>}}
-  >{text}</ReactMarkdown></div>;
+function MarkdownSummary({
+  text, cards, conversationId, onOpenDetail, onPromoteMapField, onResultAction,
+}: {
+  text: string;
+  cards: ResultCardSummary[];
+  conversationId?: string | null;
+  onOpenDetail?: (card: ResultCardSummary, data: WorkspaceData) => void;
+  onPromoteMapField?: (card: ResultCardSummary, data: WorkspaceData, field: MapFieldData) => void;
+  onResultAction?: (card: ResultCardSummary, data: WorkspaceData, actionId: string) => void;
+}) {
+  const { prose, figures } = selectResponseFigures(text, cards);
+  return <>
+    <div className="markdown-summary"><ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      skipHtml
+      components={{table: ({ children }) => <div className="markdown-table-wrap"><table>{children}</table></div>}}
+    >{prose}</ReactMarkdown></div>
+    {figures.length > 0 ? <div className="response-figures">
+      {figures.map(({ card, caption }) => <figure key={card.id} id={`figure-${card.id}`} className="response-figure">
+        <StepResultContent card={card} conversationId={conversationId}
+          onOpenDetail={onOpenDetail} onPromoteMapField={onPromoteMapField}
+          onResultAction={onResultAction} />
+        <figcaption>{caption}</figcaption>
+      </figure>)}
+    </div> : null}
+  </>;
 }
 
 function statusIcon(status: StepCard["status"]) {
@@ -180,10 +201,15 @@ function StepResultContent({
   preferredLanguage?: "en";
 }) {
   const chinese = false;
+  const [selectedFrame, setSelectedFrame] = useState(0);
   const imageUrl = conversationId && card.type === "image_png"
     ? resultImageUrl(conversationId, card.id)
     : null;
-  const workspaceData = card.workspaceData ? normalizeWorkspaceData(card.workspaceData) : undefined;
+  const rawWorkspaceData = card.workspaceData ? normalizeWorkspaceData(card.workspaceData) : undefined;
+  const frames = rawWorkspaceData?.mapFieldFrames ?? [];
+  const workspaceData = rawWorkspaceData && frames.length > 0
+    ? { ...rawWorkspaceData, mapField: frames[Math.min(selectedFrame, frames.length - 1)].mapField }
+    : rawWorkspaceData;
   const inlineChart =
     workspaceData && !showFullVisualization && card.type !== "image_png"
       ? renderInlineChart(card, workspaceData, {
@@ -214,6 +240,21 @@ function StepResultContent({
         <h4>{card.title}</h4>
         {card.surface === "map" && hasLoadedMapPayload ? <span className="result-map-badge">{chinese ? "📍 已加载到地图" : "📍 Loaded on map"}</span> : null}
       </div>
+      {frames.length > 1 ? (
+        <label className="result-map-frame-selector">Slice
+          <select value={Math.min(selectedFrame, frames.length - 1)}
+            onChange={(event) => {
+              const index = Number(event.target.value);
+              setSelectedFrame(index);
+              const frame = frames[index];
+              if (frame && rawWorkspaceData && card.surface === "map") {
+                onPromoteMapField?.(card, { ...rawWorkspaceData, mapField: frame.mapField }, frame.mapField);
+              }
+            }}>
+            {frames.map((frame, index) => <option key={`${index}-${frame.label}`} value={index}>{frame.label}</option>)}
+          </select>
+        </label>
+      ) : null}
       {imageUrl ? <ResultImage url={imageUrl} title={card.title}
         mapSupplement={card.surface === "map"} /> : null}
       {inlineChart ? <div className={`result-inline-chart ${usesWideInlineChart ? "is-wide" : ""}`}>{inlineChart}</div> : null}
@@ -381,7 +422,6 @@ function AssistantBlock({
     ...step, results: step.results.filter(keepResult),
   }));
   const resultCards = allResultCards.filter(keepResult);
-  const figureAttachments = resultCards.filter((card) => card.type === "image_png");
   const terminal = payload?.state === "completed" || payload?.state === "failed";
   const visibleSteps = displayStepTimeline(stepCards, terminal);
   const detailSteps = displayStepDetails(stepCards, visibleSteps);
@@ -496,17 +536,9 @@ function AssistantBlock({
       {(payload?.state === "completed" || (payload?.state === "failed" && payload.failureExplained)) && payload.summary ? (
         <div className="findings-section ui-card">
           <h4 className="findings-title ui-card-title">{chinese ? "回复" : "Response"}</h4>
-          {conversationId && figureAttachments.length > 0 ? (
-            <div className="response-figures">
-              {figureAttachments.map((card) => (
-                <figure key={card.id} className="response-figure">
-                  <ResultImage url={resultImageUrl(conversationId, card.id)} title={card.title} />
-                  <figcaption>{card.title}</figcaption>
-                </figure>
-              ))}
-            </div>
-          ) : null}
-          <MarkdownSummary text={payload.summary} />
+          <MarkdownSummary text={payload.summary} cards={resultCards}
+            conversationId={conversationId} onOpenDetail={onOpenDetail}
+            onPromoteMapField={onPromoteMapField} onResultAction={onResultAction} />
 
           {summaryContent.evidence.length > 0 ? (
             <div className="findings-evidence-list">

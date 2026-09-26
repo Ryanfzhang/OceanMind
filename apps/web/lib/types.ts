@@ -401,6 +401,7 @@ export type WorkspaceData = {
   eofModes: EofModePreview[];
   compositeFields: CompositeFieldPreview[];
   mapField?: MapFieldData | null;
+  mapFieldFrames?: Array<{ label: string; mapField: MapFieldData }>;
   eventOverlays: EventOverlay[];
 };
 

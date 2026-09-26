@@ -167,7 +167,7 @@ class AnalysisSession:
         )
         visible = {key: result[key] for key in (
             "artifact_id", "run_id", "attempt_id", "stage_id", "call_id", "name",
-            "kind", "status", "summary", "inputs", "error", "content", "truncated",
+            "kind", "status", "summary", "description", "inputs", "error", "content", "truncated",
         ) if key in result}
         if isinstance(visible.get("name"), str):
             visible["name"] = visible["name"][:120]
