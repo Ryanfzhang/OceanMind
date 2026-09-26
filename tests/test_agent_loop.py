@@ -135,6 +135,21 @@ def test_answer_agent_can_explain_missing_input_and_request_clarification():
     }
 
 
+def test_missing_input_reaches_model_when_optional_skill_is_invalid(tmp_path):
+    broken = tmp_path / "ocean_transport_analysis"
+    broken.mkdir()
+    (broken / "SKILL.md").write_text("No frontmatter")
+    question = "I need a section line to integrate transport. Could you draw one or provide its endpoints?"
+    model = ScriptedModel([{"role": "assistant", "content": None, "tool_calls": [
+        call("request_clarification", {"question": question})
+    ]}])
+    state = build_graph(model, skills_root=tmp_path).invoke(
+        initial_state("Compute transport across my drawn transect")
+    )
+    assert state["status"] == "needs_input"
+    assert json.loads(state["messages"][-1]["content"])["question"] == question
+
+
 def test_clarification_and_limits_have_distinct_statuses():
     clarification = {"role": "assistant", "content": None, "tool_calls": [
         call("request_clarification", {"question": "Which dataset?"})

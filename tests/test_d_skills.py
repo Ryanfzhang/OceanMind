@@ -39,6 +39,20 @@ def test_windows_crlf_skill_frontmatter_is_indexed(tmp_path):
     assert "include_climatology" in read_skill("ocean_transport_analysis", tmp_path)
 
 
+def test_invalid_optional_skill_does_not_block_index(tmp_path):
+    broken = tmp_path / "broken"
+    broken.mkdir()
+    (broken / "SKILL.md").write_text("No frontmatter")
+    valid = tmp_path / "valid"
+    valid.mkdir()
+    (valid / "SKILL.md").write_text(
+        "---\nskill_id: valid\ndescription: Useful guidance.\n---\nBody\n"
+    )
+    assert list_skills(tmp_path) == [
+        {"skill_id": "valid", "description": "Useful guidance."}
+    ]
+
+
 def test_index_does_not_decode_skill_body(tmp_path):
     folder = tmp_path / "sample"
     folder.mkdir()

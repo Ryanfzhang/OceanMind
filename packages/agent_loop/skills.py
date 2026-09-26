@@ -69,7 +69,12 @@ def list_skills(root: Path | str | None = None) -> list[dict[str, str]]:
     summaries = []
     for child in sorted(base.iterdir()):
         if child.is_dir() and _SKILL_ID.fullmatch(child.name):
-            summaries.append(_metadata(_skill_file(child.name, base)))
+            try:
+                summaries.append(_metadata(_skill_file(child.name, base)))
+            except (OSError, ValueError):
+                # Skills are optional guidance; one unreadable entry must not
+                # prevent the model from answering or requesting user input.
+                continue
     return summaries
 
 
