@@ -607,6 +607,8 @@ export type ChatAssistantState = "info" | "running" | "completed" | "clarificati
 
 export type AssistantMessagePayload = {
   state: ChatAssistantState | "planning";
+  workflowStartedAt?: number;
+  workflowFinishedAt?: number;
   preferredLanguage?: "en";
   summary: string;
   note?: string;

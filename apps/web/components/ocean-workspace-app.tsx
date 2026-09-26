@@ -681,6 +681,7 @@ export function OceanWorkspaceApp() {
         text: "Thinking",
         payload: {
           state: "planning",
+          workflowStartedAt: Date.now(),
           preferredLanguage: "en" as const,
           summary: "Thinking",
           note: "Routing and planning are starting.",
@@ -707,6 +708,7 @@ export function OceanWorkspaceApp() {
         updateAssistantMessage(previous, pendingAssistantId, (current) => ({
           ...current,
           state: "failed",
+          workflowFinishedAt: Date.now(),
           summary: responseCopy.summary,
           note: responseCopy.note,
           failureKind: "transport",
@@ -938,7 +940,7 @@ export function OceanWorkspaceApp() {
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
                   state: "running",
-                  summary: `Completed: ${stepLabel}`,
+                  summary: `Reviewing result: ${stepLabel}`,
                   note: `${stepLabel} completed.`,
                   planSteps: updatePlanStepStatus(current.planSteps, stepId, "completed"),
                   stepCards: stepCard ? mergeOrAppendStepCard(current.stepCards ?? [], stepCard) : current.stepCards,
@@ -1000,16 +1002,8 @@ export function OceanWorkspaceApp() {
                     state: "running",
                     summary: "Continuing the analysis...",
                     note: "",
-                    planSteps: updatePlanStepStatus(current.planSteps, stepId, "active"),
-                    stepCards: stepCard
-                      ? mergeOrAppendStepCard(current.stepCards ?? [], {
-                          ...stepCard,
-                          status: "running",
-                          error: undefined,
-                          is_expanded: false,
-                          progress: { phase: "reflection", message: "Continuing analysis" },
-                        })
-                      : current.stepCards,
+                    planSteps: updatePlanStepStatus(current.planSteps, stepId, "failed"),
+                    stepCards: stepCard ? mergeOrAppendStepCard(current.stepCards ?? [], stepCard) : current.stepCards,
                 }))
               );
               return;
@@ -1125,6 +1119,7 @@ export function OceanWorkspaceApp() {
                   return {
                     ...current,
                     state: "completed",
+                    workflowFinishedAt: Date.now(),
                     summary,
                     note: "Summary ready.",
                     findings,
@@ -1191,7 +1186,12 @@ export function OceanWorkspaceApp() {
                 return {
                   ...msg,
                   text: assistantPayload.summary,
-                  payload: { ...assistantPayload, stepCards: mergedStepCards },
+                  payload: {
+                    ...assistantPayload,
+                    workflowStartedAt: msg.payload?.workflowStartedAt,
+                    workflowFinishedAt: msg.payload?.workflowFinishedAt ?? Date.now(),
+                    stepCards: mergedStepCards,
+                  },
                 };
               })
             );

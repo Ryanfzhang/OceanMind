@@ -234,6 +234,12 @@ def _summarize_attempt(
         store.get_path(code_id)
     except (OSError, ValueError) as exc:
         status, reason = "failed", f"Saved code changed during execution: {exc}"
+    if status == "completed" and any(
+        item["status"] == "running"
+        for kind in ("stage", "call")
+        for item in _records_for(records, kind, attempt_id)
+    ):
+        status, reason = "failed", "Worker exited with unfinished analysis work"
     if status != "completed":
         _close_unfinished(records, attempt_id, reason, on_event)
         records.update("attempt", attempt_id, status=status, error=reason)
@@ -250,6 +256,17 @@ def _summarize_attempt(
     failed_stages = [item for item in stages if item["status"] != "completed"]
     stage_preview = (list(reversed(failed_stages)) + [item for item in reversed(stages)
                                       if item["status"] == "completed"])[:PREVIEW_LIMIT]
+    if on_event:
+        try:
+            on_event({"type": "attempt_reconciled", "attempt_id": attempt_id,
+                      "status": status, "error": reason,
+                      "stages": [{"stage_id": item["stage_id"], "title": item["name"],
+                                  "status": item["status"],
+                                  "completed_units": item.get("completed_units", 0),
+                                  "error": item.get("error")}
+                                 for item in stages]})
+        except Exception:
+            event_counts["callback_errors"] += 1
     return {
         "run_id": run_id, "attempt_id": attempt_id, "code_id": code_id,
         "status": status, "exit_code": exit_code, "timed_out": timed_out,

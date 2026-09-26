@@ -32,6 +32,31 @@ def test_many_runtime_updates_remain_one_stage_card_and_keep_final_count():
     assert envelopes[0]["payload"]["step_card"]["status"] == "running"
 
 
+def test_attempt_reconciliation_closes_cards_when_terminal_events_are_missed(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    completed = session.records.new_stage(attempt, "Load field")
+    failed = session.records.new_stage(attempt, "Render figure")
+    envelopes = []
+    adapter = ProgressAdapter(session, envelopes.append)
+    for stage_id, title in ((completed, "Load field"), (failed, "Render figure")):
+        adapter.on_event({"type": "step_started", "attempt_id": attempt,
+                          "stage_id": stage_id, "title": title})
+    session.records.update("stage", completed, status="completed")
+    session.records.update("stage", failed, status="failed", error="Plotting failed")
+    adapter.on_event({"type": "attempt_reconciled", "attempt_id": attempt,
+                      "status": "failed", "error": "Plotting failed", "stages": [
+                          {"stage_id": completed, "title": "Load field", "status": "completed"},
+                          {"stage_id": failed, "title": "Render figure", "status": "failed",
+                           "error": "Plotting failed"},
+                      ]})
+    assert [card["status"] for card in adapter.finalize()["step_cards"]] == ["completed", "failed"]
+    assert [event["payload"]["type"] for event in envelopes[-2:]] == [
+        "step_completed", "step_failed",
+    ]
+    assert envelopes[-1]["payload"]["step_card"]["error"] == "Plotting failed"
+
+
 class _Artifacts:
     def read_artifact(self, artifact_id: str) -> dict:
         return {"status": "completed", "run_id": "run_test", "stage_id": "stage_1",

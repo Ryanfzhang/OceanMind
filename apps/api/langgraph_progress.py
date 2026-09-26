@@ -691,6 +691,9 @@ class ProgressAdapter:
                 "attempt_index": self._attempt_index(attempt_id),
             }
             self.counts[stage_id] = {"completed": 0, "failed": 0}
+        elif attempt_id and self.cards[stage_id]["attempt_id"] is None:
+            self.cards[stage_id]["attempt_id"] = attempt_id
+            self.cards[stage_id]["attempt_index"] = self._attempt_index(attempt_id)
         return self.cards[stage_id]
 
     def _attach(self, stage_id: str, entry: dict, *, visible_step: bool = True) -> None:
@@ -828,6 +831,24 @@ class ProgressAdapter:
         if kind == "synthesis_started":
             self._send("synthesis_started", {})
             return
+        if kind == "attempt_reconciled":
+            attempt_id = event.get("attempt_id")
+            for stage in event.get("stages", []):
+                if not isinstance(stage, dict):
+                    continue
+                stage_id = stage.get("stage_id")
+                card = self.cards.get(stage_id) if isinstance(stage_id, str) else None
+                status = stage.get("status")
+                if (card is None or card.get("attempt_id") not in (None, attempt_id)
+                        or status not in {"completed", "failed"}
+                        or card["status"] == status):
+                    continue
+                self.on_event({"type": "step_completed" if status == "completed" else "step_failed",
+                               "attempt_id": attempt_id, "stage_id": stage_id,
+                               "title": stage.get("title"),
+                               "completed_units": stage.get("completed_units"),
+                               "error": stage.get("error") or event.get("error")})
+            return
         stage_id = event.get("stage_id") or event.get("step_id")
         if not isinstance(stage_id, str):
             return
@@ -851,7 +872,8 @@ class ProgressAdapter:
         count = self.counts[stage_id]
         completed = event.get("completed_units")
         total = event.get("total_units")
-        progress: dict[str, Any] = {"phase": "complete" if kind == "step_completed" else "computing",
+        progress: dict[str, Any] = {"phase": "complete" if kind == "step_completed" else
+                                    "failed" if kind == "step_failed" else "computing",
                                     "message": f"{count['completed']} results saved"
                                     + (f", {count['failed']} failed" if count["failed"] else "")}
         if isinstance(completed, int):
@@ -869,7 +891,7 @@ class ProgressAdapter:
         if kind in ("step_completed", "step_failed"):
             card["status"] = "completed" if kind == "step_completed" else "failed"
             if kind == "step_failed":
-                card["error"] = str(event.get("error", "Analysis stage failed"))[:500]
+                card["error"] = str(event.get("error") or "Analysis stage failed")[:500]
         self._send(kind, {"step_id": stage_id, "attempt_id": event.get("attempt_id"),
                           "step_card": card.copy(),
                           "error": card.get("error"), "recoverable": False})

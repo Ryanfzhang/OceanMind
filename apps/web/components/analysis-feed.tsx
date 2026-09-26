@@ -19,7 +19,7 @@ import { renderDockPanel, renderInlineChart } from "@/components/renderers";
 import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
-import { displayLooseResults, displayStepTimeline, getProgressCounts, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
+import { displayLooseResults, displayStepTimeline, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
 import { normalizeWorkspaceData } from "@/lib/workspace-results";
 
 type QuerySubmitOptions = {
@@ -252,18 +252,7 @@ function StepCardBlock({
   const chinese = false;
   const canExpand = step.status !== "running" && step.status !== "pending" && step.results.length > 0;
   const showFallbackInterpretation = shouldShowStepFallbackInterpretation(step);
-  const isRunning = step.status === "running";
-  const [elapsedSeconds, setElapsedSeconds] = useState(1);
-  useEffect(() => {
-    if (!isRunning) return;
-    const startedAt = Date.now();
-    setElapsedSeconds(1);
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.max(1, Math.ceil((Date.now() - startedAt) / 1000)));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [isRunning]);
-  const displayStatus = step.status === "failed" && step.results.length > 0 ? "completed" : step.status === "failed" ? "running" : step.status;
+  const displayStatus = step.status;
 
   return (
     <div className={`step-card status-${displayStatus} ${step.is_expanded ? "is-expanded" : ""}`}>
@@ -281,14 +270,6 @@ function StepCardBlock({
         </div>
         <span className="step-card-toggle">{canExpand ? (step.is_expanded ? "▾" : "▸") : ""}</span>
       </button>
-
-      {isRunning ? (
-        <div className="step-progress-panel">
-          <div className="step-progress-meta" role="timer">
-            {chinese ? "正在计算" : "Computing"} · {formatElapsedTime(elapsedSeconds)}
-          </div>
-        </div>
-      ) : null}
 
       {step.is_expanded ? (
         <div className="step-card-body">
@@ -338,6 +319,17 @@ function AssistantBlock({
   const [planExpanded, setPlanExpanded] = useState(false);
   const payload = message.payload;
   const chinese = false;
+  const showExecutionProgress = shouldShowExecutionProgress(payload);
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!showExecutionProgress) return;
+    setClockNow(Date.now());
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [showExecutionProgress]);
+  const elapsedSeconds = typeof payload?.workflowStartedAt === "number"
+    ? Math.max(0, Math.floor(((payload.workflowFinishedAt ?? clockNow) - payload.workflowStartedAt) / 1000))
+    : null;
   const stepCards = payload?.stepCards ?? [];
   const resultCards = payload?.resultCards ?? [];
   const terminal = payload?.state === "completed" || payload?.state === "failed";
@@ -350,12 +342,8 @@ function AssistantBlock({
   const displaySourceCards = sourceCards.filter((source) => !isNoUsableExternalSourcesCard(source) && hasUsableSourceUrl(source));
   const webSearchHeader = buildWebSearchHeader(displaySourceCards, chinese);
   const summaryContent = buildCompletedSummaryContent(message);
-  const progressCounts = getProgressCounts(visiblePlanSteps, visibleSteps);
-  const { completedSteps, totalSteps } = terminal
-    ? { completedSteps: visibleSteps.length, totalSteps: visibleSteps.length }
-    : progressCounts;
-  const progressLabel = totalSteps > 0 ? `[${completedSteps}/${totalSteps}]` : "";
-  const showExecutionProgress = shouldShowExecutionProgress(payload);
+  const completedSteps = visibleSteps.length;
+  const progressLabel = completedSteps > 0 ? `${completedSteps} completed` : "";
   return (
     <div className="analysis-block">
       {showExecutionProgress || visibleSteps.length > 0 || looseResults.length > 0 ? (
@@ -363,9 +351,10 @@ function AssistantBlock({
           <div className="workflow-card-header">
             <div>
               <h4 className="ui-card-title">{chinese ? "工作流" : "Workflow"}</h4>
-              <p className="ui-card-subtitle">{progressLabel ? `${completedSteps}/${totalSteps} steps` : "Execution steps"}</p>
+              <p className="ui-card-subtitle">{completedSteps > 0 ? `${completedSteps} completed steps` : "Execution steps"}</p>
             </div>
             <span>
+              {elapsedSeconds !== null ? `${formatElapsedTime(elapsedSeconds)} · ` : ""}
               {payload?.state === "completed"
                 ? "Complete"
                 : payload?.state === "running" || payload?.state === "planning"

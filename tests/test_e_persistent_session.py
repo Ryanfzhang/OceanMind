@@ -87,3 +87,25 @@ publish("recovered", {{"count": value["count"] + 1}}, inputs=[{artifact_id!r}])
         ) == {"count": 4}
     finally:
         session.close()
+
+
+def test_worker_exit_with_open_stage_is_reported_as_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "packages.agent_loop.analysis.build_sandbox_command",
+        lambda python, args, root, read_roots: [python, *args],
+    )
+    events = []
+    session = AnalysisSession(tmp_path / "runs", on_event=events.append)
+    code = session.write_analysis('''from oceanmind_runtime import stage
+open_stage = stage("Unfinished load")
+open_stage.__enter__()
+''')["code_id"]
+    try:
+        result = session.run_analysis(code, timeout_seconds=20)
+        assert result["status"] == "failed"
+        assert result["stages"][0]["status"] == "failed"
+        assert "unfinished analysis work" in result["error"]
+        assert any(event["type"] == "step_failed" for event in events)
+        assert events[-1]["type"] == "attempt_reconciled"
+    finally:
+        session.close()

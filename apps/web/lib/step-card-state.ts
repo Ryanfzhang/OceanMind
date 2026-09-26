@@ -85,22 +85,10 @@ export function mergeStepCardLists(existingCards: StepCard[], incomingCards: Ste
   );
 }
 
-export function displayStepTimeline(stepCards: StepCard[], terminal: boolean): StepCard[] {
-  const steps = new Map<string, StepCard>();
-  const occurrences = new Map<string, number>();
-  for (const step of stepCards) {
-    if (terminal && step.status !== "completed" && step.results.length === 0) continue;
-    const label = step.human_label.trim().toLocaleLowerCase() || step.step_id;
-    const withinAttempt = `${step.attempt_id ?? "run"}\u0000${label}`;
-    const occurrence = occurrences.get(withinAttempt) ?? 0;
-    occurrences.set(withinAttempt, occurrence + 1);
-    const key = `${label}\u0000${occurrence}`;
-    const previous = steps.get(key);
-    if (!terminal || !previous || step.results.length > 0 || previous.results.length === 0) {
-      steps.set(key, step);
-    }
-  }
-  return [...steps.values()];
+export function displayStepTimeline(stepCards: StepCard[], _terminal: boolean): StepCard[] {
+  // A card is a saved outcome. Running and failed stages remain in internal
+  // history for reconciliation and retries but never appear as result cards.
+  return stepCards.filter((step) => step.status === "completed");
 }
 
 export function displayLooseResults(

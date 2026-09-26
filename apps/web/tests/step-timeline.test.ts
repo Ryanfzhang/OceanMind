@@ -18,7 +18,7 @@ function step(id: string, label: string, status: StepCard["status"], attempt_id:
   };
 }
 
-test("workflow reuses one visible card for a step repeated in later attempts", () => {
+test("workflow keeps successful attempts but hides failed stages", () => {
   const visible = displayStepTimeline([
     step("load_1", "Load SST", "completed", "attempt_1"),
     step("detect_1", "Detect heatwaves", "completed", "attempt_1"),
@@ -28,29 +28,32 @@ test("workflow reuses one visible card for a step repeated in later attempts", (
     step("verify_2", "Verify statistics", "completed", "attempt_2"),
   ], true);
   assert.deepEqual(visible.map((item) => item.step_id),
-    ["load_1", "detect_2", "summary_2", "verify_2"]);
+    ["load_1", "detect_1", "detect_2", "summary_2", "verify_2"]);
 });
 
-test("repeated execution does not grow the live card count", () => {
+test("repeated execution keeps the same history while running and after completion", () => {
   const cards = Array.from({ length: 20 }, (_, index) =>
     step(`stage_${index}`, `Step ${index % 5}`, "completed",
       `attempt_${Math.floor(index / 5)}`));
-  assert.equal(displayStepTimeline(cards, false).length, 5);
-  assert.equal(displayStepTimeline(cards, true).length, 5);
+  assert.equal(displayStepTimeline(cards, false).length, 20);
+  assert.equal(displayStepTimeline(cards, true).length, 20);
   assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
-    ["stage_15", "stage_16", "stage_17", "stage_18", "stage_19"]);
+    cards.map((item) => item.step_id));
 });
 
-test("a retry updates its existing card to running without adding a card", () => {
+test("a retry stays in workflow progress until it completes", () => {
   const cards = [
     step("load_1", "Load data", "completed", "attempt_1"),
     step("detect_1", "Detect events", "completed", "attempt_1"),
     step("load_2", "Load data", "running", "attempt_2"),
   ];
   assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
-    ["load_2", "detect_1"]);
+    ["load_1", "detect_1"]);
   assert.deepEqual(displayStepTimeline(cards, true).map((item) => item.step_id),
     ["load_1", "detect_1"]);
+  cards[2] = { ...cards[2], status: "completed" };
+  assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
+    ["load_1", "detect_1", "load_2"]);
 });
 
 test("two genuine same-name stages in one attempt remain visible", () => {
@@ -61,24 +64,26 @@ test("two genuine same-name stages in one attempt remain visible", () => {
   assert.deepEqual(visible.map((item) => item.step_id), ["map_day_1", "map_day_2"]);
 });
 
-test("cards remain visible during execution and empty failed cards disappear at the end", () => {
+test("failed and unfinished stages never appear as cards", () => {
   const cards = [
     step("load", "Load data", "completed", "attempt_1"),
     step("analysis", "Compute field", "running", "attempt_1"),
     step("retry", "Compute field", "failed", "attempt_2"),
   ];
   assert.deepEqual(displayStepTimeline(cards, false).map((item) => item.step_id),
-    ["load", "retry"]);
-  assert.deepEqual(displayStepTimeline(cards, true).map((item) => item.step_id), ["load"]);
+    ["load"]);
+  assert.deepEqual(displayStepTimeline(cards, true).map((item) => item.step_id),
+    ["load"]);
 });
 
-test("a failed step with a delivered result stays in the final timeline", () => {
+test("a failed step with a partial result is still hidden", () => {
   const delivered = step("partial", "Compute field", "failed", "attempt_1");
   delivered.results = [{
     id: "field", title: "Computed field", type: "json", headline: "Computed field",
     description: "", renderer: "summary", metrics: [],
   }];
-  assert.deepEqual(displayStepTimeline([delivered], true).map((item) => item.step_id), ["partial"]);
+  assert.deepEqual(displayStepTimeline([delivered], false), []);
+  assert.deepEqual(displayStepTimeline([delivered], true), []);
 });
 
 test("loose results reuse the latest version of each saved product", () => {
