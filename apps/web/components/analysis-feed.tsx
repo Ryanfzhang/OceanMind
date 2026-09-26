@@ -146,7 +146,7 @@ function StepResultContent({
     : null;
   const workspaceData = card.workspaceData ? normalizeWorkspaceData(card.workspaceData) : undefined;
   const inlineChart =
-    workspaceData && !showFullVisualization
+    workspaceData && !showFullVisualization && card.type !== "image_png"
       ? renderInlineChart(card, workspaceData, {
           onPromoteMapField: (field) => onPromoteMapField?.(card, workspaceData, field),
         })
@@ -175,7 +175,7 @@ function StepResultContent({
         <h4>{card.title}</h4>
         {card.surface === "map" && hasLoadedMapPayload ? <span className="result-map-badge">{chinese ? "📍 已加载到地图" : "📍 Loaded on map"}</span> : null}
       </div>
-      {imageUrl ? <img className="result-inline-image" src={imageUrl} alt={card.title} /> : null}
+      {imageUrl ? <img className={`result-inline-image${card.surface === "map" ? " is-map-supplement" : ""}`} src={imageUrl} alt={card.title} /> : null}
       {inlineChart ? <div className={`result-inline-chart ${usesWideInlineChart ? "is-wide" : ""}`}>{inlineChart}</div> : null}
       <p className="result-inline-headline">{card.headline}</p>
       {card.description ? <p className="result-inline-description">{card.description}</p> : null}

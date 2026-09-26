@@ -2897,6 +2897,12 @@ h4 {
   border-radius: var(--radius-sm);
 }
 
+.result-inline-image.is-map-supplement {
+  max-width: 280px;
+  max-height: 200px;
+  object-fit: contain;
+}
+
 .result-inline-chart.is-wide {
   max-width: none;
 }

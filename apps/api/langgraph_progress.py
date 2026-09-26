@@ -53,7 +53,7 @@ def _loaded_field_metrics(path: Any, summary: dict) -> list[dict[str, str]]:
     return metrics
 
 
-def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
+def _array_preview(path: Any, name: str, *, spatial_slice_only: bool = False) -> tuple[str, dict] | None:
     """Read at most a small slice of a saved field for the existing UI charts."""
     import numpy as np
     import xarray as xr
@@ -63,6 +63,8 @@ def _array_preview(path: Any, name: str) -> tuple[str, dict] | None:
         field = source.squeeze(drop=True)
         if {"lat", "lon"}.issubset(field.dims):
             extras = [dim for dim in field.dims if dim not in {"lat", "lon"}]
+            if spatial_slice_only and extras:
+                return None
             is_mask = (source.dtype.kind == "b" or
                        str(source.name or name).lower().endswith("_mask"))
             field = field.isel(**{
@@ -734,12 +736,32 @@ class ProgressAdapter:
                 if metadata.get("presentation") == "summary":
                     result["metrics"] = _loaded_field_metrics(path, metadata.get("summary") or {})
                     result["headline"] = "Loaded data dimensions and sampled statistics"
+                    # A saved 2D georeferenced field is already a map result, even
+                    # when the producer also requested a statistical summary.
+                    preview = _array_preview(path, display_name, spatial_slice_only=True)
+                    if preview and preview[1].get("mapField"):
+                        result["renderer"], workspace = preview
+                        result["workspaceData"] = workspace
+                        self.workspace_by_result[artifact_id] = workspace
                 else:
                     preview = _array_preview(path, display_name)
                     if preview:
                         result["renderer"], workspace = preview
                         result["workspaceData"] = workspace
                         self.workspace_by_result[artifact_id] = workspace
+            elif is_figure and len(metadata.get("inputs") or []) == 1:
+                source_id = metadata["inputs"][0]
+                source = self.session.artifacts.read_artifact(source_id)
+                if (source.get("status") == "completed" and source.get("run_id") == self.session.run_id
+                        and source.get("kind") == "dataarray_netcdf"):
+                    preview = _array_preview(
+                        _stored_payload(self.session.root, source["payload"]),
+                        str(source.get("name") or display_name).removeprefix("publish:"),
+                        spatial_slice_only=True,
+                    )
+                    if preview and preview[1].get("mapField"):
+                        result["workspaceData"] = preview[1]
+                        self.workspace_by_result[artifact_id] = preview[1]
             elif metadata.get("kind") == "json":
                 path = _stored_payload(self.session.root, metadata["payload"])
                 result["metrics"] = _numeric_metrics(path)

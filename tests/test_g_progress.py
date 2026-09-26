@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from io import BytesIO
 from types import SimpleNamespace
 
 import numpy as np
 import xarray as xr
+from PIL import Image
 
 from apps.api.langgraph_progress import ProgressAdapter
 from packages.agent_loop.analysis import AnalysisSession
+from packages.analysis_runtime.figures import PngFigure
 from packages.analysis_runtime.stages import StageManager
 from packages.analysis_runtime.tools import AnalysisTools
 
@@ -83,7 +86,7 @@ def test_every_result_is_visible_without_resending_the_whole_stage():
     assert all(len(event["payload"]["step_card"]["results"]) == 1 for event in attached)
 
 
-def test_loaded_field_shows_stats_and_computed_field_shows_map(tmp_path):
+def test_saved_2d_field_shows_stats_and_map_before_computed_map(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()
     stage = session.records.new_stage(attempt, "Mean chlorophyll")
@@ -105,7 +108,8 @@ def test_loaded_field_shows_stats_and_computed_field_shows_map(tmp_path):
         adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
                           "entry": {"status": "completed", "artifact_id": artifact_id}})
     field_card, mean_card, map_card = adapter.finalize()["result_cards"]
-    assert "workspaceData" not in field_card
+    assert field_card["surface"] == "map"
+    assert field_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
     assert {item["label"]: item["value"] for item in field_card["metrics"]} == {
         "Dimensions": "lat × lon", "Shape": "2 × 2", "Units": "mg m-3",
         "Sample valid": "4/4", "Sample min": "0.5", "Sample mean": "0.9",
@@ -116,6 +120,61 @@ def test_loaded_field_shows_stats_and_computed_field_shows_map(tmp_path):
     assert map_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
     assert map_card["surface"] == "map"
     assert adapter.finalize()["active_result_id"] == map_id
+
+
+def test_multidimensional_summary_does_not_show_a_mean_field_as_the_map(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Load time series")
+    field = xr.DataArray(
+        np.ones((2, 2, 2)), dims=("time", "lat", "lon"),
+        coords={"time": [0, 1], "lat": [20.0, 21.0], "lon": [120.0, 121.0]},
+        name="chlorophyll",
+    )
+    artifact = session.artifacts.publish(
+        "load_dataset", field, run_id=session.run_id, attempt_id=attempt,
+        stage_id=stage, inputs=[], presentation="summary",
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": artifact}})
+    card = adapter.finalize()["result_cards"][0]
+    assert card["surface"] == "inline"
+    assert "workspaceData" not in card
+    assert adapter.finalize()["active_result_id"] is None
+
+
+def test_figure_linked_to_saved_2d_field_opens_interactive_map(tmp_path):
+    session = AnalysisSession(tmp_path)
+    field_attempt = session.records.new_attempt()
+    field_stage = session.records.new_stage(field_attempt, "Save chlorophyll field")
+    field = xr.DataArray(
+        np.array([[0.5, 0.8], [1.0, 1.3]]), dims=("lat", "lon"),
+        coords={"lat": [20.0, 21.0], "lon": [120.0, 121.0]},
+        name="chlorophyll",
+    )
+    field_id = session.artifacts.publish(
+        "chlorophyll_surface", field, run_id=session.run_id, attempt_id=field_attempt,
+        stage_id=field_stage, inputs=[], presentation="summary",
+    )
+    figure_attempt = session.records.new_attempt()
+    figure_stage = session.records.new_stage(figure_attempt, "Render chlorophyll figure")
+    image = BytesIO()
+    Image.new("RGB", (2, 2), "green").save(image, format="PNG")
+    figure_id = session.artifacts.publish(
+        "chlorophyll_figure", PngFigure(image.getvalue(), {}),
+        run_id=session.run_id, attempt_id=figure_attempt, stage_id=figure_stage,
+        inputs=[field_id],
+    )
+    adapter = ProgressAdapter(session)
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": figure_stage,
+                      "entry": {"status": "completed", "artifact_id": figure_id}})
+    payload = adapter.finalize()
+    figure_card = payload["result_cards"][0]
+    assert figure_card["type"] == "image_png"
+    assert figure_card["surface"] == "map"
+    assert figure_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
+    assert payload["active_result_id"] == figure_id
 
 
 def test_map_preview_clips_land_for_unrelated_ocean_fields(tmp_path, monkeypatch):
