@@ -778,13 +778,6 @@ class ProgressAdapter:
                 if metadata.get("presentation") == "summary":
                     result["metrics"] = _loaded_field_metrics(path, metadata.get("summary") or {})
                     result["headline"] = "Loaded data dimensions and sampled statistics"
-                    # A saved 2D georeferenced field is already a map result, even
-                    # when the producer also requested a statistical summary.
-                    preview = _array_preview(path, display_name, spatial_slice_only=True)
-                    if preview and preview[1].get("mapField"):
-                        result["renderer"], workspace = preview
-                        result["workspaceData"] = workspace
-                        self.workspace_by_result[artifact_id] = workspace
                 else:
                     preview = _array_preview(path, display_name)
                     if preview:

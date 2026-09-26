@@ -114,7 +114,7 @@ def test_every_result_is_visible_without_resending_the_whole_stage():
     assert all(len(event["payload"]["step_card"]["results"]) == 1 for event in attached)
 
 
-def test_saved_2d_field_shows_stats_and_map_before_computed_map(tmp_path):
+def test_loaded_2d_field_shows_stats_without_map_before_computed_map(tmp_path):
     session = AnalysisSession(tmp_path)
     attempt = session.records.new_attempt()
     stage = session.records.new_stage(attempt, "Mean chlorophyll")
@@ -132,12 +132,16 @@ def test_saved_2d_field_shows_stats_and_map_before_computed_map(tmp_path):
         "values": [[0.5, 0.8], [1.0, 1.3]],
         "metadata": {"variable": "chlorophyll", "units": "mg m-3"},
     }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[field_id])
-    for artifact_id in (field_id, mean_id, map_id):
+    adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                      "entry": {"status": "completed", "artifact_id": field_id}})
+    assert adapter.finalize()["active_result_id"] is None
+    assert adapter.finalize()["step_cards"][0]["is_map_bound"] is False
+    for artifact_id in (mean_id, map_id):
         adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
                           "entry": {"status": "completed", "artifact_id": artifact_id}})
     field_card, mean_card, map_card = adapter.finalize()["result_cards"]
-    assert field_card["surface"] == "map"
-    assert field_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
+    assert field_card["surface"] == "inline"
+    assert "workspaceData" not in field_card
     assert {item["label"]: item["value"] for item in field_card["metrics"]} == {
         "Dimensions": "lat × lon", "Shape": "2 × 2", "Units": "mg m-3",
         "Sample valid": "4/4", "Sample min": "0.5", "Sample mean": "0.9",
@@ -147,6 +151,7 @@ def test_saved_2d_field_shows_stats_and_map_before_computed_map(tmp_path):
     assert "workspaceData" not in mean_card
     assert map_card["workspaceData"]["mapField"]["variable"] == "chlorophyll"
     assert map_card["surface"] == "map"
+    assert adapter.finalize()["step_cards"][0]["is_map_bound"] is True
     assert adapter.finalize()["active_result_id"] == map_id
 
 
