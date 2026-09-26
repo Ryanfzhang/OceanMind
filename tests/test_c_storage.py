@@ -1,8 +1,13 @@
+from io import BytesIO
+from pathlib import Path
+
 import numpy as np
 import pytest
 import xarray as xr
+from PIL import Image
 
 from packages.analysis_runtime.artifacts import ArtifactStore, SourceChangedError
+from packages.analysis_runtime.figures import PngFigure
 from packages.analysis_runtime.records import RunRecords, new_id
 
 
@@ -107,6 +112,43 @@ def test_large_nested_array_uses_sidecar_not_json(tmp_path):
     assert list((tmp_path / "artifacts" / "data").glob("*_array_*.npy"))
     np.testing.assert_array_equal(ArtifactStore(tmp_path).load_result(artifact_id)["ow_field"],
                                   values)
+
+
+def test_binary_payloads_replace_only_after_temporary_files_close(tmp_path, monkeypatch):
+    import packages.analysis_runtime.artifacts as module
+
+    opened = {}
+    original_temporary = module.tempfile.NamedTemporaryFile
+    original_replace = module.os.replace
+
+    def track_temporary(*args, **kwargs):
+        file = original_temporary(*args, **kwargs)
+        opened[Path(file.name)] = file
+        return file
+
+    def windows_style_replace(source, destination):
+        file = opened.get(Path(source))
+        if file is not None and not file.closed:
+            raise PermissionError("[WinError 32] Another process is using this file")
+        return original_replace(source, destination)
+
+    monkeypatch.setattr(module.tempfile, "NamedTemporaryFile", track_temporary)
+    monkeypatch.setattr(module.os, "replace", windows_style_replace)
+    records, attempt, stage, store = context(tmp_path)
+    image = BytesIO()
+    Image.new("RGB", (2, 2), "blue").save(image, format="PNG")
+    figure_id = store.publish("figure", PngFigure(image.getvalue(), {}),
+                              run_id=records.run_id, attempt_id=attempt, stage_id=stage,
+                              inputs=[])
+    array_id = store.publish("large array", {"values": np.arange(30_000)},
+                             run_id=records.run_id, attempt_id=attempt, stage_id=stage,
+                             inputs=[])
+    field = xr.DataArray([[1.0, 2.0], [3.0, 4.0]], dims=("lat", "lon"))
+    field_id = store.publish("field", field, run_id=records.run_id,
+                             attempt_id=attempt, stage_id=stage, inputs=[])
+    assert store.read_image(figure_id) == image.getvalue()
+    np.testing.assert_array_equal(store.load_result(array_id)["values"], np.arange(30_000))
+    xr.testing.assert_identical(store.load_result(field_id), field)
 
 
 def test_nested_dataarray_roundtrips_for_structured_analysis_result(tmp_path):

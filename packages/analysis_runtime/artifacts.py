@@ -52,6 +52,12 @@ def _stored_payload(root: Path, relative: str) -> Path:
     return resolved
 
 
+def _sync_written_file(path: Path) -> None:
+    """Flush a library-written payload before its temporary name is replaced."""
+    with path.open("r+b") as file:
+        os.fsync(file.fileno())
+
+
 def _encoded(value: Any, *, root: Path | None = None,
              artifact_id: str | None = None, sidecars: list[Path] | None = None) -> Any:
     import numpy as np
@@ -66,6 +72,7 @@ def _encoded(value: Any, *, root: Path | None = None,
             temporary = Path(file.name)
         try:
             value.to_netcdf(temporary)
+            _sync_written_file(temporary)
             os.replace(temporary, path)
         finally:
             temporary.unlink(missing_ok=True)
@@ -80,14 +87,16 @@ def _encoded(value: Any, *, root: Path | None = None,
                 raise ValueError("Large arrays require artifact storage")
             path = root / "artifacts" / "data" / f"{artifact_id}_array_{len(sidecars)}.npy"
             path.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".npy", delete=False) as file:
-                temporary = Path(file.name)
-                try:
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".npy", delete=False) as file:
+                    temporary = Path(file.name)
                     np.save(file, contiguous, allow_pickle=False)
                     file.flush()
                     os.fsync(file.fileno())
-                    os.replace(temporary, path)
-                finally:
+                os.replace(temporary, path)
+            finally:
+                if temporary is not None:
                     temporary.unlink(missing_ok=True)
             sidecars.append(path)
             return {"__ndarray_file__": str(path.relative_to(root))}
@@ -255,22 +264,23 @@ class ArtifactStore:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             if is_image:
-                with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".png", delete=False) as file:
-                    temporary = Path(file.name)
-                    try:
+                temporary = None
+                try:
+                    with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".png", delete=False) as file:
+                        temporary = Path(file.name)
                         file.write(value.png_bytes)
                         file.flush()
                         os.fsync(file.fileno())
-                        os.replace(temporary, path)
-                    finally:
+                    os.replace(temporary, path)
+                finally:
+                    if temporary is not None:
                         temporary.unlink(missing_ok=True)
             elif is_array:
                 with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".nc", delete=False) as file:
                     temporary = Path(file.name)
                 try:
                     value.to_netcdf(temporary)
-                    with temporary.open("rb") as file:
-                        os.fsync(file.fileno())
+                    _sync_written_file(temporary)
                     os.replace(temporary, path)
                 finally:
                     temporary.unlink(missing_ok=True)
