@@ -3289,6 +3289,23 @@ h4 {
   color: var(--text);
 }
 
+.response-attachments {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+
+.response-attachments a {
+  color: var(--accent);
+}
+
 .markdown-summary {
   display: flex;
   flex-direction: column;

@@ -124,6 +124,10 @@ function formatElapsedTime(seconds: number) {
     : `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
+function resultImageUrl(conversationId: string, artifactId: string) {
+  return `/api/results?${new URLSearchParams({ conversation: conversationId, mode: "image", artifact: artifactId })}`;
+}
+
 function StepResultContent({
   card,
   conversationId,
@@ -152,7 +156,7 @@ function StepResultContent({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [imageExpanded]);
   const imageUrl = conversationId && card.type === "image_png"
-    ? `/api/results?${new URLSearchParams({ conversation: conversationId, mode: "image", artifact: card.id })}`
+    ? resultImageUrl(conversationId, card.id)
     : null;
   const workspaceData = card.workspaceData ? normalizeWorkspaceData(card.workspaceData) : undefined;
   const inlineChart =
@@ -359,6 +363,7 @@ function AssistantBlock({
     : null;
   const stepCards = payload?.stepCards ?? [];
   const resultCards = payload?.resultCards ?? [];
+  const figureAttachments = resultCards.filter((card) => card.type === "image_png");
   const terminal = payload?.state === "completed" || payload?.state === "failed";
   const visibleSteps = displayStepTimeline(stepCards, terminal);
   const detailSteps = displayStepDetails(stepCards, visibleSteps);
@@ -473,6 +478,17 @@ function AssistantBlock({
       {payload?.state === "completed" && payload.summary ? (
         <div className="findings-section ui-card">
           <h4 className="findings-title ui-card-title">{chinese ? "回复" : "Response"}</h4>
+          {conversationId && figureAttachments.length > 0 ? (
+            <div className="response-attachments">
+              <strong>Figure attachments</strong>
+              {figureAttachments.map((card) => (
+                <a key={card.id} href={resultImageUrl(conversationId, card.id)}
+                  target="_blank" rel="noreferrer">
+                  {card.title} ↗
+                </a>
+              ))}
+            </div>
+          ) : null}
           <MarkdownSummary text={payload.summary} />
 
           {summaryContent.evidence.length > 0 ? (
