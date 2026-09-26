@@ -6,12 +6,15 @@ import json
 import re
 from typing import Any, Mapping
 
+from packages.agent_loop.answer import figure_reference_map
 from packages.agent_loop.language import language_instruction
 from packages.agent_loop.state import AgentState
 from packages.analysis_runtime.artifacts import _stored_payload
 
 
 DELIVERY_REF = re.compile(r"\b(?:code_[0-9a-f]{32}|(?:run_[a-z0-9_]+_)?artifact_[0-9a-f]{32})\b")
+FIGURE_ALIAS = re.compile(r"#figure-(f_[0-9a-f]{12})\b")
+FIGURE_LINK = re.compile(r"(!?)\[([^\]\n]+)\]\(#figure-([a-zA-Z0-9_]+)\)")
 
 
 REQUEST_CLARIFICATION_SCHEMA: dict[str, Any] = {
@@ -153,7 +156,14 @@ def finalize_delivery(state: AgentState, session: Any) -> AgentState:
     if classified["status"] != "completed":
         return classified
     content = classified["messages"][-1]["content"]
+    if "#figure-" in content:
+        figure_refs = figure_reference_map(session)
+        content = FIGURE_ALIAS.sub(
+            lambda match: "#figure-" + figure_refs.get(match.group(1), match.group(1)),
+            content,
+        )
     invalid: list[str] = []
+    valid: set[str] = set()
     for ref in set(DELIVERY_REF.findall(content)):
         try:
             if ref.startswith("code_"):
@@ -178,14 +188,17 @@ def finalize_delivery(state: AgentState, session: Any) -> AgentState:
                     session.artifacts._source(metadata["source_path"])
                 else:
                     raise ValueError("Unknown artifact format")
+            valid.add(ref)
         except (KeyError, OSError, TypeError, ValueError):
             invalid.append(ref)
-    if invalid:
-        # The backend supplies verified attachments below. A mistyped long ID in
-        # prose must not trigger another execution of an already successful run.
-        cleaned = content
-        for ref in invalid:
-            cleaned = cleaned.replace(ref, "[unverified reference omitted]")
+    # A bad figure handle must not leave broken Markdown in the response.
+    cleaned = FIGURE_LINK.sub(
+        lambda match: match.group(0) if match.group(3) in valid else "",
+        content,
+    )
+    for ref in invalid:
+        cleaned = cleaned.replace(ref, "[unverified reference omitted]")
+    if cleaned != classified["messages"][-1]["content"]:
         messages = [*classified["messages"]]
         messages[-1] = {**messages[-1], "content": cleaned}
         classified = {**classified, "messages": messages}

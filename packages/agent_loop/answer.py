@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Any
@@ -55,12 +56,14 @@ ANSWER_PROMPT = (
     "must not be invented. If live search fails, say current conditions could not "
     "be verified; do not substitute old workspace data or invent current facts. "
     "Organize the answer by finding, not by figure. For an important claim "
-    "supported by a saved visual, add a brief inline citation "
-    "such as [(Fig. 1)](#figure-ARTIFACT_ID) immediately after the claim. "
+    "supported by a saved visual, add a brief inline citation immediately "
+    "after the claim. Use the catalog's short figure_ref for Markdown links, "
+    "for example [(Fig. 1)](#figure-FIGURE_REF), replacing FIGURE_REF with the "
+    "exact figure_ref value; never copy a long artifact_id into a figure link. "
     "Select only the figures needed to substantiate those claims; do not include "
     "every completed figure. Include a ## Key figures section only if figures are "
     "cited, and embed each selected result card there once using "
-    "![Fig. 1. Short subject](#figure-ARTIFACT_ID). Do not write a separate "
+    "![Fig. 1. Short subject](#figure-FIGURE_REF). Do not write a separate "
     "paragraph describing each figure. Completed published results appear in the UI; "
     "do not list artifact IDs in the prose. "
     "Choose completed results from the catalog; interactive cards and PNGs both work. "
@@ -71,12 +74,12 @@ ANSWER_PROMPT = (
 )
 
 
-def visual_result_catalog(session: Any, limit: int = 80) -> str:
-    """Give the answer agent bounded, verified result references for figure selection."""
+def _visual_result_entries(session: Any, limit: int | None = 200) -> list[dict[str, str]]:
+    """List completed results with stable, short figure handles."""
     index = session.root / "artifacts" / "index"
     if not index.is_dir():
-        return ""
-    entries = []
+        return []
+    entries: list[dict[str, str]] = []
     for path in sorted(index.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
         try:
             item = session.artifacts.read_artifact(path.stem)
@@ -90,10 +93,27 @@ def visual_result_catalog(session: Any, limit: int = 80) -> str:
             continue
         if kind not in {"image_png", "dataarray_netcdf", "json"}:
             continue
-        entries.append({key: item[key] for key in ("artifact_id", "name", "kind", "description") if key in item})
-        if len(entries) >= limit:
+        artifact_id = str(item["artifact_id"])
+        entry = {key: str(item[key]) for key in ("artifact_id", "name", "kind") if key in item}
+        entry["figure_ref"] = "f_" + hashlib.sha256(artifact_id.encode()).hexdigest()[:12]
+        if item.get("description"):
+            entry["description"] = str(item["description"])[:240]
+        entries.append(entry)
+        if limit is not None and len(entries) >= limit:
             break
-    return json.dumps(entries, ensure_ascii=False)
+    return entries
+
+
+def visual_result_catalog(session: Any, limit: int = 200) -> str:
+    """Give the answer agent bounded result references for figure selection."""
+    entries = _visual_result_entries(session, limit)
+    return json.dumps(entries, ensure_ascii=False) if entries else ""
+
+
+def figure_reference_map(session: Any) -> dict[str, str]:
+    """Resolve LLM-selected figure handles to saved artifact IDs."""
+    return {entry["figure_ref"]: entry["artifact_id"]
+            for entry in _visual_result_entries(session, limit=None)}
 
 
 def web_answer_messages(
