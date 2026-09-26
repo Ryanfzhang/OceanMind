@@ -14,7 +14,6 @@ from packages.agent_loop.analysis import AnalysisSession
 from packages.analysis_runtime.artifacts import _stored_payload
 
 
-PREVIEW_JSON_BYTES = 4 * 1024 * 1024
 PREVIEW_GRID_SIDE = 64
 
 
@@ -54,7 +53,7 @@ def _loaded_field_metrics(path: Any, summary: dict) -> list[dict[str, str]]:
 
 
 def _array_preview(path: Any, name: str, *, spatial_slice_only: bool = False) -> tuple[str, dict] | None:
-    """Read at most a small slice of a saved field for the existing UI charts."""
+    """Read saved fields for UI charts without dropping spatial grid cells."""
     import numpy as np
     import xarray as xr
     from domain.ocean.visualization.landmask import mask_land_for_map_preview
@@ -67,10 +66,6 @@ def _array_preview(path: Any, name: str, *, spatial_slice_only: bool = False) ->
                 return None
             is_mask = (source.dtype.kind == "b" or
                        str(source.name or name).lower().endswith("_mask"))
-            field = field.isel(**{
-                dim: slice(None, None, max(1, math.ceil(field.sizes[dim] / PREVIEW_GRID_SIDE)))
-                for dim in ("lat", "lon")
-            })
             if extras:
                 if is_mask:
                     field = field.any(extras) if field.dtype.kind == "b" else field.max(extras)
@@ -219,13 +214,11 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
     if (np.ndim(values) != 2 or len(lon) < 2 or len(lat) < 2
             or np.shape(values) != (len(lat), len(lon))):
         return None
-    row_step = max(1, math.ceil(len(lat) / PREVIEW_GRID_SIDE))
-    col_step = max(1, math.ceil(len(lon) / PREVIEW_GRID_SIDE))
-    rows = np.arange(0, len(lat), row_step)
-    cols = np.arange(0, len(lon), col_step)
-    x = np.asarray(lon, dtype=float)[cols]
-    y = np.asarray(lat, dtype=float)[rows]
-    sample = np.asarray(values[np.ix_(rows, cols)], dtype=float)
+    rows = np.arange(len(lat))
+    cols = np.arange(len(lon))
+    x = np.asarray(lon, dtype=float)
+    y = np.asarray(lat, dtype=float)
+    sample = np.asarray(values, dtype=float)
     if not (np.all(np.isfinite(x)) and np.all(np.isfinite(y)) and np.any(np.isfinite(sample))):
         return None
     metadata = value.get("metadata") or {}
@@ -247,7 +240,7 @@ def _map_payload(value: dict, root: Any, name: str) -> dict | None:
 
 def _mask_map_payload(mask_value: Any, lon: Any, lat: Any, root: Any,
                       label: str, variable: str) -> dict | None:
-    """Project any georeferenced binary mask onto a sparse map layer."""
+    """Project a georeferenced binary mask onto its native map grid."""
     import numpy as np
 
     if not isinstance(lon, list) or not isinstance(lat, list) or len(lon) < 2 or len(lat) < 2:
@@ -265,11 +258,7 @@ def _mask_map_payload(mask_value: Any, lon: Any, lat: Any, root: Any,
     if (mask.ndim < 2 or mask.shape[-2:] != (len(lat), len(lon))
             or mask.dtype.kind not in "bifu"):
         return None
-    row_step = max(1, math.ceil(len(lat) / PREVIEW_GRID_SIDE))
-    col_step = max(1, math.ceil(len(lon) / PREVIEW_GRID_SIDE))
-    rows = np.arange(0, len(lat), row_step)
-    cols = np.arange(0, len(lon), col_step)
-    occupied = np.zeros((len(rows), len(cols)), dtype=bool)
+    occupied = np.zeros((len(lat), len(lon)), dtype=bool)
     for field in mask.reshape((-1, len(lat), len(lon))):
         if field.dtype.kind == "b":
             hits = field
@@ -278,12 +267,11 @@ def _mask_map_payload(mask_value: Any, lon: Any, lat: Any, root: Any,
             if not np.all(~valid | (field == 0) | (field == 1)):
                 return None
             hits = valid & (field == 1)
-        occupied |= np.logical_or.reduceat(
-            np.logical_or.reduceat(hits, rows, axis=0), cols, axis=1)
+        occupied |= hits
     if not np.any(occupied):
         return None
     return {
-        "lon": x[cols].tolist(), "lat": y[rows].tolist(),
+        "lon": x.tolist(), "lat": y.tolist(),
         "values": [[1.0 if hit else None for hit in row] for row in occupied],
         "label": label, "variable": variable, "units": "mask cells",
         "bounds": [[float(y.min()), float(x.min())], [float(y.max()), float(x.max())]],
@@ -317,8 +305,6 @@ def _structured_mask_payload(value: dict, root: Any, name: str) -> dict | None:
 def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
     import numpy as np
 
-    if path.stat().st_size > PREVIEW_JSON_BYTES:
-        return None
     with path.open(encoding="utf-8") as file:
         value = json.load(file).get("value")
     if not isinstance(value, dict):
@@ -709,8 +695,7 @@ class ProgressAdapter:
                         else:
                             preview = None
                         workspace = preview[1] if preview else {}
-                        if (source.get("kind") == "json"
-                                and path.stat().st_size <= PREVIEW_JSON_BYTES):
+                        if source.get("kind") == "json":
                             with path.open(encoding="utf-8") as file:
                                 value = json.load(file).get("value")
                             events = value.get("events") if isinstance(value, dict) else None
@@ -827,47 +812,46 @@ class ProgressAdapter:
         if metadata.get("kind") == "json":
             try:
                 path = _stored_payload(self.session.root, metadata["payload"])
-                if path.stat().st_size <= PREVIEW_JSON_BYTES:
-                    with path.open(encoding="utf-8") as file:
-                        value = json.load(file).get("value")
-                    events = value.get("events") if isinstance(value, dict) else None
-                    if isinstance(events, list):
-                        event_type = str(value.get("event_type") or
-                                         ("eddy" if name == "detect_eddies" else
-                                          name.removeprefix("detect_").rstrip("s")) or "event")
-                        existing_field = (result.get("workspaceData") or {}).get("mapField")
-                        map_field = existing_field or _structured_mask_payload(
-                            value, self.session.root, event_type,
-                        )
-                        overlays = [overlay for i, item in enumerate(events, 1)
-                                    if isinstance(item, dict)
-                                    if (overlay := _overlay(item, artifact_id, i, event_type,
-                                                            when, depth))]
-                        workspace = {"eventOverlays": overlays}
-                        if map_field:
-                            workspace["mapField"] = map_field
-                        coordinates = value.get("coordinates")
-                        if isinstance(coordinates, dict) and "mapField" not in workspace:
-                            for field_name in ("ow_field", "gradient_field", "vorticity_field"):
-                                if field_name not in value:
-                                    continue
-                                map_field = _map_payload({**coordinates, "values": value[field_name]},
-                                                         self.session.root, field_name)
-                                if map_field:
-                                    workspace["mapField"] = map_field
-                                    break
-                        if "mapField" not in workspace:
-                            linked = self._linked_map_workspace(metadata)
-                            if linked and linked.get("mapField"):
-                                workspace["mapField"] = linked["mapField"]
-                        result.update(type="eddy_detection" if event_type == "eddy" else "event_detection",
-                                      renderer="event", surface="map",
-                                      metrics=[{"label": "Detected events", "value": str(len(overlays))}],
-                                      workspaceData=workspace,
-                                      actions=[{"id": "focus_map", "label": "Show on map"}])
-                        self.workspace_by_result[artifact_id] = workspace
-                        if card is not None:
-                            card["is_map_bound"] = True
+                with path.open(encoding="utf-8") as file:
+                    value = json.load(file).get("value")
+                events = value.get("events") if isinstance(value, dict) else None
+                if isinstance(events, list):
+                    event_type = str(value.get("event_type") or
+                                     ("eddy" if name == "detect_eddies" else
+                                      name.removeprefix("detect_").rstrip("s")) or "event")
+                    existing_field = (result.get("workspaceData") or {}).get("mapField")
+                    map_field = existing_field or _structured_mask_payload(
+                        value, self.session.root, event_type,
+                    )
+                    overlays = [overlay for i, item in enumerate(events, 1)
+                                if isinstance(item, dict)
+                                if (overlay := _overlay(item, artifact_id, i, event_type,
+                                                        when, depth))]
+                    workspace = {"eventOverlays": overlays}
+                    if map_field:
+                        workspace["mapField"] = map_field
+                    coordinates = value.get("coordinates")
+                    if isinstance(coordinates, dict) and "mapField" not in workspace:
+                        for field_name in ("ow_field", "gradient_field", "vorticity_field"):
+                            if field_name not in value:
+                                continue
+                            map_field = _map_payload({**coordinates, "values": value[field_name]},
+                                                     self.session.root, field_name)
+                            if map_field:
+                                workspace["mapField"] = map_field
+                                break
+                    if "mapField" not in workspace:
+                        linked = self._linked_map_workspace(metadata)
+                        if linked and linked.get("mapField"):
+                            workspace["mapField"] = linked["mapField"]
+                    result.update(type="eddy_detection" if event_type == "eddy" else "event_detection",
+                                  renderer="event", surface="map",
+                                  metrics=[{"label": "Detected events", "value": str(len(overlays))}],
+                                  workspaceData=workspace,
+                                  actions=[{"id": "focus_map", "label": "Show on map"}])
+                    self.workspace_by_result[artifact_id] = workspace
+                    if card is not None:
+                        card["is_map_bound"] = True
             except (OSError, KeyError, TypeError, ValueError):
                 pass
         workspace = result.get("workspaceData") or {}

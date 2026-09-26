@@ -700,62 +700,6 @@ function gridValue(field: MapFieldData, row: number, col: number) {
   return Number.isFinite(value) ? value : null;
 }
 
-function interpolateGridValue(
-  field: MapFieldData,
-  rowPosition: AxisPosition | null,
-  colPosition: AxisPosition | null,
-) {
-  if (!rowPosition || !colPosition) {
-    return null;
-  }
-
-  const nearestRow = nearestGridIndex(rowPosition);
-  const nearestCol = nearestGridIndex(colPosition);
-  const nearestValue = gridValue(field, nearestRow, nearestCol);
-  if (nearestValue === null) {
-    return null;
-  }
-
-  const corners = [
-    {
-      row: rowPosition.lower,
-      col: colPosition.lower,
-      weight: (1 - rowPosition.t) * (1 - colPosition.t),
-    },
-    {
-      row: rowPosition.lower,
-      col: colPosition.upper,
-      weight: (1 - rowPosition.t) * colPosition.t,
-    },
-    {
-      row: rowPosition.upper,
-      col: colPosition.lower,
-      weight: rowPosition.t * (1 - colPosition.t),
-    },
-    {
-      row: rowPosition.upper,
-      col: colPosition.upper,
-      weight: rowPosition.t * colPosition.t,
-    },
-  ];
-
-  let weightedSum = 0;
-  let weightSum = 0;
-  corners.forEach((corner) => {
-    const value = gridValue(field, corner.row, corner.col);
-    if (corner.weight <= 0 || value === null) {
-      return;
-    }
-    weightedSum += value * corner.weight;
-    weightSum += corner.weight;
-  });
-
-  if (weightSum >= 0.45) {
-    return weightedSum / weightSum;
-  }
-  return nearestValue;
-}
-
 function interpolateTransportFilledValue(
   field: MapFieldData,
   filledMask: boolean[][] | undefined,
@@ -856,10 +800,23 @@ type TransportFilledRegionStyle = {
   colormap: string;
 };
 
+function finiteFieldRange(field: MapFieldData): { min: number; max: number } | null {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const row of field.values) {
+    for (const value of row) {
+      if (!Number.isFinite(value)) continue;
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+    }
+  }
+  return min <= max ? { min, max } : null;
+}
+
 function transportFilledRegionStyles(field: MapFieldData, fallbackScale: MapColorScale | null) {
-  const allValues = field.values.flat().filter((value) => Number.isFinite(value));
-  const fallbackMin = fallbackScale?.min ?? Math.min(...allValues);
-  const fallbackMax = fallbackScale?.max ?? Math.max(...allValues);
+  const fieldRange = finiteFieldRange(field);
+  const fallbackMin = fallbackScale?.min ?? fieldRange?.min ?? 0;
+  const fallbackMax = fallbackScale?.max ?? fieldRange?.max ?? 0;
   return transportFilledRegionDefinitions(field).map((region) => {
     const scale = transportRegionalScale(field, "filled", transportFilledRegionKey(region)) ?? fallbackScale;
     return {
@@ -1210,8 +1167,8 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
       return;
     }
 
-    const allValues = field.values.flat().filter((value) => Number.isFinite(value));
-    if (allValues.length === 0) {
+    const fieldRange = finiteFieldRange(field);
+    if (!fieldRange) {
       setHeatmapUrl("");
       return;
     }
@@ -1255,8 +1212,8 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
     }
 
     const colorScale = resolveMapColorScale(field);
-    const valueMin = colorScale?.min ?? Math.min(...allValues);
-    const valueMax = colorScale?.max ?? Math.max(...allValues);
+    const valueMin = colorScale?.min ?? fieldRange.min;
+    const valueMax = colorScale?.max ?? fieldRange.max;
     const range = Math.max(valueMax - valueMin, 1e-9);
 
     const canvas = document.createElement("canvas");
@@ -1282,19 +1239,14 @@ export function useMapFieldImageUrl(field: MapFieldData | null | undefined, widt
       const targetLon = extent.lonMin + ((px + 0.5) / width) * lonSpan;
       return axisPosition(field.lon, targetLon);
     });
-    const shouldInterpolateValues = discreteColorMap.size === 0;
-
     for (let py = 0; py < height; py += 1) {
       const rowPosition = rowPositions[py];
       const nearestRow = rowPosition ? nearestGridIndex(rowPosition) : 0;
       for (let px = 0; px < width; px += 1) {
         const colPosition = colPositions[px];
         const nearestCol = colPosition ? nearestGridIndex(colPosition) : 0;
-        const value = shouldInterpolateValues
-          ? interpolateGridValue(field, rowPosition, colPosition)
-          : rowPosition && colPosition
-            ? field.values[nearestRow]?.[nearestCol]
-            : null;
+        // Preserve individual grid cells, including narrow extrema, in the map image.
+        const value = rowPosition && colPosition ? field.values[nearestRow]?.[nearestCol] : null;
         const index = (py * width + px) * 4;
         if (typeof value !== "number" || !Number.isFinite(value)) {
           imageData.data[index] = 255;

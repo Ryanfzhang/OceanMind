@@ -267,7 +267,11 @@ export default function MainMapLeaflet({
 }: MainMapLeafletProps) {
   const regionBounds = manualState.regionBounds;
   const mapField = workspaceData.mapField;
-  const mapFieldImageUrl = useMapFieldImageUrl(mapField, 720, 520);
+  const mapFieldImageUrl = useMapFieldImageUrl(
+    mapField,
+    Math.max(720, mapField?.lon.length ?? 0),
+    Math.max(520, mapField?.lat.length ?? 0),
+  );
   const eventOverlays = workspaceData.eventOverlays;
   const mapEventOverlays = useMemo(() => groupEventOverlaysForMap(eventOverlays), [eventOverlays]);
   const simplifyEventOverlays = useMemo(() => shouldSimplifyEventOverlays(eventOverlays), [eventOverlays]);

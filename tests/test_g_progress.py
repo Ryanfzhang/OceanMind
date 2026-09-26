@@ -7,11 +7,39 @@ import numpy as np
 import xarray as xr
 from PIL import Image
 
-from apps.api.langgraph_progress import ProgressAdapter
+from apps.api.langgraph_progress import ProgressAdapter, _array_preview, _map_payload
 from packages.agent_loop.analysis import AnalysisSession
 from packages.analysis_runtime.figures import PngFigure
 from packages.analysis_runtime.stages import StageManager
 from packages.analysis_runtime.tools import AnalysisTools
+
+
+def test_map_previews_keep_an_isolated_native_grid_extremum(tmp_path, monkeypatch):
+    import domain.ocean.visualization.landmask as landmask
+
+    monkeypatch.setattr(landmask, "mask_land_for_map_preview",
+                        lambda lon, lat, values: (values, None))
+    for rows, cols, extreme_row, extreme_col in ((170, 146, 101, 71),
+                                                  (601, 517, 599, 515)):
+        lon = np.linspace(135, 150, cols)
+        lat = np.linspace(10, 20, rows)
+        values = np.zeros((rows, cols))
+        values[extreme_row, extreme_col] = -5000
+
+        field = xr.DataArray(values, dims=("lat", "lon"),
+                             coords={"lat": lat, "lon": lon}, name="depth")
+        path = tmp_path / f"depth_{rows}.nc"
+        field.to_netcdf(path)
+
+        array_map = _array_preview(path, "depth")[1]["mapField"]
+        json_map = _map_payload({"lon": lon.tolist(), "lat": lat.tolist(),
+                                 "values": values.tolist()}, None, "depth")
+        for preview in (array_map, json_map):
+            assert len(preview["lat"]) == rows
+            assert len(preview["lon"]) == cols
+            assert preview["values"][extreme_row][extreme_col] == -5000
+            assert preview["lat"][extreme_row] == lat[extreme_row]
+            assert preview["lon"][extreme_col] == lon[extreme_col]
 
 
 def test_many_runtime_updates_remain_one_stage_card_and_keep_final_count():
