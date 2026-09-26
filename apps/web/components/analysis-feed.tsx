@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type {
@@ -141,6 +142,15 @@ function StepResultContent({
   preferredLanguage?: "en";
 }) {
   const chinese = false;
+  const [imageExpanded, setImageExpanded] = useState(false);
+  useEffect(() => {
+    if (!imageExpanded) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImageExpanded(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imageExpanded]);
   const imageUrl = conversationId && card.type === "image_png"
     ? `/api/results?${new URLSearchParams({ conversation: conversationId, mode: "image", artifact: card.id })}`
     : null;
@@ -175,7 +185,24 @@ function StepResultContent({
         <h4>{card.title}</h4>
         {card.surface === "map" && hasLoadedMapPayload ? <span className="result-map-badge">{chinese ? "📍 已加载到地图" : "📍 Loaded on map"}</span> : null}
       </div>
-      {imageUrl ? <img className={`result-inline-image${card.surface === "map" ? " is-map-supplement" : ""}`} src={imageUrl} alt={card.title} /> : null}
+      {imageUrl ? (
+        <button className="result-inline-image-button" type="button"
+          aria-label={`Enlarge ${card.title}`} onClick={() => setImageExpanded(true)}>
+          <img className={`result-inline-image${card.surface === "map" ? " is-map-supplement" : ""}`}
+            src={imageUrl} alt={card.title} />
+          <span className="result-image-expand-hint">Click to enlarge</span>
+        </button>
+      ) : null}
+      {imageUrl && imageExpanded ? createPortal(
+        <div className="result-image-dialog" role="dialog" aria-modal="true"
+          aria-label={card.title} onClick={(event) => {
+            if (event.target === event.currentTarget) setImageExpanded(false);
+          }}>
+          <button className="result-image-dialog-close" type="button"
+            aria-label="Close enlarged image" onClick={() => setImageExpanded(false)} autoFocus>×</button>
+          <img className="result-image-dialog-image" src={imageUrl} alt={card.title} />
+        </div>, document.body,
+      ) : null}
       {inlineChart ? <div className={`result-inline-chart ${usesWideInlineChart ? "is-wide" : ""}`}>{inlineChart}</div> : null}
       <p className="result-inline-headline">{card.headline}</p>
       {card.description ? <p className="result-inline-description">{card.description}</p> : null}

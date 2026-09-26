@@ -2897,6 +2897,58 @@ h4 {
   border-radius: var(--radius-sm);
 }
 
+.result-inline-image-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: zoom-in;
+}
+
+.result-inline-image-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.result-image-expand-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
+
+.result-image-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 3rem 1rem 1rem;
+  background: rgba(7, 20, 35, 0.88);
+}
+
+.result-image-dialog-image {
+  display: block;
+  max-width: 96vw;
+  max-height: calc(100vh - 4rem);
+  object-fit: contain;
+}
+
+.result-image-dialog-close {
+  position: fixed;
+  top: 0.75rem;
+  right: 1rem;
+  border: 0;
+  background: transparent;
+  color: white;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .result-inline-image.is-map-supplement {
   max-width: 280px;
   max-height: 200px;
