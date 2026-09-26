@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
@@ -34,19 +35,42 @@ class _BoundedTextLog:
         return self.buffer.result()
 
 
-def _send(fd: int, event: dict) -> None:
+def _send(fd: int | None, event: dict, event_file=None) -> None:
     packet = (json.dumps(event, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
-    while packet:
-        packet = packet[os.write(fd, packet):]
+    if event_file is not None:
+        event_file.write(packet)
+    else:
+        assert fd is not None
+        while packet:
+            packet = packet[os.write(fd, packet):]
+
+
+def _commands(path: str | None):
+    if path is None:
+        yield from sys.stdin
+        return
+    with open(path, encoding="utf-8") as file:
+        while True:
+            line = file.readline()
+            if line:
+                yield line
+            else:
+                time.sleep(0.05)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", required=True)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--event-fd", required=True, type=int)
+    parser.add_argument("--event-fd", type=int)
+    parser.add_argument("--command-file")
+    parser.add_argument("--event-file")
     parser.add_argument("--max-log-bytes", required=True, type=int)
     args = parser.parse_args(argv)
+    if (args.event_fd is None) == (args.event_file is None):
+        parser.error("Exactly one event transport is required")
+    if (args.command_file is None) != (args.event_file is None):
+        parser.error("File commands and events must be used together")
 
     root = Path(args.root)
     records = RunRecords(root, run_id=args.run_id)
@@ -55,8 +79,9 @@ def main(argv: list[str] | None = None) -> int:
     runtime = ModuleType("oceanmind_runtime")
     sys.modules[runtime.__name__] = runtime
     namespace: dict = {"__name__": "__main__", "__package__": None}
+    event_file = open(args.event_file, "ab", buffering=0) if args.event_file else None
     try:
-        for line in sys.stdin:
+        for line in _commands(args.command_file):
             command = json.loads(line)
             if command.get("shutdown"):
                 break
@@ -71,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
                 script = codes.get_path(code_id)
                 stages = StageManager(
                     args.run_id, attempt_id, records=records, retain_events=False,
-                    callback=lambda event: _send(args.event_fd, event),
+                    callback=lambda event: _send(args.event_fd, event, event_file),
                 )
                 tools = AnalysisTools(records, artifacts, stages)
                 runtime.stage, runtime.tools = stage, tools
@@ -95,10 +120,13 @@ def main(argv: list[str] | None = None) -> int:
                 "stdout": out, "stderr": err,
                 "stdout_truncated": out_truncated,
                 "stderr_truncated": err_truncated,
-            })
+            }, event_file)
     finally:
         sys.modules.pop(runtime.__name__, None)
-        os.close(args.event_fd)
+        if args.event_fd is not None:
+            os.close(args.event_fd)
+        if event_file is not None:
+            event_file.close()
     return 0
 
 

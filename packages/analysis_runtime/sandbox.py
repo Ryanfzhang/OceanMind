@@ -1,9 +1,10 @@
-"""Verified macOS Seatbelt and Linux Bubblewrap launchers for analysis scripts.
+"""Verified host isolation for analysis scripts.
 
 The child may read its task directory, explicitly supplied data paths, the
 OceanMind Python source, and the Python/system runtime. It may write only its
 task directory. Network access is denied. The probe runs under the same policy
-before a worker command is returned; unsupported hosts fail closed.
+before a worker command is returned; Windows uses a verified AppContainer
+session instead of a command wrapper. Unsupported hosts fail closed.
 
 This is filesystem and network isolation, not a CPU/memory quota. The parent
 executor must still impose timeouts, log limits, and a clean environment.
@@ -78,7 +79,9 @@ def _validate_data_roots(roots: tuple[Path, ...]) -> None:
     broad = {Path("/"), Path.home().resolve(), Path("/Users"), Path("/home"),
              Path("/private"), Path("/private/tmp"), Path("/var"), Path("/tmp"),
              Path("/import"), Path("/etc"), Path("/usr")}
-    if any(root in broad for root in roots):
+    if os.name == "nt":
+        broad.update(Path(root.anchor) for root in roots)
+    if any(root in broad or _PROJECT_ROOT.is_relative_to(root) for root in roots):
         raise ValueError("Data read roots must be specific files or narrow directories")
 
 
@@ -269,6 +272,15 @@ def verify_sandbox_enforcement(
     Raises SandboxUnavailableError on any unexpected outcome, including an
     outer container forbidding sandbox_apply. No analysis code is then run.
     """
+    if platform.system() == "Windows":
+        from .executor import _child_env
+        from .windows_appcontainer import WindowsAppContainer
+
+        root = _path(writable_root, directory=True)
+        data = [_path(path) for path in allowed_read_roots]
+        sandbox = WindowsAppContainer(root, data, _child_env(root))
+        sandbox.close()
+        return
     linux = platform.system() == "Linux"
     if linux:
         executable, root, data = _linux_configuration(python, writable_root, allowed_read_roots)
@@ -346,6 +358,9 @@ def build_sandbox_command(
     """Return a verified host sandbox worker argv; never a bare Python argv."""
     if not isinstance(worker_args, list) or not all(isinstance(arg, str) for arg in worker_args):
         raise TypeError("worker_args must be a list of strings")
+    if platform.system() == "Windows":
+        raise SandboxUnavailableError(
+            "Windows AppContainer sessions are launched by SessionRunner, not by an argv wrapper")
     if platform.system() == "Linux":
         executable, root, data = _linux_configuration(python, writable_root, allowed_read_roots)
         verify_sandbox_enforcement(executable, root, data)

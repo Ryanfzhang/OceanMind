@@ -17,7 +17,6 @@ from .artifacts import ArtifactStore, _stored_payload
 from .code_store import CodeStore
 from .records import RunRecords
 
-
 EventCallback = Callable[[dict], None]
 Launcher = Callable[[str, list[str], Path, Sequence[Path]], list[str]]
 PREVIEW_LIMIT = 5
@@ -99,15 +98,31 @@ def _child_env(root: Path) -> dict[str, str]:
         (root / name).mkdir(parents=True, exist_ok=True)
     repo = Path(__file__).resolve().parents[2]
     env = {
-        "PATH": "/usr/bin:/bin",
-        "LANG": "C.UTF-8",
-        "HOME": str(root),
-        "TMPDIR": str(root / "tmp"),
         "MPLCONFIGDIR": str(root / ".mplconfig"),
         "PYTHONPATH": str(repo),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONUNBUFFERED": "1",
     }
+    if os.name == "nt":
+        system_root = os.environ.get("SystemRoot", r"C:\Windows")
+        prefixes = dict.fromkeys((Path(sys.prefix), Path(sys.base_prefix)))
+        paths = [path for prefix in prefixes for path in
+                 (prefix / "Library" / "bin", prefix / "DLLs", prefix,
+                  prefix / "Scripts")]
+        paths.extend((Path(system_root) / "System32", Path(system_root)))
+        env.update(PATH=os.pathsep.join(str(path) for path in paths),
+                   SystemRoot=system_root, WINDIR=system_root,
+                   COMSPEC=str(Path(system_root) / "System32" / "cmd.exe"),
+                   HOME=str(root), USERPROFILE=str(root),
+                   HOMEDRIVE=root.drive, HOMEPATH=str(root)[len(root.drive):],
+                   TEMP=str(root / "tmp"), TMP=str(root / "tmp"),
+                   APPDATA=str(root / "appdata"),
+                   LOCALAPPDATA=str(root / "appdata"),
+                   CONDA_PREFIX=sys.prefix)
+        (root / "appdata").mkdir(exist_ok=True)
+    else:
+        env.update(PATH="/usr/bin:/bin", LANG="C.UTF-8", HOME=str(root),
+                   TMPDIR=str(root / "tmp"))
     if sys.platform == "linux":
         env.update(OPENBLAS_NUM_THREADS="4", OMP_NUM_THREADS="4",
                    MKL_NUM_THREADS="4", NUMEXPR_NUM_THREADS="4",
@@ -278,6 +293,16 @@ def run_script(
         raise ValueError("Code store must belong to this run directory")
     script = store.get_path(code_id)  # validates path, ownership, and hash
     roots = [Path(path).expanduser().resolve() for path in allowed_read_roots]
+    if os.name == "nt":
+        runner = SessionRunner(root=root, run_id=run_id, code_store=store,
+                               launcher=launcher, allowed_read_roots=roots,
+                               on_event=on_event, max_log_bytes=max_log_bytes)
+        try:
+            result = runner.run(code_id, timeout_seconds=timeout_seconds)
+            result.pop("environment_lost", None)
+            return result
+        finally:
+            runner.close()
     attempt_id = records.new_attempt(code_version=code_id)
     worker_args = ["-m", "packages.analysis_runtime.worker", "--root", str(root),
                    "--run-id", run_id, "--attempt-id", attempt_id,
@@ -369,11 +394,18 @@ class SessionRunner:
         self.stderr_thread: threading.Thread | None = None
         self.pending = bytearray()
         self.lock = threading.Lock()
+        self.windows_sandbox = None
+        self.command_file: Path | None = None
+        self.event_file: Path | None = None
+        self.event_offset = 0
 
     def _start(self) -> None:
         if self.process is not None and self.process.poll() is None:
             return
         self._stop()
+        if os.name == "nt":
+            self._start_windows()
+            return
         read_fd, write_fd = os.pipe()
         try:
             args = ["-m", "packages.analysis_runtime.session_worker",
@@ -405,7 +437,59 @@ class SessionRunner:
         finally:
             os.close(write_fd)
 
+    def _start_windows(self) -> None:
+        from .windows_appcontainer import WindowsAppContainer
+
+        if self.windows_sandbox is None:
+            self.windows_sandbox = WindowsAppContainer(
+                self.root, self.roots, _child_env(self.root))
+        ipc = self.root / ".analysis_ipc"
+        ipc.mkdir(exist_ok=True)
+        suffix = os.urandom(12).hex()
+        # The worker reads commands but cannot append its own requests: the
+        # code directory is read-only inside the AppContainer.
+        self.command_file = self.root / "code" / f"commands_{suffix}.jsonl"
+        self.event_file = ipc / f"events_{suffix}.jsonl"
+        self.command_file.touch(exist_ok=False)
+        self.event_file.touch(exist_ok=False)
+        self.event_offset = 0
+        self.pending.clear()
+        args = ["-m", "packages.analysis_runtime.session_worker",
+                "--root", str(self.root), "--run-id", self.run_id,
+                "--command-file", str(self.command_file),
+                "--event-file", str(self.event_file),
+                "--max-log-bytes", str(self.max_log_bytes)]
+        self.process = self.windows_sandbox.spawn(args)
+
+    def _read_windows_event(self, remaining: float) -> bytes | None:
+        deadline = time.monotonic() + remaining
+        while True:
+            assert self.event_file is not None
+            with self.event_file.open("rb") as file:
+                file.seek(self.event_offset)
+                chunk = file.read(8192)
+            if chunk:
+                self.event_offset += len(chunk)
+                return chunk
+            if self.process is None or self.process.poll() is not None:
+                return b""
+            delay = min(0.05, deadline - time.monotonic())
+            if delay <= 0:
+                return None
+            time.sleep(delay)
+
     def _stop(self) -> None:
+        if os.name == "nt":
+            process = self.process
+            self.process = None
+            if process is not None:
+                process.close()
+            for path in (self.command_file, self.event_file):
+                if path is not None:
+                    path.unlink(missing_ok=True)
+            self.command_file = self.event_file = None
+            self.pending.clear()
+            return
         process = self.process
         self.process = None
         if process is not None:
@@ -427,6 +511,9 @@ class SessionRunner:
     def close(self) -> None:
         with self.lock:
             self._stop()
+            if self.windows_sandbox is not None:
+                self.windows_sandbox.close()
+                self.windows_sandbox = None
 
     def run(self, code_id: str, timeout_seconds: float = 1800) -> dict:
         if not 0 < timeout_seconds <= 3600:
@@ -439,22 +526,36 @@ class SessionRunner:
             timed_out = False
             try:
                 self._start()
-                assert self.process is not None and self.process.stdin is not None
-                self.process.stdin.write((json.dumps({"attempt_id": attempt_id,
-                                                      "code_id": code_id}) + "\n").encode())
-                self.process.stdin.flush()
+                assert self.process is not None
+                request = (json.dumps({"attempt_id": attempt_id,
+                                       "code_id": code_id}) + "\n").encode()
+                if os.name == "nt":
+                    assert self.command_file is not None
+                    with self.command_file.open("ab") as file:
+                        file.write(request)
+                        file.flush()
+                else:
+                    assert self.process.stdin is not None
+                    self.process.stdin.write(request)
+                    self.process.stdin.flush()
                 deadline = time.monotonic() + timeout_seconds
                 while completion is None:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         timed_out = True
                         break
-                    assert self.read_fd is not None
-                    readable, _, _ = select.select([self.read_fd], [], [], remaining)
-                    if not readable:
-                        timed_out = True
-                        break
-                    chunk = os.read(self.read_fd, 8192)
+                    if os.name == "nt":
+                        chunk = self._read_windows_event(remaining)
+                        if chunk is None:
+                            timed_out = True
+                            break
+                    else:
+                        assert self.read_fd is not None
+                        readable, _, _ = select.select([self.read_fd], [], [], remaining)
+                        if not readable:
+                            timed_out = True
+                            break
+                        chunk = os.read(self.read_fd, 8192)
                     if not chunk:
                         break
                     self.pending.extend(chunk)
@@ -466,7 +567,8 @@ class SessionRunner:
                             continue
                         try:
                             event = json.loads(line)
-                            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                            if (not isinstance(event, dict) or
+                                    not isinstance(event.get("type"), str)):
                                 raise ValueError("Invalid event")
                         except (ValueError, UnicodeDecodeError):
                             counts["invalid"] += 1

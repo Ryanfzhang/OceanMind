@@ -395,17 +395,6 @@ function mergeTiming(current: AssistantMessagePayload, payload: Record<string, u
   };
 }
 
-function planningPhaseLabel(name: string) {
-  const labels: Record<string, string> = {
-    router: "Routing",
-    "memory.planner": "Planner memory",
-    "memory.synthesizer": "Synthesizer memory",
-    analysis_proposal: "Analysis proposal",
-    planning: "Task planning",
-  };
-  return labels[name] ?? name;
-}
-
 function buildClientFailureMessage(message: string) {
   const lowered = message.toLowerCase();
   if (
@@ -689,11 +678,11 @@ export function OceanWorkspaceApp() {
       {
         id: pendingAssistantId,
         role: "assistant",
-        text: "The model is planning the analysis.",
+        text: "Thinking",
         payload: {
           state: "planning",
           preferredLanguage: "en" as const,
-          summary: "The model is planning the analysis.",
+          summary: "Thinking",
           note: "Routing and planning are starting.",
           routingMode: undefined,
           datasetInfo: datasetInfo ?? undefined,
@@ -757,13 +746,11 @@ export function OceanWorkspaceApp() {
             }
 
             if (eventType === "planning_phase") {
-              const phaseName = typeof payload.name === "string" ? payload.name : "";
-              const phaseLabel = planningPhaseLabel(phaseName);
               setMessages((previous) =>
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
                   state: current.state === "completed" || current.state === "failed" ? current.state : "planning",
-                  summary: `${phaseLabel} is running.`,
+                  summary: "Thinking",
                   note: formatTimings(current.timings),
                 }))
               );
@@ -775,7 +762,7 @@ export function OceanWorkspaceApp() {
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
                   state: "planning",
-                  summary: "The model is planning the analysis.",
+                  summary: "Thinking",
                   note: "Deciding whether this needs the active dataset.",
                 }))
               );
@@ -786,12 +773,7 @@ export function OceanWorkspaceApp() {
               setMessages((previous) =>
                 updateAssistantMessage(previous, pendingAssistantId, (current) => ({
                   ...current,
-                  summary:
-                    payload.routing_mode === "dataset_analysis" && current.state === "planning"
-                      ? "Routing complete. Building the execution plan."
-                      : payload.routing_mode === "general_answer" && current.state === "planning"
-                        ? "Routing complete. Preparing an answer."
-                      : current.summary,
+                  summary: current.state === "planning" ? "Thinking" : current.summary,
                   note: typeof payload.reason === "string" ? payload.reason : current.note,
                   routingMode:
                     payload.routing_mode === "dataset_analysis" ||

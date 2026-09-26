@@ -84,6 +84,16 @@ Windows:
 .\start-server.bat
 ```
 
+On Windows, analysis uses the built-in AppContainer API with the current Python
+environment; Docker and WSL are not required. The first analysis request checks
+that Python and the selected dataset are readable, the task directory is
+writable, and private files, network access, and child processes are blocked.
+The Python environment, project source, task directory, and dataset should be
+on NTFS volumes where the server account can update their access rules. If the
+isolation check fails, analysis does not run.
+To run the native Windows acceptance check after installing the optional dev
+dependencies, use `python -m pytest tests/test_e_windows_sandbox.py`.
+
 The launcher installs frontend dependencies and rebuilds the frontend when its
 source changes, then starts both services. Open
 [http://localhost:3000](http://localhost:3000).
