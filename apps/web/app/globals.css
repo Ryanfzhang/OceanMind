@@ -3200,6 +3200,10 @@ h4 {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .web-search-card-header {
@@ -3207,6 +3211,10 @@ h4 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.web-search-card-header > div {
+  min-width: 0;
 }
 
 .web-search-card-header h4 {
@@ -3227,12 +3235,14 @@ h4 {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .web-search-result-row {
   display: block;
   padding-top: 10px;
   border-top: 1px solid var(--border);
+  min-width: 0;
 }
 
 .web-search-result-row:first-child {
@@ -3242,6 +3252,7 @@ h4 {
 
 .web-search-result-body {
   min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 5px;
