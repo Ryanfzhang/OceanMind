@@ -338,7 +338,7 @@ function buildAssistantPayload(response: QueryApiResponse, workspaceData: Worksp
       response.status === "completed"
         ? [response.plan_summary ?? response.router_reason ?? "", timingText].filter(Boolean).join(" ")
         : response.status === "clarification_needed"
-          ? timingText
+          ? ""
           : failureResponse?.note ?? timingText,
     routingMode: response.routing_mode ?? undefined,
     routerConfidence: typeof response.router_confidence === "number" ? response.router_confidence : undefined,

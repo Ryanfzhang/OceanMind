@@ -191,6 +191,33 @@ def test_program_failure_is_explained_by_model_without_backend_response():
     assert model.calls == 2
 
 
+def test_interrupted_run_can_ask_only_for_missing_user_choice():
+    question = "Please draw the section on the map or provide its endpoints."
+
+    class ClarifyingModel:
+        calls = 0
+
+        def complete(self, messages, *, tools, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("clarification step interrupted")
+            assert {item["function"]["name"] for item in tools} == {
+                "request_clarification"
+            }
+            return {"role": "assistant", "content": None, "tool_calls": [
+                call("request_clarification", {"question": question})
+            ]}
+
+    model = ClarifyingModel()
+    state = build_graph(model, max_rounds=6).invoke(initial_state(
+        "Compute 0–60 m transport for 2011–2022 using the drawn section"
+    ))
+    assert state["status"] == "needs_input"
+    assert state["rounds"] == 1
+    assert json.loads(state["messages"][-1]["content"])["question"] == question
+    assert model.calls == 2
+
+
 def test_clarification_and_limits_have_distinct_statuses():
     clarification = {"role": "assistant", "content": None, "tool_calls": [
         call("request_clarification", {"question": "Which dataset?"})

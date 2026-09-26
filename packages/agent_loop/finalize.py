@@ -18,7 +18,7 @@ REQUEST_CLARIFICATION_SCHEMA: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "request_clarification",
-        "description": "Pause for required user input, explain why, and ask one actionable question so the task can resume.",
+        "description": "Pause for one essential user choice. Ask one short question; do not repeat the request or ask for discoverable settings.",
         "parameters": {
             "type": "object",
             "properties": {"question": {"type": "string"}},
@@ -102,10 +102,16 @@ def explain_failure(state: AgentState, model: Any, max_rounds: int) -> AgentStat
         "Write the user-facing explanation yourself from the supplied facts: "
         "what was actually attempted or verified, why work stopped, and the most "
         "useful next step. Distinguish saved results from unfinished work. "
-        "If user input is required, explain why and offer a clearly unconfirmed "
-        "option when useful. Do not invent results, blame the user, or expose "
-        "internal exception names unless they clarify a concrete action. "
-        "Be concise."
+        "If one essential user choice is the only obstacle, call "
+        "request_clarification with one sentence asking only for that choice "
+        "instead of writing "
+        "a failure report. Accept details already stated in the request; do not "
+        "ask the user to confirm settings or data that can be obtained from the "
+        "workspace or available tools. Do not repeat the task or expose internal "
+        "field names in the question. "
+        "Otherwise explain the interruption in "
+        "one or two sentences. Do not invent results, blame the user, or expose "
+        "internal exception names unless they clarify a concrete action."
         + language_instruction(state["language"])
     )
     facts = json.dumps({
@@ -117,9 +123,22 @@ def explain_failure(state: AgentState, model: Any, max_rounds: int) -> AgentStat
         reply = model.complete([
             {"role": "system", "content": prompt},
             {"role": "user", "content": facts},
-        ], tools=[], timeout=20)
+        ], tools=[REQUEST_CLARIFICATION_SCHEMA], timeout=20)
     except Exception:
         return state
+    try:
+        clarification = clarification_request(reply)
+    except ValueError:
+        clarification = None
+    if clarification:
+        call_id, question = clarification
+        observation = {"role": "tool", "tool_call_id": call_id,
+                       "content": json.dumps({"status": "needs_input", "question": question})}
+        return {**state,
+                "messages": [*state["messages"], reply, observation],
+                "rounds": state["rounds"] + 1,
+                "status": "needs_input",
+                "termination_reason": "clarification_requested"}
     content = reply.get("content")
     if not isinstance(content, str) or not content.strip() or reply.get("tool_calls"):
         return state

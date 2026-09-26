@@ -92,6 +92,21 @@ def test_backend_exception_uses_model_authored_failure_response(tmp_path, monkey
     assert "optional analysis setup failed" in model.seen[0][-1]["content"]
 
 
+def test_backend_exception_can_return_only_model_clarification(tmp_path, monkeypatch):
+    def broken_graph(*_args, **_kwargs):
+        raise RuntimeError("analysis setup interrupted")
+
+    monkeypatch.setattr("apps.api.langgraph_query.build_graph", broken_graph)
+    question = "Please draw the section or provide its endpoints."
+    model = ScriptedModel([_clarify(question)])
+    service = QueryService(tmp_path, model_factory=lambda: model, data_roots=lambda: ())
+    result = service.execute(QueryRequest(query="Analyze 0–60 m transport across my drawn section"))
+    assert result["status"] == "clarification_needed"
+    assert result["clarification_question"] == question
+    assert result["synthesis"] is None
+    assert result["missing_fields"] == []
+
+
 def test_ndjson_starts_before_model_completes(tmp_path):
     release = threading.Event()
 
