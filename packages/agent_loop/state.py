@@ -6,7 +6,6 @@ from typing import Any, Literal, TypedDict
 
 from packages.agent_loop.language import Language, preferred_language
 
-
 Message = dict[str, Any]
 RunStatus = Literal["running", "completed", "needs_input", "incomplete", "failed"]
 
@@ -25,6 +24,8 @@ class AgentState(TypedDict):
     draft: str
     language: Language
     answer_active: bool
+    current_query: str
+    turn_start: int
 
 
 def initial_state(
@@ -46,6 +47,8 @@ def initial_state(
         "draft": "",
         "language": language or preferred_language(user_query),
         "answer_active": False,
+        "current_query": user_query,
+        "turn_start": 0,
     }
 
 

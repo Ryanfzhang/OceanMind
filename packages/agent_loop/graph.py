@@ -8,8 +8,8 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from langgraph.graph import END, START, StateGraph
 from langgraph.errors import NodeError
+from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, RetryPolicy
 
 from packages.agent_loop.analysis import (
@@ -19,7 +19,12 @@ from packages.agent_loop.analysis import (
     WRITE_ANALYSIS_SCHEMA,
     AnalysisSession,
 )
-from packages.agent_loop.answer import ANSWER_PROMPT, REQUEST_VERIFICATION_SCHEMA
+from packages.agent_loop.answer import (
+    ANSWER_PROMPT,
+    REQUEST_VERIFICATION_SCHEMA,
+    web_answer_messages,
+    web_evidence_from_turn,
+)
 from packages.agent_loop.finalize import (
     REQUEST_CLARIFICATION_SCHEMA,
     clarification_request,
@@ -44,7 +49,6 @@ from packages.agent_loop.vision import (
     make_view_image,
 )
 from packages.runtime.dataset_config import get_active_dataset_config
-
 
 SYSTEM_PROMPT = (
     "You are OceanMind. For questions that do not need dataset analysis, use "
@@ -276,10 +280,15 @@ def build_graph(
         prompt = ANSWER_PROMPT + language_instruction(state["language"])
         if remaining == 1:
             prompt += "\nThis is the final model decision. Deliver from verified evidence now."
-        messages = hydrate_vision_messages(
-            [{"role": "system", "content": prompt}, *state["messages"]],
-            analysis_session,
-        )
+        current_turn = state["messages"][state.get("turn_start", 0):]
+        web_evidence = web_evidence_from_turn(current_turn)
+        messages = (web_answer_messages(state["current_query"], web_evidence,
+                                        state["language"])
+                    if web_evidence is not None
+                    else hydrate_vision_messages(
+                        [{"role": "system", "content": prompt}, *state["messages"]],
+                        analysis_session,
+                    ))
         reply = answer_model.complete(
             messages,
             tools=[] if remaining == 1 else answer_schemas,

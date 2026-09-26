@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from typing import Any, Literal, TypedDict
-
 
 RouteMode = Literal["workspace_analysis", "web_information", "conversation", "clarification"]
 
@@ -26,7 +26,8 @@ ROUTER_PROMPT = (
     "clarification = essential detail missing; ask one question (weather needs a "
     "location; workspace map is not user location). If answering pending_question, "
     "combine pending_request and latest_request. For web_information set search_query "
-    "to the complete subject/time/place; for clarification set question. Otherwise "
+    "to the complete subject/time/place, resolving relative dates using current_utc_time "
+    "and the location; for clarification set question. Otherwise "
     "leave both null. Ocean data lacking a variable does not prevent web search."
 )
 
@@ -36,7 +37,8 @@ def route_query(
     pending_question: str | None = None, timeout: float | None = None,
 ) -> RouteDecision | None:
     """Use a dedicated model decision; malformed output falls back to normal agent routing."""
-    payload = {"latest_request": query}
+    payload = {"latest_request": query,
+               "current_utc_time": datetime.now(timezone.utc).isoformat(timespec="minutes")}
     if pending_request and pending_question:
         payload.update({"pending_request": pending_request,
                         "pending_question": pending_question})

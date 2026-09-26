@@ -25,6 +25,12 @@ def decision(mode, *, search_query=None, question=None):
     }, ensure_ascii=False)}
 
 
+def call(name, arguments, call_id="call_search"):
+    return {"id": call_id, "type": "function", "function": {
+        "name": name, "arguments": json.dumps(arguments, ensure_ascii=False),
+    }}
+
+
 def test_external_information_searches_even_if_executor_would_skip_it(tmp_path):
     router = ScriptedModel([decision("web_information", search_query="今天香港天气")])
 
@@ -64,6 +70,52 @@ def test_external_information_searches_even_if_executor_would_skip_it(tmp_path):
     assert not executor.seen
     assert len(synthesis.seen) == 1
     assert synthesis.tools_seen == [[]]
+
+
+def test_search_answer_stays_on_latest_question_after_router_fallback(tmp_path):
+    router = ScriptedModel([
+        decision("conversation"),
+        {"role": "assistant", "content": "invalid routing output"},
+    ])
+    executor = ScriptedModel([
+        {"role": "assistant", "content": "CMOMS ends in December 2022."},
+        {"role": "assistant", "content": None, "tool_calls": [
+            call("web_search", {"query": "香港今天天气 香港天文台"}),
+        ]},
+        {"role": "assistant", "content": "The search returned a Hong Kong weather bulletin."},
+    ])
+
+    def weather_answer(messages):
+        assert len(messages) == 2
+        assert "CMOMS" not in json.dumps(messages, ensure_ascii=False)
+        assert "香港今天的天气" in messages[-1]["content"]
+        assert "https://weather.example/hk" in messages[-1]["content"]
+        assert "Current UTC time:" in messages[0]["content"]
+        return {"role": "assistant", "content": "香港今天的天气见天文台预报：https://weather.example/hk"}
+
+    synthesis = ScriptedModel([
+        {"role": "assistant", "content": "CMOMS ends in December 2022."},
+        weather_answer,
+    ])
+    service = QueryService(
+        tmp_path, model_factory=lambda: executor,
+        answer_model_factory=lambda: synthesis,
+        router_model_factory=lambda: router,
+        web_search=lambda **kwargs: {"query": kwargs["query"], "provider": "test", "results": [{
+            "title": "Hong Kong weather", "url": "https://weather.example/hk",
+            "snippet": "Today: sunny, 28 to 32 C", "published_at": "today",
+        }]},
+        data_roots=lambda: (),
+    )
+    first = service.execute(QueryRequest(query="CMOMS 数据到什么时候？"))
+    second = service.execute(QueryRequest(
+        query="我想知道香港今天的天气", conversation_id=first["conversation_id"],
+    ))
+    assert second["status"] == "completed"
+    assert second["router_reason"] is None
+    assert "香港今天的天气" in second["synthesis"]["summary"]
+    assert "CMOMS" not in second["synthesis"]["summary"]
+    assert second["source_cards"][0]["url"] == "https://weather.example/hk"
 
 
 def test_missing_location_clarifies_then_searches_on_resume(tmp_path):
