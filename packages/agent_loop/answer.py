@@ -35,8 +35,6 @@ ANSWER_PROMPT = (
     "line. Confirm a completed image_png result with list_results/read_artifact "
     "before calling a figure attached; a disk path alone is insufficient. If an "
     "explicitly requested static figure is missing, request_verification. "
-    "If the execution requested a Hovmoller climatology, verify that its "
-    "separate result was saved; request_verification if missing. "
     "For current external "
     "facts or requested citations without retrieved web "
     "results, call web_search when needed. Cite useful "
