@@ -84,15 +84,15 @@ Windows:
 .\start-server.bat
 ```
 
-On Windows, analysis uses the built-in AppContainer API with the current Python
-environment; Docker and WSL are not required. The first analysis request checks
-that Python and the selected dataset are readable, the task directory is
-writable, and private files, network access, and child processes are blocked.
-The Python environment, project source, task directory, and dataset should be
-on NTFS volumes where the server account can update their access rules. If the
-isolation check fails, analysis does not run.
-To run the native Windows acceptance check after installing the optional dev
-dependencies, use `python -m pytest tests/test_e_windows_sandbox.py`.
+On Windows, analysis runs directly under your Windows user account by default;
+Docker and WSL are not required. This allows the analysis worker to read the
+same SMB/UNC dataset that the normal viewer can read. Model-generated Python
+has your account's file and network access, so use this mode only for a trusted
+deployment. To opt into AppContainer isolation for data on local NTFS volumes,
+set `OCEANMIND_WINDOWS_ANALYSIS_MODE=appcontainer` in `.env` and restart the
+server. This AppContainer implementation cannot authorize a network-share dataset. Its
+native acceptance check is `python -m pytest tests/test_e_windows_sandbox.py`
+after installing the optional dev dependencies.
 
 The launcher installs frontend dependencies and rebuilds the frontend when its
 source changes, then starts both services. Open

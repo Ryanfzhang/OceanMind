@@ -21,6 +21,15 @@ EventCallback = Callable[[dict], None]
 Launcher = Callable[[str, list[str], Path, Sequence[Path]], list[str]]
 PREVIEW_LIMIT = 5
 MAX_EVENT_LINE = 128 * 1024
+WINDOWS_ANALYSIS_MODE_ENV = "OCEANMIND_WINDOWS_ANALYSIS_MODE"
+
+
+def _windows_analysis_mode() -> str:
+    mode = os.environ.get(WINDOWS_ANALYSIS_MODE_ENV, "unsandboxed").strip().lower()
+    if mode not in {"appcontainer", "unsandboxed"}:
+        raise ValueError(
+            f"{WINDOWS_ANALYSIS_MODE_ENV} must be 'appcontainer' or 'unsandboxed'")
+    return mode
 
 
 class _LogBuffer:
@@ -398,6 +407,7 @@ class SessionRunner:
         self.command_file: Path | None = None
         self.event_file: Path | None = None
         self.event_offset = 0
+        self.windows_unsandboxed = os.name == "nt" and _windows_analysis_mode() == "unsandboxed"
 
     def _start(self) -> None:
         if self.process is not None and self.process.poll() is None:
@@ -438,9 +448,9 @@ class SessionRunner:
             os.close(write_fd)
 
     def _start_windows(self) -> None:
-        from .windows_appcontainer import WindowsAppContainer
+        if not self.windows_unsandboxed and self.windows_sandbox is None:
+            from .windows_appcontainer import WindowsAppContainer
 
-        if self.windows_sandbox is None:
             self.windows_sandbox = WindowsAppContainer(
                 self.root, self.roots, _child_env(self.root))
         ipc = self.root / ".analysis_ipc"
@@ -459,7 +469,21 @@ class SessionRunner:
                 "--command-file", str(self.command_file),
                 "--event-file", str(self.event_file),
                 "--max-log-bytes", str(self.max_log_bytes)]
-        self.process = self.windows_sandbox.spawn(args)
+        if self.windows_unsandboxed:
+            self.process = subprocess.Popen(
+                [sys.executable, *args], cwd=self.root, env=_child_env(self.root),
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            self.worker_stderr = _LogBuffer(self.max_log_bytes)
+            assert self.process.stderr is not None
+            self.stderr_thread = threading.Thread(
+                target=_read_log, args=(self.process.stderr, self.worker_stderr),
+                daemon=True,
+            )
+            self.stderr_thread.start()
+        else:
+            self.process = self.windows_sandbox.spawn(args)
 
     def _read_windows_event(self, remaining: float) -> bytes | None:
         deadline = time.monotonic() + remaining
@@ -483,7 +507,26 @@ class SessionRunner:
             process = self.process
             self.process = None
             if process is not None:
-                process.close()
+                if isinstance(process, subprocess.Popen):
+                    if process.poll() is None:
+                        taskkill = (Path(os.environ.get("SystemRoot", r"C:\Windows")) /
+                                    "System32" / "taskkill.exe")
+                        try:
+                            subprocess.run(
+                                [str(taskkill), "/PID", str(process.pid), "/T", "/F"],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                timeout=10, check=False,
+                            )
+                        except (OSError, subprocess.TimeoutExpired):
+                            pass
+                        if process.poll() is None:
+                            process.kill()
+                    process.wait()
+                else:
+                    process.close()
+            if self.stderr_thread is not None:
+                self.stderr_thread.join(timeout=5)
+                self.stderr_thread = None
             for path in (self.command_file, self.event_file):
                 if path is not None:
                     path.unlink(missing_ok=True)

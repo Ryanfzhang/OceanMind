@@ -34,6 +34,7 @@ _JOB_OBJECT_LIMIT_ACTIVE_PROCESS = 0x00000008
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 _WAIT_OBJECT_0 = 0
 _WAIT_TIMEOUT = 258
+_DRIVE_REMOTE = 4
 
 
 class _SecurityCapabilities(ctypes.Structure):
@@ -159,6 +160,19 @@ def _checked_path(path: Path) -> Path:
     return path.resolve(strict=True)
 
 
+def _is_network_path(path: Path) -> bool:
+    # Detect UNC paths before any SMB stat or ACL operation, and mapped drives
+    # before attempting to grant an AppContainer SID on the remote server.
+    if str(path).startswith("\\\\"):
+        return True
+    if os.name != "nt" or not path.anchor:
+        return False
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetDriveTypeW.argtypes = [wintypes.LPCWSTR]
+    kernel.GetDriveTypeW.restype = wintypes.UINT
+    return kernel.GetDriveTypeW(path.anchor) == _DRIVE_REMOTE
+
+
 def _acl(path: Path, action: str, value: str) -> None:
     result = subprocess.run(
         [_icacls(), str(path), action, value, "/Q"],
@@ -216,6 +230,12 @@ class WindowsAppContainer:
     """One fresh AppContainer identity per query, shared across its attempts."""
 
     def __init__(self, root: Path, data_roots: list[Path], env: dict[str, str]):
+        for path in data_roots:
+            if _is_network_path(path):
+                raise WindowsSandboxUnavailable(
+                    f"The Windows AppContainer cannot authorize the network-share dataset {path}. "
+                    "For a trusted local deployment, set "
+                    "OCEANMIND_WINDOWS_ANALYSIS_MODE=unsandboxed in .env and restart OceanMind.")
         self.root = _checked_path(root)
         self.data_roots = [_checked_path(path) for path in data_roots]
         self.env = env
