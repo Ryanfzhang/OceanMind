@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -7,11 +8,59 @@ import numpy as np
 import xarray as xr
 from PIL import Image
 
-from apps.api.langgraph_progress import ProgressAdapter, _array_preview, _map_payload
+from apps.api.langgraph_progress import ProgressAdapter, _array_preview, _json_preview, _map_payload
 from packages.agent_loop.analysis import AnalysisSession
 from packages.analysis_runtime.figures import PngFigure
 from packages.analysis_runtime.stages import StageManager
 from packages.analysis_runtime.tools import AnalysisTools
+
+
+def test_hovmoller_preview_preserves_agent_supplied_view_metadata(tmp_path):
+    path = tmp_path / "climatology.json"
+    path.write_text(json.dumps({"value": {
+        "time": ["Jan 01", "Jan 02"], "spatial_coord": [0, 10],
+        "values": [[1, 2], [3, 4]], "depth_integrated": [15, 35],
+        "metadata": {
+            "units": "m^2 s^-1", "depth_integrated_units": "m^3 s^-1",
+            "aggregation": "daily_climatology",
+            "aggregation_label": "30-day smoothed daily climatology (730 to 365 days)",
+            "source_time_steps": 730,
+        },
+    }}), encoding="utf-8")
+    renderer, preview = _json_preview(tmp_path, path, "flux climatology")
+    assert renderer == "hovmoller"
+    assert preview["hovmollerDisplayInfo"] == {
+        "aggregation": "daily_climatology",
+        "aggregationLabel": "30-day smoothed daily climatology (730 to 365 days)",
+        "originalColumns": 730, "displayColumns": 2,
+        "units": "m^2 s^-1", "depthIntegratedUnits": "m^3 s^-1",
+    }
+    assert preview["hovmollerDepthIntegratedSeries"] == [
+        {"label": "Jan 01", "value": 15.0},
+        {"label": "Jan 02", "value": 35.0},
+    ]
+
+
+def test_hovmoller_raw_and_climatology_are_separate_results(tmp_path):
+    session = AnalysisSession(tmp_path)
+    attempt = session.records.new_attempt()
+    stage = session.records.new_stage(attempt, "Analyze time-depth flux")
+    raw = session.artifacts.publish("normal_flux", {
+        "time": ["2011-01-01", "2011-01-02"], "spatial_coord": [0, 10],
+        "values": [[1, 2], [3, 4]], "metadata": {"units": "m^2 s^-1"},
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[])
+    climate = session.artifacts.publish("flux_climatology", {
+        "time": ["Jan 01", "Jan 02"], "spatial_coord": [0, 10],
+        "values": [[2, 3], [4, 5]],
+        "metadata": {"aggregation": "daily_climatology", "units": "m^2 s^-1"},
+    }, run_id=session.run_id, attempt_id=attempt, stage_id=stage, inputs=[raw])
+    adapter = ProgressAdapter(session)
+    for artifact in (raw, climate):
+        adapter.on_event({"type": "stage_result_indexed", "stage_id": stage,
+                          "entry": {"status": "completed", "artifact_id": artifact}})
+    results = adapter.finalize()["result_cards"]
+    assert {result["id"] for result in results} == {raw, climate}
+    assert [result["renderer"] for result in results] == ["hovmoller", "hovmoller"]
 
 
 def test_map_previews_keep_an_isolated_native_grid_extremum(tmp_path, monkeypatch):

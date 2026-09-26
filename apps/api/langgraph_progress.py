@@ -446,15 +446,40 @@ def _json_preview(root: Any, path: Any, name: str) -> tuple[str, dict] | None:
         values = _preview_values(value["values"], root)
         time, coordinate = value["time"], value["spatial_coord"]
         if np.ndim(values) == 2 and np.shape(values) == (len(time), len(coordinate)):
+            metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
             time_step = max(1, math.ceil(len(time) / PREVIEW_GRID_SIDE))
             coord_step = max(1, math.ceil(len(coordinate) / PREVIEW_GRID_SIDE))
-            sampled = np.asarray(values[::time_step, ::coord_step], dtype=float)
+            sampled = np.asarray(values, dtype=float)[::time_step, ::coord_step]
             rows = [{"depthLabel": str(label), "depthValue": float(label),
                      "values": [float(number) if math.isfinite(number) else None for number in sampled[:, i]]}
                     for i, label in enumerate(coordinate[::coord_step])]
             if rows:
-                return "hovmoller", {"hovmollerRows": rows,
-                                     "hovmollerTimeLabels": [str(t)[:19] for t in time[::time_step]]}
+                labels = [str(t)[:19] for t in time[::time_step]]
+                aggregation = str(metadata.get("aggregation") or "none")
+                label = str(metadata.get("aggregation_label") or (
+                    "Original time steps" if aggregation == "none" else aggregation.replace("_", " ")))
+                if time_step > 1:
+                    label += f" · preview: {len(labels)} of {len(time)} time steps"
+                display_info = {
+                    "aggregation": aggregation,
+                    "aggregationLabel": label,
+                    "originalColumns": metadata.get("source_time_steps") or len(time),
+                    "displayColumns": len(labels),
+                    "units": str(metadata.get("units") or metadata.get("unit") or ""),
+                    "depthIntegratedUnits": str(metadata.get("depth_integrated_units") or ""),
+                }
+                workspace = {"hovmollerRows": rows, "hovmollerTimeLabels": labels,
+                             "hovmollerDisplayInfo": display_info}
+                integrated = value.get("depth_integrated")
+                if integrated is not None:
+                    integrated = np.asarray(_preview_values(integrated, root), dtype=float)
+                    if integrated.ndim == 1 and len(integrated) == len(time):
+                        sampled_integrated = integrated[::time_step]
+                        if np.all(np.isfinite(sampled_integrated)):
+                            workspace["hovmollerDepthIntegratedSeries"] = [
+                                {"label": label, "value": float(number)}
+                                for label, number in zip(labels, sampled_integrated)]
+                return "hovmoller", workspace
     if isinstance(value.get("distance_km"), list) and "values" in value:
         values = _preview_values(value["values"], root)
         if np.ndim(values) == 3:

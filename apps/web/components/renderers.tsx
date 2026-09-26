@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { colormapRGB, useMapFieldImageUrl } from "../lib/map-field-preview";
 import { MapColorbar } from "./map-colorbar";
 import {
@@ -511,10 +511,13 @@ function buildHovmollerContourLabels(
     });
     const best = bestRef.value;
     if (best) {
+      const x = clamp(best.x, HOVMOLLER_CONTOUR_LABEL_MARGIN_X, Math.max(HOVMOLLER_CONTOUR_LABEL_MARGIN_X, plotWidth - HOVMOLLER_CONTOUR_LABEL_MARGIN_X));
+      const y = clamp(best.y, HOVMOLLER_CONTOUR_LABEL_MARGIN_Y, Math.max(HOVMOLLER_CONTOUR_LABEL_MARGIN_Y, plotHeight - HOVMOLLER_CONTOUR_LABEL_MARGIN_Y));
+      if (labels.some((label) => Math.abs(label.x - x) < 50 && Math.abs(label.y - y) < 16)) return;
       labels.push({
         level: targetLevel,
-        x: clamp(best.x, HOVMOLLER_CONTOUR_LABEL_MARGIN_X, Math.max(HOVMOLLER_CONTOUR_LABEL_MARGIN_X, plotWidth - HOVMOLLER_CONTOUR_LABEL_MARGIN_X)),
-        y: clamp(best.y, HOVMOLLER_CONTOUR_LABEL_MARGIN_Y, Math.max(HOVMOLLER_CONTOUR_LABEL_MARGIN_Y, plotHeight - HOVMOLLER_CONTOUR_LABEL_MARGIN_Y)),
+        x,
+        y,
         text: formatValue(targetLevel),
       });
     }
@@ -1433,6 +1436,9 @@ function HovmollerChart({
   timeLabels?: WorkspaceData["hovmollerTimeLabels"];
   depthIntegratedSeries?: WorkspaceData["hovmollerDepthIntegratedSeries"];
 }) {
+  const gradientId = useId();
+  const plotClipId = useId();
+  const hasIntegratedSeries = depthIntegratedSeries.length > 0;
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [hoverState, setHoverState] = useState<{
     row: number;
@@ -1444,7 +1450,7 @@ function HovmollerChart({
   const [heatmapUrl, setHeatmapUrl] = useState<string>("");
   const frame = {
     width: 640,
-    height: 440,
+    height: hasIntegratedSeries ? 440 : 330,
     paddingTop: 18,
     paddingRight: 84,
     paddingBottom: 14,
@@ -1454,7 +1460,7 @@ function HovmollerChart({
   const plotHeight = 246;
   const curveTop = frame.paddingTop + plotHeight + 34;
   const curveHeight = 82;
-  const timeTickY = curveTop + curveHeight + 24;
+  const timeTickY = hasIntegratedSeries ? curveTop + curveHeight + 24 : frame.paddingTop + plotHeight + 28;
   const timeAxisY = frame.height - 4;
 
   const filteredRows = useMemo(
@@ -1562,12 +1568,12 @@ function HovmollerChart({
   const hoveredTime = hoverState ? resolvedTimeLabels[hoverState.col] : null;
   const hoverOverlayX = hoverState ? frame.paddingLeft + hoverState.plotX : null;
   const hoverOverlayY = hoverState ? frame.paddingTop + hoverState.plotY : null;
-  const displaySubtitle =
-    displayInfo?.aggregation && displayInfo.aggregation !== "none"
-      ? `${displayInfo.aggregationLabel} (${displayInfo.originalColumns} to ${displayInfo.displayColumns} steps)`
-      : "Original time steps";
-  const units = displayInfo?.units || "s^-1";
-  const integratedUnits = displayInfo?.depthIntegratedUnits || `${units} m`;
+  const displaySubtitle = displayInfo?.aggregationLabel || "Original time steps";
+  const units = displayInfo?.units || "";
+  const integratedUnits = displayInfo?.depthIntegratedUnits || (units ? `${units} m` : "");
+  const firstYear = resolvedTimeLabels[0]?.match(/^(\d{4})-/)?.[1];
+  const lastYear = resolvedTimeLabels[resolvedTimeLabels.length - 1]?.match(/^(\d{4})-/)?.[1];
+  const spansYears = Boolean(firstYear && lastYear && firstYear !== lastYear);
   const integratedPoints = depthIntegratedSeries.slice(0, nColumns).map((point, index) => ({
     label: point.label || resolvedTimeLabels[index] || `t${index + 1}`,
     value: point.value,
@@ -1614,7 +1620,7 @@ function HovmollerChart({
           <div className="chart-readout-values">
             <span>Min: {formatValue(valueMin)}</span>
             <span>Max: {formatValue(valueMax)}</span>
-            <span>{units}</span>
+            {units ? <span>{units}</span> : null}
             {Number.isFinite(integratedMean) ? <span>Integral mean: {formatValue(integratedMean)}</span> : null}
           </div>
         </div>
@@ -1622,6 +1628,7 @@ function HovmollerChart({
 
       <div
         className="detail-chart-shell"
+        style={{ aspectRatio: hasIntegratedSeries ? "704 / 440" : "704 / 330" }}
         onMouseLeave={() => setHoverState(null)}
         onMouseMove={(event) => {
           const svg = svgRef.current;
@@ -1649,12 +1656,12 @@ function HovmollerChart({
       >
         <svg ref={svgRef} viewBox={`0 0 ${svgViewWidth} ${svgViewHeight}`} aria-hidden="true">
           <defs>
-            <linearGradient id="hov-colorbar-grad" x1="0" x2="0" y1="1" y2="0">
+            <linearGradient id={gradientId} x1="0" x2="0" y1="1" y2="0">
               {colorbarStops.map(({ t, color }) => (
                 <stop key={t} offset={`${t * 100}%`} stopColor={color} />
               ))}
             </linearGradient>
-            <clipPath id="hov-plot-clip">
+            <clipPath id={plotClipId}>
               <rect x={frame.paddingLeft} y={frame.paddingTop} width={plotWidth} height={plotHeight} />
             </clipPath>
           </defs>
@@ -1671,7 +1678,7 @@ function HovmollerChart({
             />
           ) : null}
 
-          <g clipPath="url(#hov-plot-clip)" pointerEvents="none">
+          <g clipPath={`url(#${plotClipId})`} pointerEvents="none">
             {contourLabels.map((label, index) => (
               <text
                 key={`${label.level}-${index}`}
@@ -1708,29 +1715,27 @@ function HovmollerChart({
             const x = frame.paddingLeft + (mapped + 0.5) * cellWidth;
             return (
               <text key={`t-${mapped}`} className="chart-axis-label" x={x} y={timeTickY} textAnchor="middle" fill="#64748b">
-                {formatCompactTimeLabel(resolvedTimeLabels[mapped] ?? `t${mapped + 1}`)}
+                {spansYears ? (resolvedTimeLabels[mapped] ?? "").slice(0, 10) : formatCompactTimeLabel(resolvedTimeLabels[mapped] ?? `t${mapped + 1}`)}
               </text>
             );
           })}
 
           {hoverOverlayX !== null && hoverOverlayY !== null ? (
             <>
-              <line x1={hoverOverlayX} x2={hoverOverlayX} y1={frame.paddingTop} y2={frame.paddingTop + plotHeight} stroke="rgba(15,23,42,0.45)" strokeWidth={1} strokeDasharray="4 3" clipPath="url(#hov-plot-clip)" />
-              <line x1={frame.paddingLeft} x2={frame.paddingLeft + plotWidth} y1={hoverOverlayY} y2={hoverOverlayY} stroke="rgba(15,23,42,0.45)" strokeWidth={1} strokeDasharray="4 3" clipPath="url(#hov-plot-clip)" />
+              <line x1={hoverOverlayX} x2={hoverOverlayX} y1={frame.paddingTop} y2={frame.paddingTop + plotHeight} stroke="rgba(15,23,42,0.45)" strokeWidth={1} strokeDasharray="4 3" clipPath={`url(#${plotClipId})`} />
+              <line x1={frame.paddingLeft} x2={frame.paddingLeft + plotWidth} y1={hoverOverlayY} y2={hoverOverlayY} stroke="rgba(15,23,42,0.45)" strokeWidth={1} strokeDasharray="4 3" clipPath={`url(#${plotClipId})`} />
             </>
           ) : null}
 
           <rect x={frame.paddingLeft} y={frame.paddingTop} width={plotWidth} height={plotHeight} fill="none" stroke="rgba(100,116,139,0.45)" strokeWidth={0.8} />
-          <rect x={colorbarX} y={frame.paddingTop} width={colorbarW} height={colorbarH} fill="url(#hov-colorbar-grad)" rx={2} />
+          <rect x={colorbarX} y={frame.paddingTop} width={colorbarW} height={colorbarH} fill={`url(#${gradientId})`} rx={2} />
           <text className="chart-axis-label" x={colorbarLabelX} y={frame.paddingTop - 4} textAnchor="middle" fill="#64748b">
             {formatValue(valueMax)}
           </text>
           <text className="chart-axis-label" x={colorbarLabelX} y={frame.paddingTop + colorbarH + 14} textAnchor="middle" fill="#64748b">
             {formatValue(valueMin)}
           </text>
-          <text className="chart-axis-title" x={colorbarUnitX} y={frame.paddingTop + colorbarH / 2} textAnchor="middle" transform={`rotate(90 ${colorbarUnitX} ${frame.paddingTop + colorbarH / 2})`}>
-            {units}
-          </text>
+          {units ? <text className="chart-axis-title" x={colorbarUnitX} y={frame.paddingTop + colorbarH / 2} textAnchor="middle" transform={`rotate(90 ${colorbarUnitX} ${frame.paddingTop + colorbarH / 2})`}>{units}</text> : null}
           <text className="chart-axis-title" x={24} y={frame.paddingTop + plotHeight / 2} textAnchor="middle" transform={`rotate(-90 24 ${frame.paddingTop + plotHeight / 2})`}>
             Depth (m)
           </text>
