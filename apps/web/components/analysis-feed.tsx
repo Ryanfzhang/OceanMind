@@ -20,7 +20,7 @@ import { renderDockPanel, renderInlineChart } from "@/components/renderers";
 import { shouldShowExecutionProgress } from "@/lib/assistant-display";
 import { buildCompletedSummaryContent } from "@/lib/assistant-summary";
 import { evidenceLinkedPolicyCardsForDisplay } from "@/lib/policy-guidance-display";
-import { displayLooseResults, displayStepDetails, displayStepTimeline, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
+import { displayLooseResults, displayStepDetails, displayStepTimeline, latestFigureResultIds, shouldShowStepFallbackInterpretation } from "@/lib/step-card-state";
 import { normalizeWorkspaceData } from "@/lib/workspace-results";
 
 type QuerySubmitOptions = {
@@ -370,8 +370,17 @@ function AssistantBlock({
   const elapsedSeconds = typeof payload?.workflowStartedAt === "number"
     ? Math.max(0, Math.floor(((payload.workflowFinishedAt ?? clockNow) - payload.workflowStartedAt) / 1000))
     : null;
-  const stepCards = payload?.stepCards ?? [];
-  const resultCards = payload?.resultCards ?? [];
+  const allStepCards = payload?.stepCards ?? [];
+  const allResultCards = payload?.resultCards ?? [];
+  const currentFigures = latestFigureResultIds(
+    allResultCards, allStepCards, payload?.state === "completed",
+  );
+  const keepResult = (card: ResultCardSummary) =>
+    card.type !== "image_png" || currentFigures.has(card.id);
+  const stepCards = allStepCards.map((step) => ({
+    ...step, results: step.results.filter(keepResult),
+  }));
+  const resultCards = allResultCards.filter(keepResult);
   const figureAttachments = resultCards.filter((card) => card.type === "image_png");
   const terminal = payload?.state === "completed" || payload?.state === "failed";
   const visibleSteps = displayStepTimeline(stepCards, terminal);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { displayLooseResults, displayStepDetails, displayStepTimeline, formatStepProgressText } from "../lib/step-card-state";
+import { displayLooseResults, displayStepDetails, displayStepTimeline, formatStepProgressText, latestFigureResultIds } from "../lib/step-card-state";
 import type { ResultCardSummary, StepCard } from "../lib/types";
 
 function step(id: string, label: string, status: StepCard["status"], attempt_id: string): StepCard {
@@ -77,6 +77,27 @@ test("two genuine same-name stages in one attempt remain visible", () => {
     withVisual(step("map_day_2", "Compute map", "completed", "attempt_1")),
   ], true);
   assert.deepEqual(visible.map((item) => item.step_id), ["map_day_1", "map_day_2"]);
+});
+
+test("later revisions replace the same figure but keep distinct scopes", () => {
+  const figure = (id: string, headline: string, attemptIndex: number): ResultCardSummary => ({
+    id, title: "Daily mean line", type: "image_png", headline,
+    description: "", renderer: "summary", metrics: [], attemptIndex,
+  });
+  const old = figure("old", "2011-01-01 to 2011-01-07", 0);
+  const revised = figure("revised", old.headline, 1);
+  const final = figure("final", old.headline, 2);
+  const other = figure("other_region", "2011-01-01 to 2011-01-07, South China Sea", 2);
+  const steps = [
+    { ...step("render_old", "Render chart", "completed", "attempt_1"), results: [old] },
+    { ...step("render_final", "Fix labels", "completed", "attempt_3"), results: [final] },
+  ];
+  assert.equal(latestFigureResultIds([old, revised, final, other], steps, false).size, 0);
+  const current = latestFigureResultIds([old, revised, final, other], steps, true);
+  assert.deepEqual([...current].sort(), ["final", "other_region"]);
+  assert.deepEqual(displayStepTimeline(steps.map((item) => ({
+    ...item, results: item.results.filter((result) => current.has(result.id)),
+  })), true).map((item) => item.step_id), ["render_final"]);
 });
 
 test("failed and unfinished stages never appear as cards", () => {

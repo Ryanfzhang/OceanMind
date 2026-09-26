@@ -85,6 +85,24 @@ export function mergeStepCardLists(existingCards: StepCard[], incomingCards: Ste
   );
 }
 
+export function latestFigureResultIds(
+  resultCards: ResultCardSummary[], stepCards: StepCard[], complete: boolean,
+): Set<string> {
+  if (!complete) return new Set();
+  const all = new Map<string, ResultCardSummary>();
+  for (const card of stepCards.flatMap((step) => step.results).concat(resultCards)) {
+    if (card.type === "image_png") all.set(card.id, card);
+  }
+  const ordered = [...all.values()].sort((left, right) =>
+    (left.attemptIndex ?? 0) - (right.attemptIndex ?? 0));
+  const latest = new Map<string, string>();
+  for (const card of ordered) {
+    const key = `${card.title.trim().toLocaleLowerCase()}\u0000${card.headline.trim().toLocaleLowerCase()}`;
+    latest.set(key, card.id);
+  }
+  return new Set(latest.values());
+}
+
 export function displayStepTimeline(stepCards: StepCard[], _terminal: boolean): StepCard[] {
   const completed = stepCards.filter((step) => step.status === "completed");
   const visualResults = completed.filter((step) => step.results.some((result) =>
